@@ -31,8 +31,12 @@ bot.on('message', async (ctx) => {
     if (ctx.msg.reply_to_message?.from?.id === bot.botInfo.id
         || msg.match(new RegExp(names.join('|'), 'gmi'))
         || random > 90) {
-        console.log(`- from ${ctx.from.first_name}`)
+        console.log(`- from ${ctx.from.first_name}`);
         const response = await ask(msg);
+
+        response.replaceAll(/you\.com/gmi, 'слерок')
+        response.replaceAll(/youchat/gmi, 'слерокус')
+
         await ctx.reply(response, {
             reply_to_message_id: ctx.msg.message_id,
         });
