@@ -41,7 +41,6 @@ bot.on('message', async (ctx) => {
             reply_to_message_id: ctx.msg.message_id,
         });
     }
-
 });
 
 void bot.start();
