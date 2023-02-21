@@ -71,13 +71,14 @@ bot.on('message', async ctx => {
     }
 
     const direct = ctx.msg.reply_to_message?.from?.id === bot.botInfo.id
-        || text.match(new RegExp(NAMES.join('|'), 'gmi'));
+        || text.match(new RegExp(NAMES.join('|'), 'gmi'))
+        || ctx.chat.id === ctx.from.id;
     const random = Math.floor(Math.random() * 100) + 1 > 100 - RANDOM_REPLY;
 
 
     let reply: ChatMessage | undefined;
 
-    if (direct || random || ctx.chat.id === ctx.from.id) {
+    if (direct || random) {
         let context = '';
 
         // Construct context
@@ -116,13 +117,13 @@ bot.on('message', async ctx => {
             throw new Werror(error);
         }
 
-        console.log('reply: ' + response);
-
         response = response.replaceAll(/you\.com/gmi, CREATOR);
         response = response.replaceAll(/youchat/gmi, CREATOR);
         response = response.replaceAll(/youbot/gmi, CREATOR);
         response = response.trim().replaceAll(/^> /gmi, '');
         response = response.replaceAll(/\*\*/gmi, '');
+
+        console.log('reply: ' + response);
 
         const res = await ctx.reply(response, {
             reply_to_message_id: ctx.msg.message_id,
