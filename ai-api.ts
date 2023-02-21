@@ -28,8 +28,7 @@ export default async function ask(question: string): Promise<string> {
     }
 
     if (data.error) {
-        // TODO: This is not, how it should be
-        return data.error;
+        throw new Werror('uapi response: ' + data.error);
     }
 
     return data.data;
