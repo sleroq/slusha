@@ -1,6 +1,7 @@
 import { Bot } from 'https://deno.land/x/grammy@v1.14.1/mod.ts';
-import ask from "./ai-api.ts";
-import Werror from "./lib/werror.ts";
+import ask from './ai-api.ts';
+import Werror from './lib/werror.ts';
+import { delay } from 'https://deno.land/std@0.177.0/async/mod.ts';
 
 const token = Deno.env.get('BOT_TOKEN');
 if (!token)
@@ -52,7 +53,7 @@ bot.on('message', async ctx => {
     if (!text) { return; }
     if (text.length > 180) { text = text.slice(0, 177) + '...'; }
 
-    let history = chats[ctx.msg.chat.id] || [];
+    let history = chats[ctx.chat.id] || [];
 
     // Filter out irrelevant messages
     history = history.filter(el => new Date().getDate() - el.date <= CONTEXT_RELEVANCE * 60 * 1000);
@@ -76,7 +77,7 @@ bot.on('message', async ctx => {
 
     let reply: ChatMessage | undefined;
 
-    if (direct || random) {
+    if (direct || random || ctx.chat.id === ctx.from.id) {
         let context = '';
 
         // Construct context
@@ -103,6 +104,7 @@ bot.on('message', async ctx => {
                 break;
             } catch (err) {
                 error = err;
+                await delay(2000);
             }
         }
 
@@ -116,10 +118,11 @@ bot.on('message', async ctx => {
 
         console.log('reply: ' + response);
 
-        response.replaceAll(/you\.com/gmi, CREATOR);
-        response.replaceAll(/youchat/gmi, CREATOR);
-        response.replaceAll(/youbot/gmi, CREATOR);
-        response.replaceAll(/^> /gmi, '');
+        response = response.replaceAll(/you\.com/gmi, CREATOR);
+        response = response.replaceAll(/youchat/gmi, CREATOR);
+        response = response.replaceAll(/youbot/gmi, CREATOR);
+        response = response.trim().replaceAll(/^> /gmi, '');
+        response = response.replaceAll(/\*\*/gmi, '');
 
         const res = await ctx.reply(response, {
             reply_to_message_id: ctx.msg.message_id,
@@ -137,7 +140,7 @@ bot.on('message', async ctx => {
         history.push(reply);
     }
 
-    chats[ctx.msg.chat.id] = history;
+    chats[ctx.chat.id] = history;
 });
 
 void bot.start();
