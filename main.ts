@@ -7,13 +7,12 @@ const token = Deno.env.get('BOT_TOKEN');
 if (!token)
     throw new Error('BOT_TOKEN env is not set')
 
-const CONTEXT_LIMIT = 5;
-const CONTEXT_RELEVANCE = 10; // In minutes
+const CONTEXT_LIMIT = 8;
+const CONTEXT_RELEVANCE = 5; // In minutes
 const RETRIES = 2;
-const RANDOM_REPLY = 10; // Percentage of messages bot will reply by itself
-const CREATOR = 'слерокус';
+const RANDOM_REPLY = 4; // Percentage of messages bot will reply by itself
+const CREATOR = '@sleroq labs';
 const NAMES = [
-    'сыл',
     'слерок',
     'слюша',
     'шлюша',
@@ -22,7 +21,6 @@ const NAMES = [
     'sleroq',
     'слиперок',
     'sleeper',
-    'sl',
 ];
 const nepons = [
     'непон.. попробуй перефразировать',
@@ -30,6 +28,19 @@ const nepons = [
     'нехочу отвечать щас чето',
     'подумаю, может потом тебе скажу',
 ];
+const tendToIgnore = [
+    'ор',
+    'ору',
+    'ха',
+    'ебать',
+    'пон',
+    'хорошо',
+    'ок',
+    'лан',
+    'спс',
+    'да',
+    'согласен',
+]
 
 interface ChatMessage {
     sender: string;
@@ -51,12 +62,12 @@ bot.command('start', ctx => ctx.reply('Привет! Я Слюша, бот-ге�
 bot.on('message', async ctx => {
     let text = await ctx.msg.text;
     if (!text) { return; }
-    if (text.length > 180) { text = text.slice(0, 177) + '...'; }
+    if (text.length > 160) { text = text.slice(0, 177) + '...'; }
 
     let history = chats[ctx.chat.id] || [];
 
     // Filter out irrelevant messages
-    history = history.filter(el => new Date().getDate() - el.date <= CONTEXT_RELEVANCE * 60 * 1000);
+    history = history.filter(el => new Date().getDate() - el.date < CONTEXT_RELEVANCE * 60 * 1000);
 
     // Save received message
     let message: ChatMessage = {
@@ -73,13 +84,18 @@ bot.on('message', async ctx => {
     const direct = ctx.msg.reply_to_message?.from?.id === bot.botInfo.id
         || text.match(new RegExp(NAMES.join('|'), 'gmi'))
         || ctx.chat.id === ctx.from.id;
-    const random = Math.floor(Math.random() * 100) + 1 > 100 - RANDOM_REPLY;
+    const random = getRandomInt(0, 100) > 100 - RANDOM_REPLY;
+    const ignored = text.length < 10
+        && text.match(new RegExp(`^(${tendToIgnore.join('|')})`, 'gmi'))
+        && getRandomInt(0, 100) > 30;
 
 
     let reply: ChatMessage | undefined;
 
-    if (direct || random) {
+    if ((direct || random) && !ignored) {
         let context = '';
+        let response = '';
+        void typing()
 
         // Construct context
         history.forEach(m => {
@@ -96,7 +112,6 @@ bot.on('message', async ctx => {
 
         console.log('prompt: ' + prompt);
 
-        let response;
         let error;
 
         for (let i=0; i<RETRIES; i++) {
@@ -112,7 +127,9 @@ bot.on('message', async ctx => {
         if (!response) {
             if (!random && text.endsWith('?')) {
                 let idk = nepons[Math.floor(Math.random() * nepons.length)];
-                await ctx.reply(idk);
+                await ctx.reply(idk, {
+                    reply_to_message_id: ctx.msg.message_id,
+                });
             }
             throw new Werror(error);
         }
@@ -121,19 +138,40 @@ bot.on('message', async ctx => {
         response = response.replaceAll(/youchat/gmi, CREATOR);
         response = response.replaceAll(/youbot/gmi, CREATOR);
         response = response.trim().replaceAll(/^> /gmi, '');
-        response = response.replaceAll(/\*\*/gmi, '');
 
         console.log('reply: ' + response);
 
-        const res = await ctx.reply(response, {
-            reply_to_message_id: ctx.msg.message_id,
-        });
+        let res;
+        try {
+            res = await ctx.reply(response, {
+                reply_to_message_id: ctx.msg.message_id,
+                parse_mode: 'Markdown',
+            });
+        } catch (err) { // Retry without markdown
+            res = await ctx.reply(response, {
+                reply_to_message_id: ctx.msg.message_id,
+            });
+        }
 
         reply = {
             sender: bot.botInfo.first_name,
             date: res.date,
             text: response,
         }
+
+        async function typing() {
+            let i = 0;
+            while (!response && i > 4) {
+                try {
+                    await ctx.replyWithChatAction('typing');
+                } catch (err) {
+                    break;
+                }
+                await delay(5000);
+                i++;
+            }
+        }
+
     }
 
     history.push(message);
@@ -143,5 +181,11 @@ bot.on('message', async ctx => {
 
     chats[ctx.chat.id] = history;
 });
+
+function getRandomInt(min: number, max: number) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min) + min); // The maximum is exclusive and the minimum is inclusive
+}
 
 void bot.start();
