@@ -161,7 +161,7 @@ bot.on('message', async ctx => {
 
         async function typing() {
             let i = 0;
-            while (!response && i > 4) {
+            while (!response && i < 4) {
                 try {
                     await ctx.replyWithChatAction('typing');
                 } catch (err) {
