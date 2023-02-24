@@ -32,6 +32,7 @@ const tendToIgnore = [
     'ор',
     'ору',
     'ха',
+    'лол',
     'ебать',
     'пон',
     'хорошо',
@@ -40,6 +41,9 @@ const tendToIgnore = [
     'спс',
     'да',
     'согласен',
+    'база',
+    '+',
+    '/q',
 ]
 
 interface ChatMessage {
