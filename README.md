@@ -1,11 +1,13 @@
-# Maidass
+# Slusha
 
-My simple telegram chat bot
+Smartest girl in your telegram group
+
+> Try it out - t.me/sl_chatbot
 
 ## Requirements
 
 - deno
-- AI on localhost:3000/api/ (like this one https://github.com/sleroq/uapi)
+- opanAI-like API for AI reponses
 
 ## Preparation
 
