@@ -1,26 +1,34 @@
-import { Bot } from 'https://deno.land/x/grammy@v1.14.1/mod.ts';
-import ask from './ai-api.ts';
+import { Bot, Context } from 'https://deno.land/x/grammy@v1.14.1/mod.ts';
+import AIApi from './ai-api.ts';
 import Werror from './lib/werror.ts';
 import { delay } from 'https://deno.land/std@0.177.0/async/mod.ts';
+import { getRandomInt, resolveEnv } from './helpers.ts';
+import { Chat, Message, Update } from "https://deno.land/x/grammy@v1.14.1/types.deno.ts";
 
 const token = Deno.env.get('BOT_TOKEN');
-if (!token)
-    throw new Error('BOT_TOKEN env is not set')
+if (!token) {
+    throw new Error('BOT_TOKEN env is not set');
+}
 
-const CONTEXT_LIMIT = 8;
-const CONTEXT_RELEVANCE = 5; // In minutes
+const CONTEXT_LIMIT = 50;
+const CONTEXT_RELEVANCE = 50; // In minutes
 const RETRIES = 2;
-const RANDOM_REPLY = 4; // Percentage of messages bot will reply by itself
-const CREATOR = '@sleroq labs';
+const RANDOM_REPLY = 1; // Percentage of messages bot will reply by itself
+
 const NAMES = [
-    'слерок',
     'слюша',
     'шлюша',
+];
+const tendToReply = [
     'sleeper',
     'слипер',
     'sleroq',
     'слиперок',
     'sleeper',
+    'слерок',
+    'бот',
+    'ботик',
+    'лучшая девочка',
 ];
 const nepons = [
     'непон.. попробуй перефразировать',
@@ -42,12 +50,19 @@ const tendToIgnore = [
     'да',
     'согласен',
     'база',
-    '+',
     '/q',
-]
-
-interface ChatMessage {
-    sender: string;
+];
+interface Sender {
+    name: string;
+    username: string | undefined;
+    myself?: boolean;
+}
+export interface ChatMessage {
+    sender: Sender;
+    replyTo?: {
+        sender: Sender;
+        text: string;
+    };
     date: number;
     text: string;
 }
@@ -59,68 +74,51 @@ const chats: TalkContext = {};
 
 const bot = new Bot(token);
 
-bot.catch(error => console.log(error));
+const environment = resolveEnv()
+const Api = new AIApi(
+    environment.url,
+    environment.prompt,
+    environment.model,
+    environment.token
+);
 
-bot.command('start', ctx => ctx.reply('Привет! Я Слюша, бот-гений.'));
+bot.catch((error) => console.log(error));
+bot.command('start', (ctx) => ctx.reply('Привет! Я Слюша, бот-гений.'));
 
-bot.on('message', async ctx => {
-    let text = await ctx.msg.text;
-    if (!text) { return; }
-    if (text.length > 160) { text = text.slice(0, 177) + '...'; }
+bot.on('message', async (ctx) => {
+    const message = handleMessage(ctx.msg);
+    if (!message) return;
 
     let history = chats[ctx.chat.id] || [];
+    history.push(message);
 
     // Filter out irrelevant messages
-    history = history.filter(el => new Date().getDate() - el.date < CONTEXT_RELEVANCE * 60 * 1000);
+    history = history.filter((el) =>
+        new Date().getDate() - el.date < CONTEXT_RELEVANCE * 60 * 1000
+    );
 
-    // Save received message
-    let message: ChatMessage = {
-        sender: ctx.msg.from.first_name,
-        date: ctx.msg.date,
-        text,
-    }
-
-    // Make sure history not too long
+    // Make sure history is not too long
     while (history.length > CONTEXT_LIMIT - 1) {
         history.shift();
     }
 
-    const direct = ctx.msg.reply_to_message?.from?.id === bot.botInfo.id
-        || text.match(new RegExp(NAMES.join('|'), 'gmi'))
-        || ctx.chat.id === ctx.from.id;
-    const random = getRandomInt(0, 100) > 100 - RANDOM_REPLY;
-    const ignored = text.length < 10
-        && text.match(new RegExp(`^(${tendToIgnore.join('|')})`, 'gmi'))
-        && getRandomInt(0, 100) > 30;
+    let botReply: ChatMessage | undefined;
 
+    const mustReply = shouldReply(message.text, ctx.msg, ctx.chat);
+    const randomReply = getRandomInt(0, 100) > 100 - RANDOM_REPLY;
 
-    let reply: ChatMessage | undefined;
+    if (mustReply || randomReply) {
+        let response: string | undefined;
+        Typer.type(ctx);
 
-    if ((direct || random) && !ignored) {
-        let context = '';
-        let response = '';
-        void typing()
-
-        // Construct context
-        history.forEach(m => {
-            context += `${m.sender}:\n> ${m.text}\n`;
-        });
-
-        // Create final prompt
-        let prompt = `${context}\n`;
-        let replied = await ctx.msg.reply_to_message?.text;
-        if (replied && history[history.length - 1]?.text != replied) {
-            prompt += `${ctx.msg.reply_to_message?.from?.first_name || 'user' }:\n> **${replied}**\n`;
-        }
-        prompt += `${message.sender}:\n> **${text}**`;
-
-        console.log('prompt: ' + prompt);
+        // Final system prompt
+        const prompt =
+            `Write your reply only to message from ${message.sender.name} (@${message.sender.username})`;
 
         let error;
-
-        for (let i=0; i<RETRIES; i++) {
+        for (let i = 0; i < RETRIES; i++) {
             try {
-                response = await ask(prompt);
+                response = await Api.ask(prompt, history);
                 break;
             } catch (err) {
                 error = err;
@@ -129,8 +127,10 @@ bot.on('message', async ctx => {
         }
 
         if (!response) {
-            if (!random && text.endsWith('?')) {
-                let idk = nepons[Math.floor(Math.random() * nepons.length)];
+            Typer.stop()
+
+            if (!randomReply) {
+                const idk = nepons[Math.floor(Math.random() * nepons.length)];
                 await ctx.reply(idk, {
                     reply_to_message_id: ctx.msg.message_id,
                 });
@@ -138,10 +138,10 @@ bot.on('message', async ctx => {
             throw new Werror(error);
         }
 
-        response = response.replaceAll(/you\.com/gmi, CREATOR);
-        response = response.replaceAll(/youchat/gmi, CREATOR);
-        response = response.replaceAll(/youbot/gmi, CREATOR);
-        response = response.trim().replaceAll(/^> /gmi, '');
+        Typer.stop()
+
+        // Remove bot's name from the beginning of the reply
+        response = response.trim().replaceAll(/^.+\(@\w+\):/gm, '');
 
         console.log('reply: ' + response);
 
@@ -151,45 +151,119 @@ bot.on('message', async ctx => {
                 reply_to_message_id: ctx.msg.message_id,
                 parse_mode: 'Markdown',
             });
-        } catch (err) { // Retry without markdown
+        } catch (_) { // Retry without markdown
             res = await ctx.reply(response, {
                 reply_to_message_id: ctx.msg.message_id,
             });
         }
 
-        reply = {
-            sender: bot.botInfo.first_name,
+        botReply = {
+            sender: {
+                name: bot.botInfo.first_name,
+                username: bot.botInfo.username,
+                myself: true,
+            },
+            replyTo: message,
             date: res.date,
             text: response,
-        }
+        };
+        history.push(botReply);
 
-        async function typing() {
-            let i = 0;
-            while (!response && i < 4) {
-                try {
-                    await ctx.replyWithChatAction('typing');
-                } catch (err) {
-                    break;
-                }
-                await delay(5000);
-                i++;
-            }
-        }
-
-    }
-
-    history.push(message);
-    if (reply) {
-        history.push(reply);
     }
 
     chats[ctx.chat.id] = history;
 });
 
-function getRandomInt(min: number, max: number) {
-    min = Math.ceil(min);
-    max = Math.floor(max);
-    return Math.floor(Math.random() * (max - min) + min); // The maximum is exclusive and the minimum is inclusive
+function handleMessage(msg: Message & Update.NonChannel): ChatMessage | undefined {
+    let { text } = msg;
+    if (!text && msg.sticker) {
+        text = 'Sticker ' + msg.sticker.emoji;
+    }
+
+    if (!text) return;
+
+    // Slice long messages, which are too long
+    if (text.length > 500) text = text.slice(0, 497) + '...';
+
+    let replyTo: ChatMessage["replyTo"] | undefined;
+    const reply = msg.reply_to_message;
+
+    if (reply?.from && (reply.caption || reply.text || reply.sticker?.emoji)) {
+        const text = reply.caption
+            || reply.text
+            || `Sticker ${reply.sticker?.emoji}`;
+
+        replyTo = {
+            sender: {
+                name: reply.from.first_name,
+                username: reply.from.username,
+            },
+            text,
+        };
+    }
+
+    const message: ChatMessage = {
+        sender: {
+            name: msg.from.first_name,
+            username: msg.from.username,
+        },
+        replyTo,
+        date: msg.date,
+        text,
+    };
+
+    return message;
+}
+
+function shouldReply(text: string, msg: Message & Update.NonChannel, chat: Chat.PrivateChat | Chat.GroupChat | Chat.SupergroupChat): boolean {
+    const direct =
+        // Message reply
+        msg.reply_to_message?.from?.id === bot.botInfo.id || 
+        // Mentioned name
+        text.match(new RegExp(NAMES.join('|'), 'gmi')) ||
+        // PM
+        chat.type == 'private';
+
+    const interested =
+        // Messages with some special text
+        text.match(new RegExp(`(${tendToReply.join('|')})`, 'gmi')) &&
+        getRandomInt(0, 100) > 100 - 30;
+
+    const ignored = 
+        // Short message with boring text
+        text.length < 10 &&
+        text.match(new RegExp(`^(${tendToIgnore.join('|')})`, 'gmi')) &&
+        getRandomInt(0, 100) > 100 - 80;
+
+    const formula = (direct || interested) && !ignored
+
+    return Boolean(formula)
+}
+
+
+class Typer {
+    static stopped = false
+
+    static async type(ctx: Context) {
+        const timeout = 1 * 1000 * 60;
+        const secondsToWait = 5 * 1000
+
+        let time = 0
+
+        while (!this.stopped && time < timeout) {
+            try {
+                await ctx.replyWithChatAction('typing');
+            } catch (_) {
+                break;
+            }
+            await delay(secondsToWait);
+            time += secondsToWait
+        }
+    }
+
+    static stop() {
+        this.stopped = false;
+    }
 }
 
 void bot.start();
