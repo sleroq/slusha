@@ -262,7 +262,7 @@ class Typer {
     }
 
     static stop() {
-        this.stopped = false;
+        this.stopped = true;
     }
 }
 
