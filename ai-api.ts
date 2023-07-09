@@ -80,9 +80,15 @@ export default class AIApi {
 
         printLatestMesssages(reqData.messages);
 
+        const headers: { [key in string]: string } = {};
+        if (this.authToken) {
+            headers['Authorization'] = `Bearer ${this.authToken}`;
+        }
+
         let res;
         try {
             res = await ky.post(this.url, {
+                headers,
                 timeout: 2 * 60 * 1000,
                 json: reqData,
             });
