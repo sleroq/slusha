@@ -8,4 +8,4 @@ cd "$(dirname "$SCRIPTPATH")"
 
 source ./scripts/env.bash
 
-deno run --allow-net --allow-env main.ts
+deno run --allow-net --allow-env --allow-write --allow-read main.ts

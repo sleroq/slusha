@@ -1,9 +1,7 @@
 import ky from 'https://esm.sh/ky';
 import Werror from './lib/werror.ts';
-import { ChatMessage } from './main.ts';
-import { assembleHistory } from './helpers.ts';
 
-interface Choise {
+interface Choice {
     index: number;
     message: {
         role: 'assistant';
@@ -17,7 +15,7 @@ interface ApiResponse {
     object: 'chat.completion';
     created: number;
     model: string;
-    choices: Choise[];
+    choices: Choice[];
     usage: {
         prompt_tokens: number;
         completion_tokens: number;
@@ -37,9 +35,9 @@ interface ApiRequest {
 }
 
 // print only last messages
-function printLatestMesssages(messages: RequestMessage[]) {
+function printLatestMessages(messages: RequestMessage[]) {
     console.log('-'.repeat(20));
-    const lastMessages = messages.slice(-4);
+    const lastMessages = messages.slice(-10);
     for (const message of lastMessages) {
         console.log(`${message.role}: ${message.content}`);
     }
@@ -47,38 +45,32 @@ function printLatestMesssages(messages: RequestMessage[]) {
 }
 
 export default class AIApi {
-    url: string
-    model: string
-    authToken: string | undefined
-    systemPrompt: string
+    url: string;
+    model: string;
+    authToken: string | undefined;
+    systemPrompt: string;
 
-    constructor(url: string, systemPrompt: string, model: string, token?: string) {
+    constructor(
+        url: string,
+        systemPrompt: string,
+        model: string,
+        token?: string,
+    ) {
         this.url = url;
         this.systemPrompt = systemPrompt;
         this.model = model;
 
         if (token) {
-            this.authToken = token
+            this.authToken = token;
         }
     }
 
-    async ask(
-        question: string,
-        history: ChatMessage[],
-    ): Promise<string> {
-        const context = assembleHistory(history, this.systemPrompt);
-
+    async ask(messages: RequestMessage[]) {
         const reqData: ApiRequest = {
             model: this.model,
-            messages: [
-                { role: 'system', content: this.systemPrompt },
-                ...context,
-                { role: 'system', content: question },
-            ],
-            temperature: 0.9,
+            messages,
+            temperature: 0.8,
         };
-
-        printLatestMesssages(reqData.messages);
 
         const headers: { [key in string]: string } = {};
         if (this.authToken) {
@@ -93,7 +85,6 @@ export default class AIApi {
                 json: reqData,
             });
         } catch (err) {
-            console.log(reqData);
             throw new Werror(err, 'Fetching response from api');
         }
 
@@ -104,11 +95,37 @@ export default class AIApi {
             throw new Werror(err, 'Parsing data');
         }
 
-
         if (resData.choices.length === 0) {
-            throw new Error('No response choises recieved from api')
+            throw new Error('No response chooses received from api');
         }
 
         return resData.choices[0].message.content;
+    }
+
+    chatReply(
+        question: string,
+        history: RequestMessage[],
+        summary?: string,
+    ): Promise<string> {
+        let messages: RequestMessage[] = [
+            { role: 'system', content: this.systemPrompt },
+        ];
+
+        if (summary) {
+            const summaryPreamble = `
+            This is key notes and memories written by you earlier to remember:
+            `;
+            messages.push({
+                role: 'system',
+                content: summaryPreamble + summary,
+            });
+        }
+
+        messages = messages.concat([
+            ...history,
+            { role: 'system', content: question },
+        ]);
+
+        return this.ask(messages);
     }
 }
