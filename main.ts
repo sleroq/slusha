@@ -53,6 +53,7 @@ const tendToIgnore = [
     '/q',
 ];
 interface Sender {
+    id: number;
     name: string;
     username: string | undefined;
     myself?: boolean;
@@ -71,6 +72,7 @@ interface Memory {
         notes: string;
         lastNotes: number;
         history: ChatMessage[];
+        type: string;
     };
 }
 
@@ -111,7 +113,7 @@ bot.catch((error) => logger.error(error));
 bot.command('start', (ctx) => ctx.reply('Привет! Я Слюша, бот-гений.'));
 
 // Returns chat data, creates new one if it does not exist
-function getChat(m: Memory, chatId: number, msgId: number) {
+function getChat(m: Memory, chatId: number, msgId: number, chatType: string) {
     let chat = chats[chatId];
 
     if (!chats[chatId]) {
@@ -119,6 +121,7 @@ function getChat(m: Memory, chatId: number, msgId: number) {
             notes: '',
             lastNotes: msgId,
             history: [],
+            type: chatType
         };
 
         chats[chatId] = chat;
@@ -151,13 +154,13 @@ async function genNotes(
     return newNotes || notes;
 }
 
-bot.on('message', async (ctx) => {
+bot.on('message', (ctx, next) => {
     const message = handleMessage(ctx.msg);
     if (!message) return;
 
-    const chat = getChat(chats, ctx.chat.id, ctx.msg.message_id);
+    const chat = getChat(chats, ctx.chat.id, ctx.msg.message_id, ctx.chat.type);
 
-    let history = chats[ctx.chat.id]?.history || [];
+    let history = chat.history;
     history.push(message);
 
     // Filter out irrelevant messages
@@ -170,9 +173,53 @@ bot.on('message', async (ctx) => {
         history.shift();
     }
 
-    let botReply: ChatMessage | undefined;
+    if (message.text.length > 40) {
+        return next()
+    }
 
-    const mustReply = shouldReply(message.text, ctx.msg, ctx.chat);
+    const mustReply = shouldReply(message.text, message.replyTo?.sender.id, ctx.chat.type)
+
+    function queue() {
+        setTimeout(async () => {
+            const userMsg = chat.history.filter(el =>
+                el.sender.id === ctx.msg.from.id)
+
+            const lastUserMsg = userMsg.reduce((prev, current) =>
+                current.date > prev.date ? current : prev);
+
+            const laterMustReply = userMsg.find(el =>
+                shouldReply(el.text, el.replyTo?.sender.id, ctx.chat.type)
+                    && el.date > ctx.msg.date)
+
+            if (laterMustReply) {
+                logger.info('skipping cause later must reply exists')
+                return
+            }
+
+            if (mustReply
+                && lastUserMsg.date > ctx.msg.date
+                && ((Date.now() / 1000 - lastUserMsg.date) < 5)) {
+                logger.info('queueing cause new later message exist ', message?.text)
+                queue()
+                return
+            }
+
+            // logger.info('pass')
+            await next()
+        }, 5000)
+    }
+
+    queue();
+});
+
+bot.on('message', async (ctx) => {
+    const message = handleMessage(ctx.msg);
+    if (!message) return;
+
+    const chat = getChat(chats, ctx.chat.id, ctx.msg.message_id, ctx.chat.type);
+    const history = chat.history;
+
+    const mustReply = shouldReply(message.text, message.replyTo?.sender.id, ctx.chat.type);
     const randomReply = getRandomInt(0, 100) > 100 - env.randomReply;
 
     if (mustReply || randomReply) {
@@ -210,9 +257,12 @@ bot.on('message', async (ctx) => {
         }
 
         // Final system prompt
-        const prompt =
-            `Write your reply only to last message from ${message.sender.name} (@${message.sender.username}). ` +
-            env.AI.finalPrompt;
+        const prompt = `
+            Write your reply only to this message from ${message.sender.name} (@${message.sender.username}).
+            > ${message.text}
+            ${env.AI.finalPrompt}`;
+
+        logger.info(prompt)
 
         let error;
         for (let i = 0; i < 2; i++) {
@@ -262,8 +312,9 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        botReply = {
+        history.push({
             sender: {
+                id: bot.botInfo.id,
                 name: bot.botInfo.first_name,
                 username: bot.botInfo.username,
                 myself: true,
@@ -271,8 +322,7 @@ bot.on('message', async (ctx) => {
             replyTo: message,
             date: res.date,
             text: response,
-        };
-        history.push(botReply);
+        });
     }
 
     chat.history = history;
@@ -301,6 +351,7 @@ function handleMessage(
 
         replyTo = {
             sender: {
+                id: reply.from.id,
                 name: reply.from.first_name,
                 username: reply.from.username,
             },
@@ -310,6 +361,7 @@ function handleMessage(
 
     return {
         sender: {
+            id: msg.from.id,
             name: msg.from.first_name,
             username: msg.from.username,
         },
@@ -321,16 +373,16 @@ function handleMessage(
 
 function shouldReply(
     text: string,
-    msg: Message & Update.NonChannel,
-    chat: Chat.PrivateChat | Chat.GroupChat | Chat.SupergroupChat,
+    replyFromId: number | undefined,
+    chatType: string,
 ): boolean {
     const direct =
         // Message reply
-        msg.reply_to_message?.from?.id === bot.botInfo.id ||
+        replyFromId === bot.botInfo.id ||
         // Mentioned name
         text.match(new RegExp(NAMES.join('|'), 'gmi')) ||
         // PM
-        chat.type == 'private';
+        chatType === 'private';
 
     const interested =
         // Messages with some special text
