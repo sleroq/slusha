@@ -1,5 +1,6 @@
 import ky from 'https://esm.sh/ky';
 import Werror from './lib/werror.ts';
+import Logger from "https://deno.land/x/logger@v1.1.1/logger.ts";
 
 interface Choice {
     index: number;
@@ -34,16 +35,6 @@ interface ApiRequest {
     temperature: number;
 }
 
-// print only last messages
-function printLatestMessages(messages: RequestMessage[]) {
-    console.log('-'.repeat(20));
-    const lastMessages = messages.slice(-10);
-    for (const message of lastMessages) {
-        console.log(`${message.role}: ${message.content}`);
-    }
-    console.log('-'.repeat(20));
-}
-
 export default class AIApi {
     url: string;
     model: string;
@@ -65,7 +56,7 @@ export default class AIApi {
         }
     }
 
-    async ask(messages: RequestMessage[]) {
+    async ask(messages: RequestMessage[], logger: Logger) {
         const reqData: ApiRequest = {
             model: this.model,
             messages,
@@ -85,6 +76,7 @@ export default class AIApi {
                 json: reqData,
             });
         } catch (err) {
+            logger.error(reqData)
             throw new Werror(err, 'Fetching response from api');
         }
 
@@ -105,7 +97,8 @@ export default class AIApi {
     chatReply(
         question: string,
         history: RequestMessage[],
-        summary?: string,
+        summary: string,
+        logger: Logger
     ): Promise<string> {
         let messages: RequestMessage[] = [
             { role: 'system', content: this.systemPrompt },
@@ -126,6 +119,6 @@ export default class AIApi {
             { role: 'system', content: question },
         ]);
 
-        return this.ask(messages);
+        return this.ask(messages, logger);
     }
 }

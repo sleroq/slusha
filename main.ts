@@ -4,7 +4,6 @@ import Werror from './lib/werror.ts';
 import { delay } from 'https://deno.land/std@0.177.0/async/mod.ts';
 import { assembleHistory, getRandomInt, resolveEnv } from './lib/helpers.ts';
 import {
-    Chat,
     Message,
     Update,
 } from 'https://deno.land/x/grammy@v1.14.1/types.deno.ts';
@@ -121,7 +120,7 @@ function getChat(m: Memory, chatId: number, msgId: number, chatType: string) {
             notes: '',
             lastNotes: msgId,
             history: [],
-            type: chatType
+            type: chatType,
         };
 
         chats[chatId] = chat;
@@ -146,12 +145,33 @@ async function genNotes(
             { role: 'system', content: env.AI.prompt },
             ...messages,
             { role: 'system', content: prompt },
-        ]);
+        ], logger);
     } catch (error) {
         throw new Werror(error, 'Taking notes');
     }
 
     return newNotes || notes;
+}
+
+function saveMemory(chats: Memory) {
+    const jsonData = JSON.stringify(chats, null, 2);
+
+    return Deno.writeTextFile('memory.json', jsonData);
+}
+
+async function replyWithMarkdown(ctx: Context, text: string) {
+    let res;
+    try {
+        res = await ctx.reply(text, {
+            reply_to_message_id: ctx.msg?.message_id,
+            parse_mode: 'Markdown',
+        });
+    } catch (_) { // Retry without markdown
+        res = await ctx.reply(text, {
+            reply_to_message_id: ctx.msg?.message_id,
+        });
+    }
+    return res;
 }
 
 bot.on('message', (ctx, next) => {
@@ -173,43 +193,97 @@ bot.on('message', (ctx, next) => {
         history.shift();
     }
 
-    if (message.text.length > 40) {
-        return next()
-    }
+    // Skipping queue for long messages
+    // Because they are more likely to be complete requests
+    // Commented cause there is no other rate-limiting techniques yet
+    // if (message.text.length > 35) {
+    //     return next();
+    // }
 
-    const mustReply = shouldReply(message.text, message.replyTo?.sender.id, ctx.chat.type)
+    const mustReply = shouldReply(
+        message.text,
+        message.replyTo?.sender.id,
+        ctx.chat.type,
+    );
 
+    const typer = new Typer(ctx);
+    if (mustReply) void typer.type()
+
+    // Queue messages from single user, to avoid spam and answer more human-like
     function queue() {
         setTimeout(async () => {
-            const userMsg = chat.history.filter(el =>
-                el.sender.id === ctx.msg.from.id)
+            const userMsg = chat.history.filter((el) =>
+                el.sender.id === ctx.msg.from.id
+            );
 
             const lastUserMsg = userMsg.reduce((prev, current) =>
-                current.date > prev.date ? current : prev);
+                current.date > prev.date ? current : prev
+            );
 
-            const laterMustReply = userMsg.find(el =>
-                shouldReply(el.text, el.replyTo?.sender.id, ctx.chat.type)
-                    && el.date > ctx.msg.date)
+            const laterMustReply = userMsg.find((el) =>
+                shouldReply(el.text, el.replyTo?.sender.id, ctx.chat.type) &&
+                el.date > ctx.msg.date
+            );
 
+            // Skipping, because will reply later anyway
             if (laterMustReply) {
-                logger.info('skipping cause later must reply exists')
-                return
+                typer.stop();
+                return;
             }
 
-            if (mustReply
-                && lastUserMsg.date > ctx.msg.date
-                && ((Date.now() / 1000 - lastUserMsg.date) < 5)) {
-                logger.info('queueing cause new later message exist ', message?.text)
-                queue()
-                return
+            // Waiting another x seconds to check if user finished
+            if (
+                mustReply &&
+                lastUserMsg.date > ctx.msg.date &&
+                ((Date.now() / 1000 - lastUserMsg.date) < 3)
+            ) {
+                queue();
+                return;
             }
 
-            // logger.info('pass')
-            await next()
-        }, 5000)
+            try {
+                await next();
+            } catch (error) {
+                logger.error('handling message', error)
+            }
+
+            typer.stop();
+        }, 3000);
     }
 
     queue();
+});
+
+bot.command('summary', async (ctx) => {
+    // Final system prompt
+    const prompt = `
+        !!Do not answer as Слюша!!.
+        Just write a concise summary of all the events that have occurred in this chat in Russian language.
+        Structure your response in a way that is easy to read, possibly with division into parts with new lines.
+        Fit into 2000 characters
+    `;
+
+    const chat = getChat(chats, ctx.chat.id, ctx.msg.message_id, ctx.chat.type);
+    const messages = assembleHistory(chat.history);
+
+    let response;
+    try {
+        response = await Api.chatReply(
+            prompt,
+            messages,
+            chat.notes,
+            logger
+        );
+    } catch (error) {
+        await ctx.reply('Что-то у меня не получилось', {
+            reply_to_message_id: ctx.msg.message_id,
+        });
+        throw new Werror(error, 'Getting summary from ai');
+    }
+
+    logger.info('/summary', response);
+
+    return replyWithMarkdown(ctx, response);
 });
 
 bot.on('message', async (ctx) => {
@@ -219,21 +293,25 @@ bot.on('message', async (ctx) => {
     const chat = getChat(chats, ctx.chat.id, ctx.msg.message_id, ctx.chat.type);
     const history = chat.history;
 
-    const mustReply = shouldReply(message.text, message.replyTo?.sender.id, ctx.chat.type);
+    const mustReply = shouldReply(
+        message.text,
+        message.replyTo?.sender.id,
+        ctx.chat.type,
+    );
     const randomReply = getRandomInt(0, 100) > 100 - env.randomReply;
 
     if (mustReply || randomReply) {
         let response: string | undefined;
-        void Typer.type(ctx);
 
         const messages: RequestMessage[] = assembleHistory(history);
 
         // Each time we add 2 messages to history.
         // If contextLimit is not even, we should account to that
-        const shouldGenSummary = ctx.msg.message_id - chat.lastNotes > env.contextLimit;
+        const shouldGenSummary =
+            ctx.msg.message_id - chat.lastNotes > env.contextLimit;
 
         if (shouldGenSummary && env.AI.notesPrompt) {
-            logger.info('generating notes')
+            logger.info('generating notes');
 
             try {
                 chat.notes = await genNotes(
@@ -243,16 +321,15 @@ bot.on('message', async (ctx) => {
                 );
                 chat.lastNotes = ctx.msg.message_id;
             } catch (error) {
-                logger.warn('Unable to take notes this time :(');
+                logger.warn('Unable to take notes this time :(', error);
             }
 
             logger.info('Chat notes:', chat.notes);
 
             try {
-                const jsonData = JSON.stringify(chats, null, 2); // Convert JSON object to a string with formatting
-                await Deno.writeTextFile('memory.json', jsonData);
+                await saveMemory(chats)
             } catch (error) {
-                logger.warn('Unable to save memory :(');
+                logger.warn('Unable to save memory :(', error);
             }
         }
 
@@ -262,7 +339,7 @@ bot.on('message', async (ctx) => {
             > ${message.text}
             ${env.AI.finalPrompt}`;
 
-        logger.info(prompt)
+        logger.info(prompt);
 
         let error;
         for (let i = 0; i < 2; i++) {
@@ -271,6 +348,7 @@ bot.on('message', async (ctx) => {
                     prompt,
                     messages,
                     chat.notes,
+                    logger
                 );
                 break;
             } catch (err) {
@@ -280,18 +358,15 @@ bot.on('message', async (ctx) => {
         }
 
         if (!response) {
-            Typer.stop();
-
             if (!randomReply) {
                 const idk = nepons[Math.floor(Math.random() * nepons.length)];
                 await ctx.reply(idk, {
                     reply_to_message_id: ctx.msg.message_id,
                 });
             }
-            throw new Werror(error);
+            logger.error('Unable to get response: ', error)
+            return;
         }
-
-        Typer.stop();
 
         // Remove bot's name from the beginning of the reply
         response = response.trim().replaceAll(/^.+\(@\w+\):/gm, '');
@@ -302,14 +377,9 @@ bot.on('message', async (ctx) => {
 
         let res;
         try {
-            res = await ctx.reply(response, {
-                reply_to_message_id: ctx.msg.message_id,
-                parse_mode: 'Markdown',
-            });
-        } catch (_) { // Retry without markdown
-            res = await ctx.reply(response, {
-                reply_to_message_id: ctx.msg.message_id,
-            });
+            res = await replyWithMarkdown(ctx, response);
+        } catch (error) {
+            throw new Werror(error, 'could not reply to user')
         }
 
         history.push({
@@ -401,9 +471,14 @@ function shouldReply(
 }
 
 class Typer {
-    static stopped = false;
+    ctx: Context;
+    stopped = false;
 
-    static async type(ctx: Context) {
+    constructor(ctx: Context) {
+        this.ctx = ctx;
+    }
+
+    async type() {
         const timeout = 1000 * 60;
         const secondsToWait = 5 * 1000;
 
@@ -411,16 +486,16 @@ class Typer {
 
         while (!this.stopped && time < timeout) {
             try {
-                await ctx.replyWithChatAction('typing');
+                await this.ctx.replyWithChatAction('typing');
             } catch (_) {
-                break;
+                continue;
             }
             await delay(secondsToWait);
             time += secondsToWait;
         }
     }
 
-    static stop() {
+    stop() {
         this.stopped = true;
     }
 }
