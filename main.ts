@@ -208,7 +208,7 @@ bot.on('message', (ctx, next) => {
     );
 
     const typer = new Typer(ctx);
-    if (mustReply) void typer.type()
+    if (mustReply) void typer.type();
 
     // Queue messages from single user, to avoid spam and answer more human-like
     function queue() {
@@ -245,7 +245,7 @@ bot.on('message', (ctx, next) => {
             try {
                 await next();
             } catch (error) {
-                logger.error('handling message', error)
+                logger.error('handling message', error);
             }
 
             typer.stop();
@@ -273,7 +273,7 @@ bot.command('summary', async (ctx) => {
             prompt,
             messages,
             chat.notes,
-            logger
+            logger,
         );
     } catch (error) {
         await ctx.reply('Что-то у меня не получилось', {
@@ -328,7 +328,7 @@ bot.on('message', async (ctx) => {
             logger.info('Chat notes:', chat.notes);
 
             try {
-                await saveMemory(chats)
+                await saveMemory(chats);
             } catch (error) {
                 logger.warn('Unable to save memory :(', error);
             }
@@ -349,7 +349,7 @@ bot.on('message', async (ctx) => {
                     prompt,
                     messages,
                     chat.notes,
-                    logger
+                    logger,
                 );
                 break;
             } catch (err) {
@@ -365,7 +365,7 @@ bot.on('message', async (ctx) => {
                     reply_to_message_id: ctx.msg.message_id,
                 });
             }
-            logger.error('Unable to get response: ', error)
+            logger.error('Unable to get response: ', error);
             return;
         }
 
@@ -380,7 +380,7 @@ bot.on('message', async (ctx) => {
         try {
             res = await replyWithMarkdown(ctx, response);
         } catch (error) {
-            throw new Werror(error, 'could not reply to user')
+            throw new Werror(error, 'could not reply to user');
         }
 
         history.push({

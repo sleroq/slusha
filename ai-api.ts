@@ -1,6 +1,6 @@
 import ky from 'https://esm.sh/ky';
 import Werror from './lib/werror.ts';
-import Logger from "https://deno.land/x/logger@v1.1.1/logger.ts";
+import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
 
 interface Choice {
     index: number;
@@ -76,7 +76,7 @@ export default class AIApi {
                 json: reqData,
             });
         } catch (err) {
-            logger.error(reqData)
+            logger.error(reqData);
             throw new Werror(err, 'Fetching response from api');
         }
 
@@ -98,7 +98,7 @@ export default class AIApi {
         question: string,
         history: RequestMessage[],
         summary: string,
-        logger: Logger
+        logger: Logger,
     ): Promise<string> {
         let messages: RequestMessage[] = [
             { role: 'system', content: this.systemPrompt },
