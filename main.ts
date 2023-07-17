@@ -195,6 +195,8 @@ bot.on('message', (ctx, next) => {
         history.shift();
     }
 
+    chat.history = history;
+
     // Skipping queue for long messages
     // Because they are more likely to be complete requests
     if (message.text.length > 35) {
