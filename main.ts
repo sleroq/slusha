@@ -2,6 +2,7 @@ import { Bot, Context } from 'https://deno.land/x/grammy@v1.14.1/mod.ts';
 import AIApi, { RequestMessage } from './ai-api.ts';
 import Werror from './lib/werror.ts';
 import { delay } from 'https://deno.land/std@0.177.0/async/mod.ts';
+import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
 import { assembleHistory, getRandomInt, resolveEnv } from './lib/helpers.ts';
 import {
     Message,
@@ -108,6 +109,7 @@ const Api = new AIApi(
     env.AI.token,
 );
 
+bot.use(limit());
 bot.catch((error) => logger.error(error));
 bot.command('start', (ctx) => ctx.reply('Привет! Я Слюша, бот-гений.'));
 
@@ -195,10 +197,9 @@ bot.on('message', (ctx, next) => {
 
     // Skipping queue for long messages
     // Because they are more likely to be complete requests
-    // Commented cause there is no other rate-limiting techniques yet
-    // if (message.text.length > 35) {
-    //     return next();
-    // }
+    if (message.text.length > 35) {
+        return next();
+    }
 
     const mustReply = shouldReply(
         message.text,
