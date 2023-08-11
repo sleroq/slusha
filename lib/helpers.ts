@@ -26,7 +26,7 @@ You are a bot Слюша, created by @sleroq. Help other people and answer funny
 const DEFAULT_FINAL_PROMPT =
     'Answer should consist only from YOUR (Слюша) reply.';
 
-const DEFAULT_CONTEXT_LIMIT = 20;
+const DEFAULT_CONTEXT_LIMIT = 40;
 const DEFAULT_CONTEXT_TIMEOUT = 60 * 24 * 7; // In minutes
 const DEFAULT_MEMORY_TIMEOUT = 60 * 24 * 7; // In minutes
 const DEFAULT_MESSAGES_MAX_LENGTH = 600; // In minutes

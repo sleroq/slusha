@@ -9,6 +9,7 @@ import {
     Update,
 } from 'https://deno.land/x/grammy@v1.14.1/types.deno.ts';
 import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
+
 const logger = new Logger();
 await logger.initFileLogger('log', { rotate: true });
 
@@ -52,12 +53,14 @@ const tendToIgnore = [
     'база',
     '/q',
 ];
+
 interface Sender {
     id: number;
     name: string;
     username: string | undefined;
     myself?: boolean;
 }
+
 export interface ChatMessage {
     sender: Sender;
     replyTo?: {
@@ -67,13 +70,16 @@ export interface ChatMessage {
     date: number;
     text: string;
 }
+
+interface Chat {
+    notes: string;
+    lastNotes: number;
+    history: ChatMessage[];
+    type: string;
+}
+
 interface Memory {
-    [key: string]: {
-        notes: string;
-        lastNotes: number;
-        history: ChatMessage[];
-        type: string;
-    };
+    [key: string]: Chat;
 }
 
 async function loadMemory() {
@@ -98,9 +104,17 @@ async function loadMemory() {
 }
 
 const chats: Memory = await loadMemory() || {};
-
 const env = resolveEnv();
-const bot = new Bot(env.botToken);
+
+interface RequestInfo {
+    isRandom: boolean;
+}
+
+type MyContext = Context & {
+    info: RequestInfo;
+};
+
+const bot = new Bot<MyContext>(env.botToken);
 
 const Api = new AIApi(
     env.AI.url,
@@ -111,76 +125,10 @@ const Api = new AIApi(
 
 bot.use(limit());
 bot.catch((error) => logger.error(error));
-bot.command('start', (ctx) => ctx.reply('Привет! Я Слюша, бот-гений.'));
-
-// Returns chat data, creates new one if it does not exist
-function getChat(m: Memory, chatId: number, msgId: number, chatType: string) {
-    let chat = chats[chatId];
-
-    if (!chats[chatId]) {
-        chat = {
-            notes: '',
-            lastNotes: msgId,
-            history: [],
-            type: chatType,
-        };
-
-        chats[chatId] = chat;
-    }
-
-    return chat;
-}
-
-async function genNotes(
-    notes: string,
-    messages: RequestMessage[],
-    prompt: string,
-): Promise<string> {
-    if (notes !== '') {
-        prompt +=
-            `This is your previous notes. Some are important, you must use them while writing a new version: ${notes}`;
-    }
-
-    let newNotes;
-    try {
-        notes = await Api.ask([
-            { role: 'system', content: env.AI.prompt },
-            ...messages,
-            { role: 'system', content: prompt },
-        ], logger);
-    } catch (error) {
-        throw new Werror(error, 'Taking notes');
-    }
-
-    return newNotes || notes;
-}
-
-function saveMemory(chats: Memory) {
-    const jsonData = JSON.stringify(chats, null, 2);
-
-    return Deno.writeTextFile('memory.json', jsonData);
-}
-
-async function replyWithMarkdown(ctx: Context, text: string) {
-    let res;
-    try {
-        res = await ctx.reply(text, {
-            reply_to_message_id: ctx.msg?.message_id,
-            parse_mode: 'Markdown',
-        });
-    } catch (_) { // Retry without markdown
-        res = await ctx.reply(text, {
-            reply_to_message_id: ctx.msg?.message_id,
-        });
-    }
-    return res;
-}
-
-bot.on('message', (ctx, next) => {
+bot.on('message', async (ctx, next) => {
+    const chat = getChat(chats, ctx.chat.id, ctx.msg.message_id, ctx.chat.type);
     const message = handleMessage(ctx.msg);
     if (!message) return;
-
-    const chat = getChat(chats, ctx.chat.id, ctx.msg.message_id, ctx.chat.type);
 
     let history = chat.history;
     history.push(message);
@@ -197,65 +145,10 @@ bot.on('message', (ctx, next) => {
 
     chat.history = history;
 
-    // Skipping queue for long messages
-    // Because they are more likely to be complete requests
-    if (message.text.length > 35) {
-        return next();
-    }
-
-    const mustReply = shouldReply(
-        message.text,
-        message.replyTo?.sender.id,
-        ctx.chat.type,
-    );
-
-    const typer = new Typer(ctx);
-    if (mustReply) void typer.type();
-
-    // Queue messages from single user, to avoid spam and answer more human-like
-    function queue() {
-        setTimeout(async () => {
-            const userMsg = chat.history.filter((el) =>
-                el.sender.id === ctx.msg.from.id
-            );
-
-            const lastUserMsg = userMsg.reduce((prev, current) =>
-                current.date > prev.date ? current : prev
-            );
-
-            const laterMustReply = userMsg.find((el) =>
-                shouldReply(el.text, el.replyTo?.sender.id, ctx.chat.type) &&
-                el.date > ctx.msg.date
-            );
-
-            // Skipping, because will reply later anyway
-            if (laterMustReply) {
-                typer.stop();
-                return;
-            }
-
-            // Waiting another x seconds to check if user finished
-            if (
-                mustReply &&
-                lastUserMsg.date > ctx.msg.date &&
-                ((Date.now() / 1000 - lastUserMsg.date) < 3)
-            ) {
-                queue();
-                return;
-            }
-
-            try {
-                await next();
-            } catch (error) {
-                logger.error('handling message', error);
-            }
-
-            typer.stop();
-        }, 3000);
-    }
-
-    queue();
+    await next();
 });
+
+bot.command('start', (ctx) => ctx.reply('Привет! Я Слюша, бот-гений.'));
 
 bot.command('summary', async (ctx) => {
     // Final system prompt
@@ -289,12 +182,17 @@ bot.command('summary', async (ctx) => {
     return replyWithMarkdown(ctx, response);
 });
 
-bot.on('message', async (ctx) => {
+bot.on('message', async (ctx, next) => {
     const message = handleMessage(ctx.msg);
     if (!message) return;
 
     const chat = getChat(chats, ctx.chat.id, ctx.msg.message_id, ctx.chat.type);
-    const history = chat.history;
+
+    // Skipping queue for long messages
+    // Because they are more likely to be complete requests
+    if (message.text.length > 35) {
+        return next();
+    }
 
     const mustReply = shouldReply(
         message.text,
@@ -303,103 +201,171 @@ bot.on('message', async (ctx) => {
     );
     const randomReply = getRandomInt(0, 100) > 100 - env.randomReply;
 
-    if (mustReply || randomReply) {
-        let response: string | undefined;
+    const typer = new Typer(ctx);
+    if (mustReply || randomReply) void typer.type();
 
-        const messages: RequestMessage[] = assembleHistory(history);
+    if (randomReply) {
+        ctx.info.isRandom = true;
+        await next();
+    } else {
+        queue();
+    }
 
-        // Each time we add 2 messages to history.
-        // If contextLimit is not even, we should account to that
-        const shouldGenSummary =
-            ctx.msg.message_id - chat.lastNotes > env.contextLimit;
+    typer.stop();
 
-        if (shouldGenSummary && env.AI.notesPrompt) {
-            logger.info('generating notes');
+    // Queue messages from single user, to avoid spam and answer more human-like
+    function queue() {
+        setTimeout(async () => {
+            const userMsg = chat.history.filter((el) =>
+                el.sender.id === ctx.msg.from.id
+            );
 
-            try {
-                chat.notes = await genNotes(
-                    chat.notes,
-                    messages,
-                    env.AI.notesPrompt,
-                );
-                chat.lastNotes = ctx.msg.message_id;
-            } catch (error) {
-                logger.warn('Unable to take notes this time :(', error);
+            const lastUserMsg = userMsg.reduce((prev, current) =>
+                current.date > prev.date ? current : prev
+            );
+
+            const laterMustReply = userMsg.find((el) =>
+                shouldReply(el.text, el.replyTo?.sender.id, ctx.chat.type) &&
+                el.date > ctx.msg.date
+            );
+
+            // Skipping, because will reply later anyway
+            if (laterMustReply) {
+                typer.stop();
+                return;
             }
 
-            logger.info('Chat notes:', chat.notes);
-
-            try {
-                await saveMemory(chats);
-            } catch (error) {
-                logger.warn('Unable to save memory :(', error);
+            // Waiting another x seconds to check if user finished
+            if (
+                mustReply &&
+                lastUserMsg.date > ctx.msg.date &&
+                ((Date.now() / 1000 - lastUserMsg.date) < 3)
+            ) {
+                queue();
+                return;
             }
+        }, 3000);
+    }
+});
+
+async function makeNotes(
+    chat: Chat,
+    msgId: number,
+    messages: RequestMessage[],
+    prompt: string,
+) {
+    logger.info('generating notes');
+
+    try {
+        chat.notes = await genNotes(
+            chat.notes,
+            messages,
+            prompt,
+        );
+    } catch (error) {
+        throw new Werror(error, 'Taking notes');
+    }
+
+    logger.info('Chat notes:', chat.notes);
+
+    chat.lastNotes = msgId;
+
+    try {
+        await saveMemory(chats);
+    } catch (error) {
+        throw new Werror(error, 'Saving memory');
+    }
+}
+
+bot.on('message', async (ctx) => {
+    const message = handleMessage(ctx.msg);
+    if (!message) return;
+
+    const chat = getChat(chats, ctx.chat.id, ctx.msg.message_id, ctx.chat.type);
+    const history = chat.history;
+
+    const messages: RequestMessage[] = assembleHistory(history);
+
+    // Each time we add 2 messages to history.
+    // If contextLimit is not even, we should account to that
+    const shouldGenSummary =
+        ctx.msg.message_id - chat.lastNotes > env.contextLimit;
+    const summaryPrompt = env.AI.notesPrompt;
+
+    if (shouldGenSummary && summaryPrompt) {
+        try {
+            await makeNotes(chat, ctx.msg.message_id, messages, summaryPrompt);
+        } catch (error) {
+            logger.warn('Unable to take notes', error);
         }
+    }
 
-        // Final system prompt
-        const prompt = `
+    // Final system prompt
+    const prompt = `
             Write your reply only to this message from ${message.sender.name} (@${message.sender.username}).
             > ${message.text}
             ${env.AI.finalPrompt}`;
 
-        logger.info(prompt);
+    logger.info(prompt);
 
-        let error;
-        for (let i = 0; i < 2; i++) {
-            try {
-                response = await Api.chatReply(
-                    prompt,
-                    messages,
-                    chat.notes,
-                    logger,
-                );
-                break;
-            } catch (err) {
-                error = err;
-                await delay(2000);
-            }
-        }
-
-        if (!response) {
-            if (!randomReply) {
-                const idk = nepons[Math.floor(Math.random() * nepons.length)];
-                await ctx.reply(idk, {
-                    reply_to_message_id: ctx.msg.message_id,
-                });
-            }
-            logger.error('Unable to get response: ', error);
-            return;
-        }
-
-        // Remove bot's name from the beginning of the reply
-        response = response.trim().replaceAll(/^.+\(@\w+\):/gm, '');
-        response = response.trim().replaceAll(/^Слюша:/gm, '');
-
-        logger.info('last msg: ', message.text);
-        logger.info('reply: ' + response);
-
-        let res;
+    let response: string | undefined;
+    let error;
+    for (let i = 0; i < 2; i++) {
         try {
-            res = await replyWithMarkdown(ctx, response);
-        } catch (error) {
-            throw new Werror(error, 'could not reply to user');
+            response = await Api.chatReply(
+                prompt,
+                messages,
+                chat.notes,
+                logger,
+            );
+            break;
+        } catch (err) {
+            error = err;
+            await delay(2000);
         }
-
-        history.push({
-            sender: {
-                id: bot.botInfo.id,
-                name: bot.botInfo.first_name,
-                username: bot.botInfo.username,
-                myself: true,
-            },
-            replyTo: message,
-            date: res.date,
-            text: response,
-        });
     }
+
+    if (!response) {
+        if (!ctx.info.isRandom) {
+            const idk = nepons[Math.floor(Math.random() * nepons.length)];
+            await ctx.reply(idk, {
+                reply_to_message_id: ctx.msg.message_id,
+            });
+        }
+        logger.error('Unable to get response: ', error);
+        return;
+    }
+
+    // Remove bot's name from the beginning of the reply
+    response = response.trim().replaceAll(/^.+\(@\w+\):/gm, '');
+    response = response.trim().replaceAll(/^Слюша:/gm, '');
+
+    logger.info('last msg: ', message.text);
+    logger.info('reply: ' + response);
+
+    let res;
+    try {
+        res = await replyWithMarkdown(ctx, response);
+    } catch (error) {
+        throw new Werror(error, 'could not reply to user');
+    }
+
+    history.push({
+        sender: {
+            id: bot.botInfo.id,
+            name: bot.botInfo.first_name,
+            username: bot.botInfo.username,
+            myself: true,
+        },
+        replyTo: message,
+        date: res.date,
+        text: response,
+    });
 
     chat.history = history;
 });
+
+void bot.start({ drop_pending_updates: false });
 
 function handleMessage(
     msg: Message & Update.NonChannel,
@@ -503,4 +469,65 @@ class Typer {
     }
 }
 
-void bot.start({ drop_pending_updates: true });
+// Returns chat data, creates new one if it does not exist
+function getChat(m: Memory, chatId: number, msgId: number, chatType: string) {
+    let chat = chats[chatId];
+
+    if (!chats[chatId]) {
+        chat = {
+            notes: '',
+            lastNotes: msgId,
+            history: [],
+            type: chatType,
+        };
+
+        chats[chatId] = chat;
+    }
+
+    return chat;
+}
+
+async function genNotes(
+    notes: string,
+    messages: RequestMessage[],
+    prompt: string,
+): Promise<string> {
+    if (notes !== '') {
+        prompt +=
+            `This is your previous notes. Some are important, you must use them while writing a new version: ${notes}`;
+    }
+
+    let newNotes;
+    try {
+        notes = await Api.ask([
+            { role: 'system', content: env.AI.prompt },
+            ...messages,
+            { role: 'system', content: prompt },
+        ], logger);
+    } catch (error) {
+        throw new Werror(error, 'Taking notes');
+    }
+
+    return newNotes || notes;
+}
+
+function saveMemory(chats: Memory) {
+    const jsonData = JSON.stringify(chats, null, 2);
+
+    return Deno.writeTextFile('memory.json', jsonData);
+}
+
+async function replyWithMarkdown(ctx: Context, text: string) {
+    let res;
+    try {
+        res = await ctx.reply(text, {
+            reply_to_message_id: ctx.msg?.message_id,
+            parse_mode: 'Markdown',
+        });
+    } catch (_) { // Retry without markdown
+        res = await ctx.reply(text, {
+            reply_to_message_id: ctx.msg?.message_id,
+        });
+    }
+    return res;
+}

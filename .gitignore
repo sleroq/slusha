@@ -1,3 +1,5 @@
 /scripts/env.bash
 /log
 /memory.json
+/out/
+/.idea/
