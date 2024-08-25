@@ -13,13 +13,26 @@ import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
 const logger = new Logger();
 await logger.initFileLogger('log', { rotate: true });
 
+
+// TODO: move this chit to config
 const NAMES = [
     'слюша',
     'шлюша',
     'слюща',
     'союша',
+    'slusha',
+    'ck\\.if',
     'слбша',
+    'слюшенция',
+    'слюшка',
+    'шлюшка',
+    'слюшенька',
+    'слюшечка',
+    'слюшунчик',
+    'слюшаня',
+    '@slchat_bot',
 ];
+
 const tendToReply = [
     'sleeper',
     'слипер',
