@@ -13,6 +13,13 @@ import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
 const logger = new Logger();
 await logger.initFileLogger('log', { rotate: true });
 
+import {
+    ChatMessage,
+    getChat,
+    loadMemory,
+    Memory,
+    saveMemory,
+} from './lib/memory.ts';
 
 // TODO: move this chit to config
 const NAMES = [
@@ -75,56 +82,7 @@ const tendToIgnore = [
     '\\[Sticker.*\\]$',
 ];
 
-interface Sender {
-    id: number;
-    name: string;
-    username: string | undefined;
-    myself?: boolean;
-}
-
-export interface ChatMessage {
-    sender: Sender;
-    replyTo?: {
-        sender: Sender;
-        text: string;
-    };
-    date: number;
-    text: string;
-}
-
-interface Chat {
-    notes: string;
-    lastNotes: number;
-    history: ChatMessage[];
-    type: string;
-}
-
-interface Memory {
-    [key: string]: Chat;
-}
-
-async function loadMemory() {
-    let data;
-
-    try {
-        data = await Deno.readTextFile('memory.json');
-    } catch (error) {
-        logger.warn('reading memory: ', error);
-        return;
-    }
-
-    let parsedData: Memory;
-    try {
-        parsedData = JSON.parse(data);
-    } catch (error) {
-        logger.warn('reading memory: ', error);
-        return;
-    }
-
-    return parsedData;
-}
-
-const chats: Memory = await loadMemory() || {};
+const memory: Memory = await loadMemory();
 const env = resolveEnv();
 
 interface RequestInfo {
@@ -488,54 +446,6 @@ class Typer {
     stop() {
         this.stopped = true;
     }
-}
-
-// Returns chat data, creates new one if it does not exist
-function getChat(m: Memory, chatId: number, msgId: number, chatType: string) {
-    let chat = chats[chatId];
-
-    if (!chats[chatId]) {
-        chat = {
-            notes: '',
-            lastNotes: msgId,
-            history: [],
-            type: chatType,
-        };
-
-        chats[chatId] = chat;
-    }
-
-    return chat;
-}
-
-async function genNotes(
-    notes: string,
-    messages: RequestMessage[],
-    prompt: string,
-): Promise<string> {
-    if (notes !== '') {
-        prompt +=
-            `This is your previous notes. Some are important, you must use them while writing a new version: ${notes}`;
-    }
-
-    let newNotes;
-    try {
-        notes = await Api.ask([
-            { role: 'system', content: env.AI.prompt },
-            ...messages,
-            { role: 'system', content: prompt },
-        ], logger);
-    } catch (error) {
-        throw new Werror(error, 'Taking notes');
-    }
-
-    return newNotes || notes;
-}
-
-function saveMemory(chats: Memory) {
-    const jsonData = JSON.stringify(chats, null, 2);
-
-    return Deno.writeTextFile('memory.json', jsonData);
 }
 
 async function replyWithMarkdown(ctx: Context, text: string) {
