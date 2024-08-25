@@ -552,3 +552,14 @@ async function replyWithMarkdown(ctx: Context, text: string) {
     }
     return res;
 }
+
+Deno.addSignalListener('SIGINT', async () => {
+    try {
+        await saveMemory(memory);
+        logger.info('Memory saved on exit');
+    } catch (error) {
+        throw new Werror(error, 'Saving memory on exit');
+    } finally {
+        Deno.exit();
+    }
+});
