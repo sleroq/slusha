@@ -17,7 +17,7 @@ const configSchema = z.object({
         temperature: z.number().default(0.9),
         topK: z.number().default(5),
         topP: z.number().default(0.8),
-        prompt: z.string().optional(),
+        prompt: z.string(),
         finalPrompt: z.string().optional(),
         notesPrompt: z.string().optional(),
         messagesToPass: z.number().default(5),
