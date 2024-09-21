@@ -42,9 +42,9 @@ interface HistoryOptions {
 
 type Prompt = Array<CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage>;
 
-export function makeHistory(history: ChatMessage[], options: HistoryOptions = {}): Prompt {
-    let { symbolLimit, usernames, messagesLimit } = options;
-    if (!usernames) usernames = true;
+export function makeHistory(history: ChatMessage[], options: HistoryOptions): Prompt {
+    const { symbolLimit, messagesLimit } = options;
+    const usernames = options?.usernames ?? true;
 
     if (history.length > messagesLimit) {
         history.splice(0, history.length - messagesLimit);
