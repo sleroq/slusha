@@ -126,7 +126,13 @@ bot.on('message', (ctx, next) => {
 
 // Get response from AI
 bot.on('message', async (ctx) => {
-    const messages = makeHistory(ctx.m.getHistory(), { messagesLimit: config.ai.messagesToPass });
+    const messages = makeHistory(
+        ctx.m.getHistory(),
+        {
+            messagesLimit: config.ai.messagesToPass,
+            symbolLimit: config.ai.messageMaxLength,
+        }
+    );
 
     messages.unshift({
         role: 'system',

@@ -35,18 +35,16 @@ export function sliceMessage(message: string, maxLength: number): string {
 }
 
 interface HistoryOptions {
-    simbolLimit?: number;
-    messagesLimit?: number;
+    symbolLimit: number;
+    messagesLimit: number;
     usernames?: boolean;
 }
 
 type Prompt = Array<CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage>;
 
 export function makeHistory(history: ChatMessage[], options: HistoryOptions = {}): Prompt {
-    let { simbolLimit, usernames, messagesLimit } = options;
-    if (!simbolLimit) simbolLimit = 2000;
+    let { symbolLimit, usernames, messagesLimit } = options;
     if (!usernames) usernames = true;
-    if (!messagesLimit) messagesLimit = 5;
 
     if (history.length > messagesLimit) {
         history.splice(0, history.length - messagesLimit);
@@ -65,7 +63,7 @@ export function makeHistory(history: ChatMessage[], options: HistoryOptions = {}
             if (i == history.length - 1) {
                 const replyText = sliceMessage(
                     message.replyTo.text,
-                    simbolLimit,
+                    symbolLimit,
                 );
                 context +=
                     ` (in reply to: ${message.replyTo.sender.name} > "${replyText}")`;
@@ -74,7 +72,7 @@ export function makeHistory(history: ChatMessage[], options: HistoryOptions = {}
             }
         }
 
-        context += ':\n' + sliceMessage(message.text, simbolLimit);
+        context += ':\n' + sliceMessage(message.text, symbolLimit);
 
         prompt.push({
             role: 'user',
