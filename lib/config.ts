@@ -1,5 +1,14 @@
 import { z } from 'https://deno.land/x/zod@v3.23.8/mod.ts';
 
+function isValidRegex(val: unknown): val is RegExp {
+    try {
+        new RegExp(val);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 const configSchema = z.object({
     ai: z.object({
         model: z.string().default('gemini-1.5-flash'),
@@ -8,10 +17,10 @@ const configSchema = z.object({
         notesPrompt: z.string().optional(),
     }),
     startMessage: z.string().default('Привет! Я Слюша, бот-гений.'),
-    names: z.array(z.string()),
-    tendToReply: z.array(z.string()),
+    names: z.array(z.string(), z.custom(isValidRegex)),
+    tendToReply: z.array(z.string(), z.custom(isValidRegex)),
+    tendToIgnore: z.array(z.string(), z.custom(isValidRegex)),
     nepons: z.array(z.string()),
-    tendToIgnore: z.array(z.string()),
 });
 
 export type UserConfig = z.infer<typeof configSchema>;

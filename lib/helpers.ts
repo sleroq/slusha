@@ -145,3 +145,10 @@ export function getText(
 
     return text;
 }
+
+export function getRandomNepon(config: Config) {
+    const nepons = config.nepons;
+    const randomIndex = getRandomInt(0, nepons.length - 1);
+    return nepons[randomIndex];
+}
+

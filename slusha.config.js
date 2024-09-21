@@ -14,6 +14,8 @@ You are a dumb bot. Help other people and answer funny.
  * @type {import('./lib/config.ts').UserConfig}
  */
 export default {
+    startMessage: 'Привет! Я Слюша, бот-гений.',
+
     ai: {
         model: 'gemini-1.5-flash',
         prompt,
@@ -45,10 +47,11 @@ export default {
     ],
 
     nepons: [
-        'непон.. попробуй перефразировать',
-        'я непон тебя',
+        'непон..',
         'нехочу отвечать щас чето',
         'подумаю, может потом тебе скажу',
+        'Чета непон жесткий, попробуй позже',
+        'откисаю, попробуй позже',
     ],
 
     tendToIgnore: [

@@ -7,7 +7,7 @@ import { ChatMemory, ChatMessage, loadMemory } from './lib/memory.ts';
 import { generateText } from 'npm:ai';
 import { google } from 'npm:@ai-sdk/google';
 
-import { getText, makeHistoryString } from './lib/helpers.ts';
+import { getRandomNepon, getText, makeHistoryString } from './lib/helpers.ts';
 import { replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
 import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
 
@@ -163,6 +163,8 @@ bot.on('message', async (ctx) => {
         });
     } catch (error) {
         logger.error('Could not get response: ', error);
+
+        await ctx.reply(getRandomNepon(config));
         return;
     }
 
@@ -185,7 +187,7 @@ bot.on('message', async (ctx) => {
     } catch (error) {
         logger.error('Could not reply to user: ', error);
 
-        await ctx.reply('Чета непон жесткий, попробуй позже');
+        await ctx.reply(getRandomNepon(config));
         return;
     }
 
