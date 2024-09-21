@@ -7,7 +7,7 @@ import { ChatMemory, ChatMessage, loadMemory } from './lib/memory.ts';
 import { generateText } from 'npm:ai';
 import { google } from 'npm:@ai-sdk/google';
 
-import { getRandomNepon, getText, makeHistory } from './lib/helpers.ts';
+import { getRandomNepon, getText, makeHistory, probability, testMessage } from './lib/helpers.ts';
 import { replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
 import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
 
@@ -79,7 +79,7 @@ bot.use(limit(
 
         // This is called when the limit is exceeded.
         onLimitExceeded: () => {
-            logger.warn('Rate limit exceeded');
+            logger.warn('Skipping message because rate limit exceeded');
         },
 
         keyGenerator: (ctx) => {
@@ -115,13 +115,20 @@ bot.on('message', (ctx, next) => {
 
     // Mentined bot's name
     if (new RegExp(`(${config.names.join('|')})`, 'gmi').test(msg.text)) {
-        logger.info("Mentioned bot's name");
+        logger.info('Replying because of mentioned bot\'s name');
         return next();
     }
 
-    // TODO: Tend to reply
-    
-    // TODO: Tend to ignore
+    if (testMessage(config.tendToReply, msg.text) && probability(config.tendToReplyProbability)) {
+        logger.info('Replying because of tend to reply');
+        ctx.info.isRandom = true;
+        return next();
+    }
+
+    if (testMessage(config.tendToIgnore, msg.text) && probability(config.tendToIgnoreProbability)) {
+        logger.info('Ignoring because of tend to ignore');
+        return;
+    }
 });
 
 // Get response from AI

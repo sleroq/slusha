@@ -26,7 +26,9 @@ const configSchema = z.object({
     startMessage: z.string(),
     names: z.array(z.string(), z.custom(isValidRegex)),
     tendToReply: z.array(z.string(), z.custom(isValidRegex)),
+    tendToReplyProbability: z.number().default(50),
     tendToIgnore: z.array(z.string(), z.custom(isValidRegex)),
+    tendToIgnoreProbability: z.number().default(90),
     nepons: z.array(z.string()),
 });
 

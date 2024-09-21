@@ -51,6 +51,8 @@ export default {
         'AI',
     ],
 
+    tendToReplyProbability: 50,
+
     nepons: [
         'непон..',
         'нехочу отвечать щас чето',
@@ -88,4 +90,6 @@ export default {
         '/q',
         '\\[Sticker.*\\]$',
     ],
+
+    tendToIgnoreProbability: 90,
 }

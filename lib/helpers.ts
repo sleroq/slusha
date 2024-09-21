@@ -161,3 +161,26 @@ export function getRandomNepon(config: Config) {
     return nepons[randomIndex];
 }
 
+/**
+ * Returns true with probability of `percentage`
+ * @param percentage
+ * @returns boolean
+ * @throws Error if `percentage` is not between 0 and 100
+ */
+export function probability(percentage: number) {
+    if (percentage < 0 || percentage > 100) {
+        throw new Error('Percentage must be between 0 and 100');
+    }
+
+    return Math.random() < percentage / 100;
+}
+
+export function testMessage(regexs: Array<string | RegExp>, text: string) {
+    return regexs.some((regex) => {
+        if (typeof regex === 'string') {
+            return text.includes(regex);
+        }
+
+        return regex.test(text);
+    });
+}
