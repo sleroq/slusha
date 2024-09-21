@@ -13,16 +13,16 @@ function isValidRegex(val: unknown): val is RegExp {
 
 const configSchema = z.object({
     ai: z.object({
-        model: z.string().default('gemini-1.5-flash'),
-        temperature: z.number().default(0.9),
-        topK: z.number().default(5),
-        topP: z.number().default(0.8),
+        model: z.string(),
+        temperature: z.number(),
+        topK: z.number(),
+        topP: z.number(),
         prompt: z.string(),
-        finalPrompt: z.string().optional(),
+        finalPrompt: z.string(),
         notesPrompt: z.string().optional(),
-        messagesToPass: z.number().default(5),
+        messagesToPass: z.number(),
     }),
-    startMessage: z.string().default('Привет! Я Слюша, бот-гений.'),
+    startMessage: z.string(),
     names: z.array(z.string(), z.custom(isValidRegex)),
     tendToReply: z.array(z.string(), z.custom(isValidRegex)),
     tendToIgnore: z.array(z.string(), z.custom(isValidRegex)),

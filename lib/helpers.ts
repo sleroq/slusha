@@ -4,6 +4,8 @@ import {
 } from 'https://deno.land/x/grammy@v1.30.0/types.deno.ts';
 import { ChatMessage } from './memory.ts';
 import { Message } from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
+import { Config } from './config.ts';
+import { CoreAssistantMessage, CoreSystemMessage, CoreToolMessage, CoreUserMessage } from 'npm:ai';
 
 export function getRandomInt(min: number, max: number) {
     min = Math.ceil(min);
@@ -34,22 +36,28 @@ export function sliceMessage(message: string, maxLength: number): string {
 
 interface HistoryOptions {
     simbolLimit?: number;
+    messagesLimit?: number;
     usernames?: boolean;
 }
 
-export function makeHistoryString(
-    history: ChatMessage[],
-    { simbolLimit, usernames }: HistoryOptions = {},
-): string {
-    if (!simbolLimit) simbolLimit = 1000;
-    if (!usernames) usernames = true;
+type Prompt = Array<CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage>;
 
-    let result = '';
+export function makeHistory(history: ChatMessage[], options: HistoryOptions = {}): Prompt {
+    let { simbolLimit, usernames, messagesLimit } = options;
+    if (!simbolLimit) simbolLimit = 2000;
+    if (!usernames) usernames = true;
+    if (!messagesLimit) messagesLimit = 5;
+
+    if (history.length > messagesLimit) {
+        history.splice(0, history.length - messagesLimit);
+    }
+
+    const prompt: Prompt = [];
     for (let i = 0; i < history.length; i++) {
         const message = history[i];
-        let context = `${message.sender.name} (@${message.sender.username}): `;
+        let context = `${message.sender.name} (@${message.sender.username})`;
         if (!usernames) {
-            context = `${message.sender.name}: `;
+            context = `${message.sender.name}`;
         }
 
         if (message.replyTo && !message.sender.myself) {
@@ -60,18 +68,21 @@ export function makeHistoryString(
                     simbolLimit,
                 );
                 context +=
-                    `(in reply to: ${message.replyTo.sender.name} > "${replyText}"): `;
+                    ` (in reply to: ${message.replyTo.sender.name} > "${replyText}")`;
             } else {
-                context += `(in reply to: ${message.replyTo.sender.name}): `;
+                context += ` (in reply to: ${message.replyTo.sender.name})`;
             }
         }
 
-        context += sliceMessage(message.text, simbolLimit);
+        context += ':\n' + sliceMessage(message.text, simbolLimit);
 
-        result += context + '\n';
+        prompt.push({
+            role: 'user',
+            content: context,
+        });
     }
 
-    return result;
+    return prompt;
 }
 
 type ReplyMessage = Exclude<Message.CommonMessage['reply_to_message'], undefined>;
@@ -114,8 +125,8 @@ export function getText(
             break;
     }
 
-    const from = `(forwarded from ${name.slice(0, 20)})`;
-    text = `${from}: ${text}`;
+    const from = name !== '' ? `(forwarded from ${name.slice(0, 20)}): ` : '';
+    text = from + text;
 
     const attachments: (keyof (Message & Update.NonChannel))[] = [
         'photo',

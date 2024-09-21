@@ -7,7 +7,7 @@ import { ChatMemory, ChatMessage, loadMemory } from './lib/memory.ts';
 import { generateText } from 'npm:ai';
 import { google } from 'npm:@ai-sdk/google';
 
-import { getRandomNepon, getText, makeHistoryString } from './lib/helpers.ts';
+import { getRandomNepon, getText, makeHistory } from './lib/helpers.ts';
 import { replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
 import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
 
@@ -126,11 +126,19 @@ bot.on('message', (ctx, next) => {
 
 // Get response from AI
 bot.on('message', async (ctx) => {
-    const history = makeHistoryString(ctx.m.getHistory().slice(config.ai.messagesToPass));
-    const prompt = `${config.ai.prompt}\n` +
-        `Input: ${history}\n` +
-        `Instruction: ${config.ai.finalPrompt}` +
-        `Output: `;
+    const messages = makeHistory(ctx.m.getHistory(), { messagesLimit: config.ai.messagesToPass });
+
+    messages.unshift({
+        role: 'system',
+        content: config.ai.prompt,
+    });
+
+    messages.push({
+        role: 'user',
+        content: config.ai.finalPrompt,
+    });
+
+    console.log(`Messages to send to AI:`, messages);
 
     const time = new Date().getTime();
 
@@ -160,7 +168,7 @@ bot.on('message', async (ctx) => {
                     ],
                 },
             ),
-            prompt,
+            messages,
             temperature: config.ai.temperature,
             topK: config.ai.topK,
             topP: config.ai.topP,
@@ -233,3 +241,4 @@ Deno.addSignalListener('SIGINT', async () => {
         Deno.exit();
     }
 });
+
