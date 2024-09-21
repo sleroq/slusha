@@ -1,6 +1,8 @@
 import { z } from 'https://deno.land/x/zod@v3.23.8/mod.ts';
 
 function isValidRegex(val: unknown): val is RegExp {
+    if (typeof val !== 'string') return false;
+
     try {
         new RegExp(val);
         return true;
