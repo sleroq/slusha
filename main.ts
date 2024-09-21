@@ -1,349 +1,81 @@
-import { Bot, Context } from 'https://deno.land/x/grammy@v1.14.1/mod.ts';
-import AIApi from './ai-api.ts';
 import Werror from './lib/werror.ts';
-import { delay } from 'https://deno.land/std@0.177.0/async/mod.ts';
-import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
-import {
-    getRandomInt,
-    getText,
-    removeBotName,
-    resolveEnv,
-    sliceMessage,
-} from './lib/helpers.ts';
-import {
-    Message,
-    Update,
-} from 'https://deno.land/x/grammy@v1.14.1/types.deno.ts';
-import {
-    ChatMessage,
-    getChat,
-    loadMemory,
-    Memory,
-    saveMemory,
-} from './lib/memory.ts';
 import logger from './lib/logger.ts';
+import resolveConfig, { Config } from './lib/config.ts';
+import setupBot from './lib/telegram/setup-bot.ts';
+import { ChatMemory, ChatMessage, loadMemory } from './lib/memory.ts';
 
-// TODO: move this chit to config
-const NAMES = [
-    'слюша',
-    'шлюша',
-    'слюща',
-    'союша',
-    'slusha',
-    'ck\\.if',
-    'слбша',
-    'слюшенция',
-    'слюшка',
-    'шлюшка',
-    'слюшенька',
-    'слюшечка',
-    'слюшунчик',
-    'слюшаня',
-    '@slchat_bot',
-];
+import { generateText } from 'npm:ai';
+import { google } from 'npm:@ai-sdk/google';
 
-const tendToReply = [
-    'лучшая девочка',
-    'лучший бот',
-    'AI',
-];
+import { getText, makeHistoryString } from './lib/helpers.ts';
+import { replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
+import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
 
-const nepons = [
-    'непон.. попробуй перефразировать',
-    'я непон тебя',
-    'нехочу отвечать щас чето',
-    'подумаю, может потом тебе скажу',
-];
+const memory = await loadMemory();
 
-const tendToIgnore = [
-    'ор+',
-    'ору+',
-    '(ха)+',
-    'а(пх)+',
-    'сука+',
-    'сук',
-    'ло+л',
-    'еба+ть',
-    'бля+ть',
-    'пон.*',
-    'хорошо',
-    'гуд',
-    'норм.*',
-    'ок',
-    'ok',
-    'кек',
-    'ок.*',
-    'лан',
-    'ладно',
-    'спс',
-    'да',
-    'согласен',
-    'согласна',
-    'база',
-    'реально',
-    '/q',
-    '\\[Sticker.*\\]$',
-];
-
-const memory: Memory = await loadMemory();
-const env = resolveEnv();
-
-let makingNotes = false;
-
-interface RequestInfo {
-    isRandom: boolean;
+let config: Config;
+try {
+    config = await resolveConfig();
+} catch (error) {
+    logger.error('Config error: ', error);
+    Deno.exit(1);
 }
 
-type MyContext = Context & {
-    info: RequestInfo;
-};
+const bot = setupBot(config);
 
-const bot = new Bot<MyContext>(env.botToken);
+bot.on('message', (ctx, next) => {
+    // Init custom context
+    ctx.memory = memory;
+    ctx.m = new ChatMemory(memory, ctx.chat);
 
-const Api = new AIApi(
-    env.AI.url,
-    env.AI.prompt,
-    env.AI.model,
-    env.AI.token,
-);
-bot.catch((error) => logger.error(error));
-
-bot.on('message', async (ctx, next) => {
-    const chat = getChat(
-        memory,
-        ctx.chat.id,
-        ctx.chat.type,
-    );
-    const message = handleMessage(ctx.msg);
-    if (!message) return;
-
-    const history = chat.history;
-
-    // Make sure history is not too long
-    while (history.length > 80) {
-        history.shift();
+    // Save all messages to memory
+    let replyTo: ChatMessage['replyTo'] | undefined;
+    if (ctx.msg.reply_to_message && ctx.msg.reply_to_message.from) {
+        replyTo = {
+            id: ctx.msg.reply_to_message.message_id,
+            sender: {
+                id: ctx.msg.reply_to_message.from.id,
+                name: ctx.msg.reply_to_message.from.first_name,
+                username: ctx.msg.reply_to_message.from.username,
+            },
+            text: getText(
+                ctx.msg.reply_to_message,
+            ) ?? '',
+        };
     }
 
-    history.push(message);
-
-    chat.history = history;
-
-    // Save memory every 20 messages
-    if (memory.unsavedMsgsCount > 20) {
-        try {
-            await saveMemory(memory);
-        } catch (error) {
-            throw new Werror(error, 'Saving memory');
-        }
-
-        memory.unsavedMsgsCount = 0;
-
-        logger.info('Memory saved');
-    } else {
-        memory.unsavedMsgsCount++;
-    }
-
-    ctx.info = { isRandom: false };
-
-    await next();
-});
-
-bot.command('start', (ctx) => ctx.reply('Привет! Я Слюша, бот-гений.'));
-
-// Make summary and notes every X messages
-bot.on('message', async (ctx, next) => {
-    const chat = getChat(
-        memory,
-        ctx.chat.id,
-        ctx.chat.type,
-    );
-
-    const usedDaysAgo = (Date.now() - chat.lastUse) / 1000 / 60 / 60 / 24;
-
-    // Make less notes if bot is not used often
-    let frequency = 80;
-    if (usedDaysAgo > 2) {
-        frequency = usedDaysAgo ** 2 * 20;
-    }
-
-    if (chat.lastNotes < frequency || makingNotes) {
-        chat.lastNotes++;
-        await next();
-        return;
-    }
-
-    const makeNotes = async () => {
-        makingNotes = true;
-
-        const historyPortion = chat.history.slice(-80);
-
-        const start = Date.now();
-        try {
-            const notes = await Api.makeNotes(historyPortion);
-            chat.notes.push(notes);
-            chat.lastNotes = 0;
-        } catch (error) {
-            logger.error('Could not make notes', error);
-        }
-        logger.info('Notes made in', (Date.now() - start) / 1000, 'seconds');
-
-        // Keep only 10 notes
-        while (chat.notes.length > 20) {
-            chat.notes.shift();
-        }
-
-        makingNotes = false;
-    };
-
-    void makeNotes();
-
-    await next();
-});
-
-bot.command('summary', async (ctx) => {
-    const chat = getChat(
-        memory,
-        ctx.chat.id,
-        ctx.chat.type,
-    );
-
-    if (chat.notes.length === 0) {
-        await ctx.reply('Рановато еще, надо накопить больше сообщений', {
-            reply_to_message_id: ctx.msg?.message_id,
-        });
-        return;
-    }
-
-    const response = chat.notes.slice(-2).join('\n');
-
-    logger.info('/summary', response);
-
-    await replyWithMarkdown(ctx, response);
-
-    chat.history.push({
+    // Save every message to memory
+    ctx.m.addMessage({
+        id: ctx.msg.message_id,
         sender: {
-            id: bot.botInfo.id,
-            name: bot.botInfo.first_name,
-            username: bot.botInfo.username,
-            myself: true,
+            id: ctx.msg.from.id,
+            name: ctx.msg.from.first_name,
+            username: ctx.msg.from.username,
         },
-        date: Date.now(),
-        text: response,
-        isSummary: true,
+        replyTo,
+        date: ctx.msg.date,
+        text: getText(ctx.msg) ?? '',
+        isSummary: false,
+        info: ctx.message,
     });
 
-    chat.lastUse = Date.now();
+    ctx.m.removeOldMessages();
+
+    return next();
 });
 
-bot.on('message', async (ctx, next) => {
-    const message = handleMessage(ctx.msg);
-    if (!message) return;
+bot.command('start', (ctx) => ctx.reply(config.startMessage));
 
-    const chat = getChat(
-        memory,
-        ctx.chat.id,
-        ctx.chat.type,
-    );
-
-    const mustReply = shouldReply(
-        chat,
-        message.text,
-        message.replyTo?.sender.id,
-        ctx.chat.type,
-        message.replyTo?.id,
-    );
-    const randomReply = getRandomInt(0, 100) > 100 - env.randomReply;
-
-    const typer = new Typer(ctx);
-    if (mustReply || randomReply) void typer.type();
-
-    if (randomReply) {
-        ctx.info.isRandom = true;
-        logger.info('Random reply');
-        await next();
-    } else if (mustReply) {
-        queue();
-    }
-
-    typer.stop();
-
-    // Queue messages from single user, to avoid spam and answer more human-like
-    function queue() {
-        setTimeout(async () => {
-            const userMsg = chat.history.filter((el) =>
-                el.sender.id === ctx.msg.from.id
-            );
-
-            const lastUserMsg = userMsg.reduce((prev, current) =>
-                current.date > prev.date ? current : prev
-            );
-
-            const laterMustReply = userMsg.find((el) =>
-                shouldReply(
-                    chat,
-                    el.text,
-                    el.replyTo?.sender.id,
-                    ctx.chat.type,
-                    el.replyTo?.isSummary,
-                ) &&
-                el.date > ctx.msg.date
-            );
-
-            // TODO: Implement per-chat rate-limiting
-
-            // Skipping, because will reply later anyway
-            if (laterMustReply) {
-                typer.stop();
-                logger.info(
-                    'Skipping message, will reply later anyway',
-                    message?.text,
-                );
-                return;
-            }
-
-            // Waiting another x seconds to check if user finished
-            if (
-                mustReply &&
-                lastUserMsg.date > ctx.msg.date &&
-                ((Date.now() / 1000 - lastUserMsg.date) < 3)
-            ) {
-                logger.info(
-                    'User is typing, waiting for the message to be sent',
-                );
-                queue();
-                return;
-            }
-
-            if (mustReply) {
-                logger.info('Must reply', message?.text);
-                try {
-                    await next();
-                } catch (error) {
-                    // Must handle error here, because queue runs without await
-                    console.log(error);
-                    typer.stop();
-                    return;
-                }
-            } else {
-                logger.info(
-                    'No reply, no if was triggered, skipping',
-                    message?.text,
-                    lastUserMsg.text,
-                    ctx.msg.date > lastUserMsg.date,
-                    (Date.now() / 1000 - lastUserMsg.date) < 3,
-                    mustReply,
-                    'mustReply',
-                );
-            }
-        }, 4000);
-    }
+bot.command('forget', async (ctx) => {
+    ctx.m.clear();
+    await ctx.reply('История очищена');
 });
 
 bot.use(limit(
     {
-        // Allow only 2 messages to be handled every 5 seconds.
-        timeFrame: 5000,
-        limit: 2,
+        // Allow only 1 message to be handled every 2 seconds.
+        timeFrame: 2000,
+        limit: 1,
 
         // This is called when the limit is exceeded.
         onLimitExceeded: () => {
@@ -360,234 +92,134 @@ bot.use(limit(
     },
 ));
 
-bot.on('message', async (ctx) => {
-    const message = handleMessage(ctx.msg);
-    if (!message) return;
+// Decide if we should reply to user
+bot.on('message', (ctx, next) => {
+    const msg = ctx.m.getLastMessage();
 
-    const chat = getChat(
-        memory,
-        ctx.chat.id,
-        ctx.chat.type,
-    );
-    const history = chat.history;
-
-    let response: string | undefined;
-    let error;
-
-    const lastNote = chat.notes.slice(-4).join('\n');
-
-    const time = new Date().getTime();
-    for (let i = 0; i < 2; i++) {
-        try {
-            response = await Api.chatReply(
-                history,
-                lastNote,
-            );
-            break;
-        } catch (err) {
-            error = err;
-            await delay(7000);
-        }
-    }
-    logger.info('Time to get response:', (new Date().getTime() - time) / 1000);
-
-    if (!response) {
-        if (!ctx.info.isRandom) {
-            logger.error('Unable to get response: ', error);
-
-            if (error instanceof Error) {
-                if (error.message === 'Safety violation detected in response') {
-                    await ctx.reply('Хочется тебя оскорбить, но я не могу', {
-                        reply_to_message_id: ctx.msg.message_id,
-                    });
-                    return;
-                }
-                if (
-                    error.message === 'No response candidates received from api'
-                ) {
-                    await ctx.reply('Извини, я не понял тебя', {
-                        reply_to_message_id: ctx.msg.message_id,
-                    });
-                    return;
-                }
-            }
-
-            const idk = nepons[Math.floor(Math.random() * nepons.length)];
-            await ctx.reply(idk, {
-                reply_to_message_id: ctx.msg.message_id,
-            });
-        }
-
+    // Ignore if text is empty
+    if (!msg.text) {
         return;
     }
 
-    response = removeBotName(
-        response,
-        bot.botInfo.first_name,
-        bot.botInfo.username,
-    );
-    response = response.replace(
-        /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g,
-        '',
-    );
-    response = response.replace(/\s+/g, ' ');
-    response = response.replace(/^\(in reply.+?\)/gi, '');
-
-    logger.info(`Response: "${response}"`);
-
-    let res;
-    try {
-        res = await replyWithMarkdown(ctx, response);
-    } catch (error) {
-        throw new Werror(error, 'could not reply to user');
+    // Direct reply to bot
+    if (ctx.msg.reply_to_message?.from?.id === bot.botInfo.id) {
+        logger.info('Direct reply to bot');
+        return next();
     }
 
-    history.push({
-        id: res.message_id,
+    // Direct message
+    if (ctx.msg.chat.type === 'private') {
+        logger.info('Direct message');
+        return next();
+    }
+
+    // Mentined bot's name
+    if (new RegExp(`(${config.names.join('|')})`, 'gmi').test(msg.text)) {
+        logger.info("Mentioned bot's name");
+        return next();
+    }
+});
+
+// Get response from AI
+bot.on('message', async (ctx) => {
+    const history = makeHistoryString(ctx.m.getHistory().slice(-10));
+    const prompt = `${config.ai.prompt}\n` +
+        `Input: ${history}\n` +
+        `Instruction: ${config.ai.finalPrompt}` +
+        `Output: `;
+
+    const time = new Date().getTime();
+
+    let response;
+    try {
+        response = await generateText({
+            model: google(
+                config.ai.model,
+                {
+                    safetySettings: [
+                        {
+                            category: 'HARM_CATEGORY_HARASSMENT',
+                            threshold: 'BLOCK_NONE',
+                        },
+                        {
+                            category: 'HARM_CATEGORY_HATE_SPEECH',
+                            threshold: 'BLOCK_NONE',
+                        },
+                        {
+                            category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                            threshold: 'BLOCK_NONE',
+                        },
+                        {
+                            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+                            threshold: 'BLOCK_NONE',
+                        },
+                    ],
+                },
+            ),
+            prompt,
+            temperature: 0.9,
+            topK: 5,
+            topP: 0.8,
+        });
+    } catch (error) {
+        logger.error('Could not get response: ', error);
+        return;
+    }
+
+    const title = ctx.chat.title ?? ctx.chat.first_name;
+    const username = ctx.chat.username ?? '';
+    logger.info('Time to get response:', (new Date().getTime() - time) / 1000, `for "${title}" (@${username})`);
+
+    let replyText = response.text;
+    // Remove emojis
+    replyText = replyText.replace(
+        /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/g,
+        ' ',
+    );
+
+    logger.info('Response:', replyText);
+
+    let replyInfo;
+    try {
+        replyInfo = await replyWithMarkdown(ctx, replyText);
+    } catch (error) {
+        logger.error('Could not reply to user: ', error);
+
+        await ctx.reply('Чета непон жесткий, попробуй позже');
+        return;
+    }
+
+    // Save bot's reply
+    ctx.m.addMessage({
+        id: replyInfo.message_id,
         sender: {
             id: bot.botInfo.id,
             name: bot.botInfo.first_name,
             username: bot.botInfo.username,
             myself: true,
         },
-        date: res.date,
-        text: response.replace(/[\n\r]/g, ' '),
+        date: replyInfo.date,
+        text: replyText,
         isSummary: false,
+        info: ctx.message,
     });
-
-    chat.history = history;
-    chat.lastUse = Date.now();
 });
 
-void bot.start({ drop_pending_updates: false });
+void bot.start();
 
-function handleMessage(
-    msg: Message & Update.NonChannel,
-): ChatMessage | undefined {
-    const text = getText(msg, bot.botInfo.id);
-
-    if (!text) return;
-
-    let replyTo: ChatMessage['replyTo'] | undefined;
-    const reply = msg.reply_to_message;
-
-    if (reply?.from && (reply.caption || reply.text || reply.sticker)) {
-        const replyText = getText(reply, bot.botInfo.id);
-
-        if (replyText) {
-            replyTo = {
-                sender: {
-                    id: reply.from.id,
-                    name: reply.from.first_name,
-                    username: reply.from.username,
-                },
-                text: replyText,
-            };
-        }
-    }
-
-    return {
-        id: msg.message_id,
-        sender: {
-            id: msg.from.id,
-            name: msg.from.first_name,
-            username: msg.from.username,
-        },
-        replyTo,
-        date: msg.date,
-        text,
-        isSummary: false,
-    };
-}
-
-function shouldReply(
-    chat: Chat,
-    text: string,
-    replyFromId: number | undefined,
-    chatType: string,
-    replyToId: number | undefined,
-): boolean {
-    const direct =
-        // Message reply
-        replyFromId === bot.botInfo.id ||
-        // Mentioned name
-        new RegExp(`(${NAMES.join('|')})`, 'gmi').test(text) ||
-        // PM
-        chatType === 'private';
-
-    const interested =
-        // Messages with some special text
-        new RegExp(`(${tendToReply.join('|')})`, 'gmi').test(text) &&
-        getRandomInt(0, 100) > 100 - 30;
-
-    const ignored = (
-        // Short message with boring text
-        text?.length < 30 &&
-        new RegExp(`^(${tendToIgnore.join('|')})`, 'gmi').test(text) &&
-        getRandomInt(0, 100) > 100 - 10
-    )
-
-    logger.info(
-        `Deciding on reply "${
-            sliceMessage(text, 20)
-        }": Direct: ${direct}, Interested: ${interested}, Ignored: ${ignored}`,
-    );
-
-    if (direct && !ignored) {
-        return true;
-    }
-
-    return interested && !ignored;
-}
-
-class Typer {
-    ctx: Context;
-    stopped = false;
-
-    constructor(ctx: Context) {
-        this.ctx = ctx;
-    }
-
-    async type() {
-        const timeout = 1000 * 60;
-        const secondsToWait = 5 * 1000;
-
-        let time = 0;
-
-        while (!this.stopped && time < timeout) {
-            try {
-                await this.ctx.replyWithChatAction('typing');
-            } catch (_) {
-                continue;
-            }
-            await delay(secondsToWait);
-            time += secondsToWait;
-        }
-    }
-
-    stop() {
-        this.stopped = true;
-    }
-}
-
-async function replyWithMarkdown(ctx: Context, text: string) {
-    let res;
+// Save memory every minute
+setInterval(async () => {
     try {
-        res = await ctx.reply(text, {
-            // reply_to_message_id: ctx.msg?.message_id,
-            parse_mode: 'Markdown',
-        });
-    } catch (_) { // Retry without markdown
-        res = await ctx.reply(text, {
-            // reply_to_message_id: ctx.msg?.message_id,
-        });
+        await memory.save();
+    } catch (error) {
+        logger.error('Could not save memory: ', error);
     }
-    return res;
-}
+}, 60 * 1000);
 
+// Save memory on exit
 Deno.addSignalListener('SIGINT', async () => {
     try {
-        await saveMemory(memory);
+        await memory.save();
         logger.info('Memory saved on exit');
     } catch (error) {
         throw new Werror(error, 'Saving memory on exit');

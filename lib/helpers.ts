@@ -1,79 +1,9 @@
 import {
-    Message,
-    ReplyMessage,
     Sticker,
     Update,
-} from 'https://deno.land/x/grammy@v1.14.1/types.deno.ts';
+} from 'https://deno.land/x/grammy@v1.30.0/types.deno.ts';
 import { ChatMessage } from './memory.ts';
-
-interface Environment {
-    AI: {
-        url: string;
-        model: string;
-        token?: string;
-        prompt: string;
-        finalPrompt: string;
-        notesPrompt?: string;
-    };
-    contextTimeout: number;
-    contextLimit: number;
-    memoryTimeout: number;
-    messageMaxLength: number;
-    randomReply: number;
-    botToken: string;
-}
-
-const DEFAULT_MODEL = 'gpt-3.5-turbo-16k';
-const DEFAULT_URL = 'https://api.openai.com/v1/chat/completions';
-const DEFAULT_PROMPT = `
-You are a bot Слюша, created by @sleroq. Help other people and answer funny.
-`;
-const DEFAULT_FINAL_PROMPT = 'Answer must only contain have your reply text.';
-
-const DEFAULT_CONTEXT_LIMIT = 40;
-const DEFAULT_CONTEXT_TIMEOUT = 60 * 24 * 7; // In minutes
-const DEFAULT_MEMORY_TIMEOUT = 60 * 24 * 7; // In minutes
-const DEFAULT_MESSAGES_MAX_LENGTH = 600; // In minutes
-const DEFAULT_RANDOM_REPLY = 1; // Percentage of messages bot will reply by itself
-
-export function resolveEnv(): Environment {
-    const botToken = Deno.env.get('BOT_TOKEN');
-    if (!botToken) throw new Error('BOT_TOKEN is required');
-
-    const url = Deno.env.get('AI_API_URL');
-    const model = Deno.env.get('AI_MODEL');
-    const AI_token = Deno.env.get('AI_AUTH_TOKEN');
-    let prompt = Deno.env.get('AI_SYSTEM_PROMPT');
-    prompt = prompt?.replaceAll('\n', ' ');
-    let finalPrompt = Deno.env.get('AI_FINAL_PROMPT');
-    finalPrompt = finalPrompt?.replaceAll('\n', ' ');
-    let notesPrompt = Deno.env.get('AI_NOTES_PROMPT');
-    notesPrompt = notesPrompt?.replaceAll('\n', ' ');
-
-    const contextTimeout = Deno.env.get('BOT_CONTEXT_TIMEOUT');
-    const contextLimit = Deno.env.get('BOT_CONTEXT_LIMIT');
-    const maxRetries = Deno.env.get('BOT_MAX_RETRIES');
-    const messagesMaxLength = Deno.env.get('BOT_MESSAGES_MAX_LENGTH');
-    const randomReply = Deno.env.get('BOT_RANDOM_REPLY');
-
-    return {
-        AI: {
-            url: url || DEFAULT_URL,
-            model: model || DEFAULT_MODEL,
-            token: AI_token,
-            prompt: prompt || DEFAULT_PROMPT,
-            finalPrompt: finalPrompt || DEFAULT_FINAL_PROMPT,
-            notesPrompt: notesPrompt,
-        },
-        contextTimeout: Number(contextTimeout) || DEFAULT_CONTEXT_TIMEOUT,
-        contextLimit: Number(contextLimit) || DEFAULT_CONTEXT_LIMIT,
-        memoryTimeout: Number(maxRetries) || DEFAULT_MEMORY_TIMEOUT,
-        messageMaxLength: Number(messagesMaxLength) ||
-            DEFAULT_MESSAGES_MAX_LENGTH,
-        randomReply: Number(randomReply) || DEFAULT_RANDOM_REPLY,
-        botToken,
-    };
-}
+import { Message } from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
 
 export function getRandomInt(min: number, max: number) {
     min = Math.ceil(min);
@@ -144,9 +74,12 @@ export function makeHistoryString(
     return result;
 }
 
+type ReplyMessage = Exclude<Message.CommonMessage['reply_to_message'], undefined>;
+
 export function getText(
-    msg: (Message & Update.NonChannel) | ReplyMessage,
-    botId: number,
+    msg:
+        | Message
+        | ReplyMessage,
 ) {
     let text = msg.text || '';
 
@@ -163,14 +96,26 @@ export function getText(
 
     if (!text.trim()) return;
 
-    if (msg.forward_from && msg.forward_from.id !== botId) {
-        const from = msg.forward_from.first_name.slice(0, 20);
-        text = `(forwarded from ${from}): ${text}`;
+    let name = '';
+    switch (msg.forward_origin?.type) {
+        case 'user':
+            name = msg.forward_origin.sender_user.first_name ?? '';
+            break;
+        case 'chat':
+            name = msg.forward_origin.sender_chat.first_name ??
+                msg.forward_origin.sender_chat.title ?? '';
+            break;
+        case 'channel':
+            name = msg.forward_origin.chat.first_name ??
+                msg.forward_origin.chat.title ?? '';
+            break;
+        case 'hidden_user':
+            name = 'hidden';
+            break;
     }
-    if (msg.forward_from_chat && 'title' in msg.forward_from_chat) {
-        const from = msg.forward_from_chat.title.slice(0, 20);
-        text = `(forwarded from ${from}): ${text}`;
-    }
+
+    const from = `(forwarded from ${name.slice(0, 20)})`;
+    text = `${from}: ${text}`;
 
     const attachments: (keyof (Message & Update.NonChannel))[] = [
         'photo',
