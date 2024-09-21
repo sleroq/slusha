@@ -3,9 +3,24 @@ import {
     Update,
 } from 'https://deno.land/x/grammy@v1.30.0/types.deno.ts';
 import { ChatMessage } from './memory.ts';
-import { Message } from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
+import {
+    Message,
+    PhotoSize,
+} from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
 import { Config } from './config.ts';
-import { CoreAssistantMessage, CoreSystemMessage, CoreToolMessage, CoreUserMessage } from 'npm:ai';
+import {
+    CoreAssistantMessage,
+    CoreSystemMessage,
+    CoreToolMessage,
+    CoreUserMessage,
+    ImagePart,
+    TextPart,
+} from 'npm:ai';
+import { Bot } from 'https://deno.land/x/grammy@v1.30.0/bot.ts';
+import { SlushaContext } from './telegram/setup-bot.ts';
+import { exists } from 'https://deno.land/x/logger@v1.1.1/fs.ts';
+import ky from 'https://esm.sh/ky@1.7.2';
+import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
 
 export function getRandomInt(min: number, max: number) {
     min = Math.ceil(min);
@@ -40,9 +55,58 @@ interface HistoryOptions {
     usernames?: boolean;
 }
 
-type Prompt = Array<CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage>;
+type Prompt = Array<
+    CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage
+>;
 
-export function makeHistory(history: ChatMessage[], options: HistoryOptions): Prompt {
+async function getPhotoContent(
+    bot: Bot<SlushaContext>,
+    logger: Logger,
+    photos: PhotoSize[],
+): Promise<Array<ImagePart>> {
+    const files = [];
+
+    const photo = photos.sort((a, b) => {
+        if (!a.file_size || !b.file_size) {
+            return 0;
+        }
+
+        if (a.file_size > b.file_size) {
+            return -1;
+        }
+
+        if (a.file_size < b.file_size) {
+            return 1;
+        }
+
+        return 0;
+    })[0];
+
+    let file: Uint8Array;
+    try {
+        file = await downloadFile(bot, photo.file_id);
+    } catch (error) {
+        logger.error(
+            'Could not download file: ',
+            error,
+        );
+        return [];
+    }
+
+    files.push(file);
+
+    return files.map((file) => ({
+        type: 'image',
+        image: file,
+    }));
+}
+
+export async function makeHistory(
+    bot: Bot<SlushaContext>,
+    logger: Logger,
+    history: ChatMessage[],
+    options: HistoryOptions,
+): Promise<Prompt> {
     const { symbolLimit, messagesLimit } = options;
     const usernames = options?.usernames ?? true;
 
@@ -61,29 +125,122 @@ export function makeHistory(history: ChatMessage[], options: HistoryOptions): Pr
         if (message.replyTo && !message.sender.myself) {
             // Add original message if this is last message in history
             if (i == history.length - 1) {
-                const replyText = sliceMessage(
-                    message.replyTo.text,
-                    symbolLimit,
-                );
-                context +=
-                    ` (in reply to: ${message.replyTo.sender.name} > "${replyText}")`;
-            } else {
-                context += ` (in reply to: ${message.replyTo.sender.name})`;
+                // If replied is before last message, there is nothing to add
+                if (message.replyTo.id !== history[i - 1].id) {
+                    const replyText = sliceMessage(
+                        message.replyTo.text,
+                        symbolLimit,
+                    );
+
+                    // Add message user replied to before the last one
+                    // for ai to understand context
+
+                    let content: Array<TextPart | ImagePart> = [
+                        {
+                            type: 'text',
+                            text: replyText,
+                        },
+                    ];
+
+                    if ('photo' in message.replyTo) {
+                        let photoContent: ImagePart[] = [];
+                        try {
+                            photoContent = await getPhotoContent(
+                                bot,
+                                logger,
+                                message.replyTo.photo,
+                            );
+                        } catch (error) {
+                            logger.error(
+                                'Could not download file: ',
+                                error,
+                            );
+                        }
+
+                        content = content.concat(photoContent);
+                    }
+
+                    prompt.push({
+                        role: 'user',
+                        content,
+                    });
+                }
             }
+
+            context += ` (in reply to: ${message.replyTo.sender.name})`;
         }
 
         context += ':\n' + sliceMessage(message.text, symbolLimit);
 
+        if (message.sender.myself) {
+            prompt.push({
+                role: 'assistant',
+                content: [{
+                    type: 'text',
+                    text: context,
+                }],
+            });
+            continue;
+        }
+
+        let content: Array<TextPart | ImagePart> = [
+            {
+                type: 'text',
+                text: context,
+            },
+        ];
+
+        // Download files attached to messages
+        if (message.info.photo && (i === history.length - 1 || i === history.length - 2)) {
+            let photoContent: ImagePart[] = [];
+            try {
+                photoContent = await getPhotoContent(
+                    bot,
+                    logger,
+                    message.info.photo,
+                );
+            } catch (error) {
+                logger.error(
+                    'Could not download file: ',
+                    error,
+                );
+            }
+
+            content = content.concat(photoContent);
+        }
+
         prompt.push({
             role: 'user',
-            content: context,
+            content,
         });
     }
 
     return prompt;
 }
 
-type ReplyMessage = Exclude<Message.CommonMessage['reply_to_message'], undefined>;
+async function downloadFile(bot: Bot<SlushaContext>, fileId: string) {
+    const filePath = `./tmp/${fileId}`;
+    if (await exists(filePath)) {
+        return await Deno.readFile(filePath);
+    }
+
+    const file = await bot.api.getFile(fileId);
+
+    const downloadUrl =
+        `https://api.telegram.org/file/bot${bot.token}/${file.file_path}`;
+
+    const arrayBuffer = await ky.get(downloadUrl).arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+
+    await Deno.writeFile(filePath, buffer);
+
+    return buffer;
+}
+
+type ReplyMessage = Exclude<
+    Message.CommonMessage['reply_to_message'],
+    undefined
+>;
 
 export function getText(
     msg:

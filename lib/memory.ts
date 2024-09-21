@@ -1,6 +1,7 @@
 import {
     Chat as TgChat,
     Message,
+    PhotoSize,
 } from 'https://deno.land/x/grammy@v1.30.0/types.deno.ts';
 import logger from './logger.ts';
 
@@ -11,14 +12,24 @@ export interface Sender {
     myself?: boolean;
 }
 
-export interface ChatMessage {
-    id: number;
-    sender: Sender;
-    replyTo?: {
+type ReplyTo =
+    | {
+        id: number;
+        sender: Sender;
+        text: string;
+        photo: PhotoSize[];
+        media_group_id?: string;
+    }
+    | {
         id: number;
         sender: Sender;
         text: string;
     };
+
+export interface ChatMessage {
+    id: number;
+    sender: Sender;
+    replyTo?: ReplyTo;
     date: number;
     text: string;
     isSummary: boolean;

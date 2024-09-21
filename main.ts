@@ -7,7 +7,7 @@ import { ChatMemory, ChatMessage, loadMemory } from './lib/memory.ts';
 import { generateText } from 'npm:ai';
 import { google } from 'npm:@ai-sdk/google';
 
-import { getRandomNepon, getText, makeHistory, probability, testMessage } from './lib/helpers.ts';
+import { getRandomNepon, getText, makeHistory, probability, removeBotName, testMessage } from './lib/helpers.ts';
 import { replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
 import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
 
@@ -41,6 +41,8 @@ bot.on('message', (ctx, next) => {
             text: getText(
                 ctx.msg.reply_to_message,
             ) ?? '',
+            photo: ctx.msg.reply_to_message.photo,
+            media_group_id: ctx.msg.reply_to_message.media_group_id,
         };
     }
 
@@ -133,7 +135,9 @@ bot.on('message', (ctx, next) => {
 
 // Get response from AI
 bot.on('message', async (ctx) => {
-    const messages = makeHistory(
+    const messages = await makeHistory(
+        bot,
+        logger,
         ctx.m.getHistory(),
         {
             messagesLimit: config.ai.messagesToPass,
@@ -201,8 +205,10 @@ bot.on('message', async (ctx) => {
     // Remove emojis
     replyText = replyText.replace(
         /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/g,
-        ' ',
+        '',
     );
+
+    replyText = removeBotName(replyText, bot.botInfo.first_name, bot.botInfo.username);
 
     logger.info('Response:', replyText);
 
