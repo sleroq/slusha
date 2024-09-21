@@ -19,7 +19,11 @@ export default {
     ai: {
         model: 'gemini-1.5-flash',
         prompt,
-        finalPrompt: 'Answer must only contain have your reply text to the last message.',
+        finalPrompt: 'Answer must only contain have your reply text. Reply only to the last message.',
+        temperature: 0.9,
+        topK: 5,
+        topP: 0.8,
+        messagesToPass: 5,
     },
 
     names: [

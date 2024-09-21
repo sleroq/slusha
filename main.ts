@@ -118,11 +118,15 @@ bot.on('message', (ctx, next) => {
         logger.info("Mentioned bot's name");
         return next();
     }
+
+    // TODO: Tend to reply
+    
+    // TODO: Tend to ignore
 });
 
 // Get response from AI
 bot.on('message', async (ctx) => {
-    const history = makeHistoryString(ctx.m.getHistory().slice(-10));
+    const history = makeHistoryString(ctx.m.getHistory().slice(config.ai.messagesToPass));
     const prompt = `${config.ai.prompt}\n` +
         `Input: ${history}\n` +
         `Instruction: ${config.ai.finalPrompt}` +
@@ -157,9 +161,9 @@ bot.on('message', async (ctx) => {
                 },
             ),
             prompt,
-            temperature: 0.9,
-            topK: 5,
-            topP: 0.8,
+            temperature: config.ai.temperature,
+            topK: config.ai.topK,
+            topP: config.ai.topP,
         });
     } catch (error) {
         logger.error('Could not get response: ', error);
