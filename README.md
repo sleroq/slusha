@@ -12,8 +12,8 @@ Smartest girl in your telegram group
 ## Preparation
 
 1. `cp scripts/env.bash.example scripts/env.bash`
-2. `chmod +x scripts/env.bash`
-3. set up environment variables
+2. set up environment variables
+3. update sluga.config.js to your liking
 
 ## Start:
 
