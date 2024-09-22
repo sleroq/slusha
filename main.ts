@@ -394,12 +394,12 @@ bot.on('message', async (ctx) => {
         return;
     }
 
-    const title = ctx.chat.title ?? ctx.chat.first_name;
-    const username = ctx.chat.username ?? '';
+    const name = ctx.from?.username ?? ctx.chat.first_name;
+    const username = ctx.from?.username ? `(@${ctx.from.username})` : '';
     logger.info(
         'Time to get response:',
         (new Date().getTime() - time) / 1000,
-        `for "${title}" (@${username})`,
+        `for "${name}" ${username}`,
     );
 
     let replyText = response.text;
