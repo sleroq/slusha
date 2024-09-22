@@ -19,11 +19,12 @@ export default {
     ai: {
         model: 'gemini-1.5-flash',
         prompt,
+        notesPrompt: 'Generate a short summary of noteworthy events in 3-5 bullet points in russian.',
         finalPrompt: 'Answer must only contain have your reply text. Reply only to the last message.',
         temperature: 0.9,
         topK: 5,
         topP: 0.8,
-        messagesToPass: 5,
+        messagesToPass: 10,
         messageMaxLength: 2000,
     },
 
@@ -102,5 +103,10 @@ export default {
         855109381,
     ],
 
-    historyMaxLength: 100,
+    maxNotesToStore: 5,
+    maxMessagesToStore: 100,
+
+    // Chats which don't use AI for more than chatLastUseNotes days
+    // will not get updated summary every 50 messages
+    chatLastUseNotes: 3,
 }
