@@ -18,7 +18,7 @@ import {
     sliceMessage,
     testMessage,
 } from './lib/helpers.ts';
-import { replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
+import { doTyping, replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
 import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
 import {
     PhotoSize,
