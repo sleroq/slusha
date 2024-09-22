@@ -33,6 +33,7 @@ const configSchema = z.object({
     nepons: z.array(z.string()),
     filesMaxAge: z.number().default(72),
     adminIds: z.array(z.number()).optional(),
+    historyMaxLength: z.number().default(100),
 });
 
 export type UserConfig = z.infer<typeof configSchema>;

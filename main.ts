@@ -70,7 +70,7 @@ bot.on('message', (ctx, next) => {
         info: ctx.message,
     });
 
-    ctx.m.removeOldMessages();
+    ctx.m.removeOldMessages(config.historyMaxLength);
 
     return next();
 });

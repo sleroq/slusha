@@ -121,10 +121,10 @@ export class ChatMemory {
         this.getHistory().push(message);
     }
 
-    removeOldMessages() {
+    removeOldMessages(maxLength: number) {
         const history = this.getHistory();
-        if (history.length > 100) {
-            history.splice(0, 100);
+        if (history.length > maxLength) {
+            history.splice(0, maxLength);
         }
     }
 }

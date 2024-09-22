@@ -101,4 +101,6 @@ export default {
         308552322,
         855109381,
     ],
+
+    historyMaxLength: 100,
 }
