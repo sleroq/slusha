@@ -31,6 +31,7 @@ const configSchema = z.object({
     tendToIgnoreProbability: z.number().default(90),
     randomReplyProbability: z.number().default(1),
     nepons: z.array(z.string()),
+    filesMaxAge: z.number().default(72),
 });
 
 export type UserConfig = z.infer<typeof configSchema>;

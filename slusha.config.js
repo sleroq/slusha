@@ -94,4 +94,6 @@ export default {
     ],
 
     tendToIgnoreProbability: 90,
+
+    filesMaxAge: 72,
 }

@@ -219,6 +219,30 @@ export async function makeHistory(
     return prompt;
 }
 
+/**
+ * Deletes old files from tmp folder
+ * @param logger Logger
+ * @param maxAge Max age in hours
+ */
+export async function deleteOldFiles(logger: Logger, maxAge: number) {
+    const files = Deno.readDir('./tmp');
+
+    for await (const file of files) {
+        const filePath = `./tmp/${file.name}`;
+
+        if (await exists(filePath)) {
+            const stat = await Deno.stat(filePath);
+            const mtime = stat.mtime?.getTime() ?? 0;
+            const age = (Date.now() - mtime) / (1000 * 60 * 60);
+
+            if (age > maxAge || stat.mtime === null) {
+                logger.info(`Deleting old file: ${file.name}`);
+                await Deno.remove(filePath);
+            }
+        }
+    }
+}
+
 async function downloadFile(bot: Bot<SlushaContext>, fileId: string) {
     const filePath = `./tmp/${fileId}`;
     if (await exists(filePath)) {

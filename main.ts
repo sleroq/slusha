@@ -7,7 +7,7 @@ import { ChatMemory, ChatMessage, loadMemory } from './lib/memory.ts';
 import { generateText } from 'npm:ai';
 import { google } from 'npm:@ai-sdk/google';
 
-import { getRandomNepon, getText, makeHistory, probability, removeBotName, testMessage } from './lib/helpers.ts';
+import { deleteOldFiles, getRandomNepon, getText, makeHistory, probability, removeBotName, testMessage } from './lib/helpers.ts';
 import { replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
 import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
 
@@ -256,6 +256,15 @@ setInterval(async () => {
         logger.error('Could not save memory: ', error);
     }
 }, 60 * 1000);
+
+// Delete old files every hour
+setInterval(async () => {
+    try {
+        await deleteOldFiles(logger, config.filesMaxAge);
+    } catch (error) {
+        logger.error('Could not delete old files: ', error);
+    }
+}, 60 * 60 * 1000);
 
 // Save memory on exit
 Deno.addSignalListener('SIGINT', async () => {
