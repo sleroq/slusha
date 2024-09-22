@@ -266,8 +266,10 @@ bot.on('message', async (ctx) => {
     );
 
     // Delete first line if it ends with "):"
-    if (replyText.match(/^.*\)\s*:\s*$/)) {
-        replyText = replyText.replace(/^.*:\s*/, '');
+    const replyLines = replyText.split('\n');
+    const firstLint = replyLines[0];
+    if (firstLint.match(/^.*\)\s*:\s*$/)) {
+        replyText = replyLines.slice(1).join('\n');
         logger.info('Deleted first line because it ends with "):"');
     }
 
