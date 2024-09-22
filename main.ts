@@ -163,7 +163,7 @@ bot.use(limit(
 
         // This is called when the limit is exceeded.
         onLimitExceeded: () => {
-            logger.warn('Skipping message because rate limit exceeded');
+            // logger.info('Skipping message because rate limit exceeded');
         },
 
         keyGenerator: (ctx) => {
@@ -193,9 +193,6 @@ bot.on('message', async (ctx, next) => {
 
     // Skip if there are less than 20 messages in chat history
     if (ctx.m.getHistory().length < 20) {
-        logger.info(
-            `Skipping because of short history: ${ctx.m.getHistory().length}`,
-        );
         return next();
     }
 
@@ -291,11 +288,11 @@ bot.on('message', (ctx, next) => {
         msg.text.length < 20 &&
         probability(config.tendToIgnoreProbability)
     ) {
-        logger.info(
-            `Ignoring because of tend to ignore "${
-                sliceMessage(msg.text, 50)
-            }"`,
-        );
+        // logger.info(
+        //     `Ignoring because of tend to ignore "${
+        //         sliceMessage(msg.text, 50)
+        //     }"`,
+        // );
         return;
     }
 
@@ -329,6 +326,28 @@ bot.on('message', (ctx, next) => {
         return next();
     }
 });
+
+bot.use(limit(
+    {
+        // Allow only 20 message to be handled every 10 minutes.
+        timeFrame: 1 * 60 * 1000,
+        limit: 20,
+
+        // This is called when the limit is exceeded.
+        onLimitExceeded: ctx => {
+            logger.warn('Skipping message because rate limit exceeded');
+            return ctx.reply('Рейтлимитим тебя');
+        },
+
+        keyGenerator: (ctx) => {
+            if (ctx.hasChatType(['group', 'supergroup'])) {
+                return ctx.chat.id.toString();
+            }
+
+            return ctx.from?.id.toString();
+        },
+    },
+));
 
 // Get response from AI
 bot.on('message', async (ctx) => {

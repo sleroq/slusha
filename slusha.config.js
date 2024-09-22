@@ -24,7 +24,7 @@ export default {
         temperature: 0.9,
         topK: 5,
         topP: 0.8,
-        messagesToPass: 7,
+        messagesToPass: 10,
         messageMaxLength: 2000,
     },
 
