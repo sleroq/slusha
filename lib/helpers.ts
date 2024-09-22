@@ -55,7 +55,7 @@ interface HistoryOptions {
     usernames?: boolean;
 }
 
-type Prompt = Array<
+export type Prompt = Array<
     CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage
 >;
 

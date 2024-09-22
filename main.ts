@@ -1,6 +1,6 @@
 import Werror from './lib/werror.ts';
 import logger from './lib/logger.ts';
-import resolveConfig, { Config } from './lib/config.ts';
+import resolveConfig, { Config, safetySettings } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
 import { ChatMemory, ChatMessage, loadMemory } from './lib/memory.ts';
 
@@ -13,6 +13,7 @@ import {
     getText,
     makeHistory,
     probability,
+    Prompt,
     removeBotName,
     sliceMessage,
     testMessage,
@@ -71,7 +72,7 @@ bot.on('message', (ctx, next) => {
         info: ctx.message,
     });
 
-    ctx.m.removeOldMessages(config.historyMaxLength);
+    ctx.m.removeOldMessages(config.maxMessagesToStore);
 
     return next();
 });
@@ -112,6 +113,17 @@ bot.command('model', (ctx) => {
     return ctx.reply(`Model set to ${newModel}`);
 });
 
+bot.command('summary', (ctx) => {
+    ctx.m.getChat().lastUse = Date.now();
+    const notes = ctx.m.getChat().notes;
+
+    if (notes.length === 0) {
+        return ctx.reply('Пока маловато сообщений прошло, сам прочитай');
+    }
+
+    return ctx.reply(notes.join('\n'));
+});
+
 bot.use(limit(
     {
         // Allow only 1 message to be handled every 2 seconds.
@@ -132,6 +144,97 @@ bot.use(limit(
         },
     },
 ));
+
+// Generate summary about chat every 50 messages
+// if bot was used in last 3 days
+bot.on('message', async (ctx, next) => {
+    if (
+        ctx.m.getChat().lastUse <
+            (Date.now() - config.chatLastUseNotes * 24 * 60 * 60 * 1000)
+    ) {
+        return next();
+    }
+
+    // Skip if there are less than 20 messages in chat history
+    if (ctx.m.getHistory().length < 20) {
+        logger.info(
+            `Skipping because of short history: ${ctx.m.getHistory().length}`,
+        );
+        return next();
+    }
+
+    // Check if 50 messages from last notes
+    if (
+        ctx.m.getChat().lastNotes &&
+        ctx.msg.message_id - ctx.m.getChat().lastNotes < 50
+    ) {
+        return next();
+    }
+
+    const model = config.ai.notesModel ?? config.ai.model;
+
+    let context: Prompt;
+    try {
+        context = await makeHistory(
+            bot,
+            logger,
+            ctx.m.getHistory(),
+            {
+                messagesLimit: 50,
+                symbolLimit: config.ai.messageMaxLength / 3,
+                images: false,
+            },
+        );
+    } catch (error) {
+        logger.error('Could not get history: ', error);
+        return next();
+    }
+
+    const messages: Prompt = [
+        {
+            role: 'system',
+            content: config.ai.prompt,
+        },
+        ...context,
+        {
+            role: 'user',
+            content: config.ai.notesPrompt,
+        },
+    ];
+
+    const start = Date.now();
+
+    let response;
+    try {
+        response = await generateText({
+            model: google(model, { safetySettings }),
+            messages,
+            temperature: config.ai.temperature,
+            topK: config.ai.topK,
+            topP: config.ai.topP,
+        });
+    } catch (error) {
+        logger.error('Could not get summary: ', error);
+        // Set last notes to prevent retries
+        ctx.m.getChat().lastNotes = ctx.msg.message_id;
+
+        return next();
+    }
+
+    logger.info(
+        'Time to generate notes:',
+        (Date.now() - start) / 1000,
+    );
+
+    const summaryText = response.text;
+
+    ctx.m.getChat().lastNotes = ctx.msg.message_id;
+    ctx.m.getChat().notes.push(summaryText);
+
+    ctx.m.removeOldNotes(config.maxNotesToStore);
+
+    return next();
+});
 
 // Decide if we should reply to user
 bot.on('message', (ctx, next) => {
@@ -192,6 +295,8 @@ bot.on('message', (ctx, next) => {
 
 // Get response from AI
 bot.on('message', async (ctx) => {
+    ctx.m.getChat().lastUse = Date.now();
+
     const messages = await makeHistory(
         bot,
         logger,
@@ -201,6 +306,14 @@ bot.on('message', async (ctx) => {
             symbolLimit: config.ai.messageMaxLength,
         },
     );
+
+    // If we have nots, add them to messages
+    if (ctx.m.getChat().notes.length > 0) {
+        messages.push({
+            role: 'user',
+            content: `Chat notes:\n${ctx.m.getChat().notes.join('\n')}`,
+        });
+    }
 
     messages.unshift({
         role: 'system',
@@ -219,29 +332,7 @@ bot.on('message', async (ctx) => {
     let response;
     try {
         response = await generateText({
-            model: google(
-                model,
-                {
-                    safetySettings: [
-                        {
-                            category: 'HARM_CATEGORY_HARASSMENT',
-                            threshold: 'BLOCK_NONE',
-                        },
-                        {
-                            category: 'HARM_CATEGORY_HATE_SPEECH',
-                            threshold: 'BLOCK_NONE',
-                        },
-                        {
-                            category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                            threshold: 'BLOCK_NONE',
-                        },
-                        {
-                            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-                            threshold: 'BLOCK_NONE',
-                        },
-                    ],
-                },
-            ),
+            model: google(model, { safetySettings }),
             messages,
             temperature: config.ai.temperature,
             topK: config.ai.topK,

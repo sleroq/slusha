@@ -109,14 +109,6 @@ export class ChatMemory {
         return this.getHistory().slice(-1)[0];
     }
 
-    getLastNotes() {
-        return this.getChat().lastNotes;
-    }
-
-    setLastNotes(value: number) {
-        this.getChat().lastNotes = value;
-    }
-
     addMessage(message: ChatMessage) {
         this.getHistory().push(message);
     }
@@ -125,6 +117,13 @@ export class ChatMemory {
         const history = this.getHistory();
         if (history.length > maxLength) {
             history.splice(0, maxLength);
+        }
+    }
+
+    removeOldNotes(maxLength: number) {
+        const notes = this.getChat().notes;
+        if (notes.length > maxLength) {
+            notes.splice(0, maxLength);
         }
     }
 }
