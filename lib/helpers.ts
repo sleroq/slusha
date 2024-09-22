@@ -117,7 +117,8 @@ export async function makeHistory(
     const prompt: Prompt = [];
     for (let i = 0; i < history.length; i++) {
         const message = history[i];
-        let context = `${message.sender.name} (@${message.sender.username})`;
+        const username = ` (@${message.sender.username})` ?? '';
+        let context = `${message.sender.name}${username}`;
         if (!usernames) {
             context = `${message.sender.name}`;
         }
