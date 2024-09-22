@@ -356,6 +356,26 @@ bot.on('message', async (ctx) => {
 
     const model = ctx.m.getChat().chatModel ?? config.ai.model;
 
+    // Print pretty log message to know what is sent to AI
+    logger.info(
+        'Sending to AI:',
+        messages.map((message) => {
+            if (typeof message.content === 'string') {
+                return message.role + ': ' + message.content;
+            }
+
+            return message.role + ': ' + message.content.map((content) => {
+                if ('text' in content) {
+                    return content.text.replaceAll('\n', ' ');
+                }
+
+                if ('image' in content) {
+                    return '[image]';
+                }
+            }).join('\n');
+        }).slice(-5).join('\n'),
+    );
+
     let response;
     try {
         response = await generateText({
