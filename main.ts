@@ -83,13 +83,18 @@ bot.command('forget', async (ctx) => {
     await ctx.reply('История очищена');
 });
 
-bot.command('model', ctx => {
+bot.command('model', (ctx) => {
     // Check if user is admin
-    if (!config.adminIds || !ctx.msg.from || !config.adminIds.includes(ctx.msg.from.id)) {
+    if (
+        !config.adminIds || !ctx.msg.from ||
+        !config.adminIds.includes(ctx.msg.from.id)
+    ) {
         return;
     }
 
-    const args = ctx.msg.text.split(' ').map((arg) => arg.trim()).filter((arg) => arg !== '');
+    const args = ctx.msg.text.split(' ').map((arg) => arg.trim()).filter((
+        arg,
+    ) => arg !== '');
 
     // If no parameter is passed, show current model
     if (args.length === 1) {
