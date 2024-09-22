@@ -139,6 +139,11 @@ bot.command('model', (ctx) => {
 });
 
 bot.command('summary', (ctx) => {
+    // Skip for private chats
+    if (ctx.msg.chat.type === 'private') {
+        return ctx.reply('Это только для групповых чатов');
+    }
+
     ctx.m.getChat().lastUse = Date.now();
     const notes = ctx.m.getChat().notes;
 
@@ -173,6 +178,11 @@ bot.use(limit(
 // Generate summary about chat every 50 messages
 // if bot was used in last 3 days
 bot.on('message', async (ctx, next) => {
+    // Skip for private chats
+    if (ctx.msg.chat.type === 'private') {
+        return next();
+    }
+
     if (
         ctx.m.getChat().lastUse <
             (Date.now() - config.chatLastUseNotes * 24 * 60 * 60 * 1000)
@@ -212,6 +222,8 @@ bot.on('message', async (ctx, next) => {
         );
     } catch (error) {
         logger.error('Could not get history: ', error);
+        // Set last notes to prevent retries
+        ctx.m.getChat().lastNotes = ctx.msg.message_id;
         return next();
     }
 
