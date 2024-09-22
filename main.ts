@@ -301,6 +301,8 @@ bot.on('message', (ctx, next) => {
 
     if (
         testMessage(config.tendToIgnore, msg.text) &&
+        // If message is longer than 25 symbols - maybe it's useful
+        msg.text.length < 25 &&
         probability(config.tendToIgnoreProbability)
     ) {
         logger.info(
