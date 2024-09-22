@@ -29,6 +29,7 @@ const configSchema = z.object({
     tendToReplyProbability: z.number().default(50),
     tendToIgnore: z.array(z.string(), z.custom(isValidRegex)),
     tendToIgnoreProbability: z.number().default(90),
+    randomReplyProbability: z.number().default(1),
     nepons: z.array(z.string()),
 });
 

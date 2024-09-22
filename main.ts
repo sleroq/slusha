@@ -131,6 +131,12 @@ bot.on('message', (ctx, next) => {
         logger.info('Ignoring because of tend to ignore');
         return;
     }
+
+    if (probability(config.randomReplyProbability)) {
+        logger.info('Replying because of random reply probability');
+        ctx.info.isRandom = true;
+        return next();
+    }
 });
 
 // Get response from AI
@@ -209,6 +215,8 @@ bot.on('message', async (ctx) => {
     );
 
     replyText = removeBotName(replyText, bot.botInfo.first_name, bot.botInfo.username);
+
+    replyText = replyText.trim();
 
     logger.info('Response:', replyText);
 

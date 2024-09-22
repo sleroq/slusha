@@ -61,6 +61,8 @@ export default {
         'откисаю, попробуй позже',
     ],
 
+    randomReplyProbability: 1,
+
     tendToIgnore: [
         'ор+',
         'ору+',
