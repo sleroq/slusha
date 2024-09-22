@@ -282,15 +282,30 @@ bot.on('message', (ctx, next) => {
         return;
     }
 
-    // Direct reply to bot
-    if (ctx.msg.reply_to_message?.from?.id === bot.botInfo.id) {
-        logger.info('Direct reply to bot');
-        return next();
-    }
-
     // Direct message
     if (ctx.msg.chat.type === 'private') {
         logger.info('Direct message');
+        return next();
+    }
+
+    if (
+        testMessage(config.tendToIgnore, msg.text) &&
+        // If message is longer than 25 symbols - maybe it's useful
+        msg.text.length < 25 &&
+        probability(config.tendToIgnoreProbability)
+    ) {
+        logger.info(
+            `Ignoring because of tend to ignore "${
+                sliceMessage(msg.text, 50)
+            }"`,
+        );
+        return;
+    }
+
+    // Direct reply to bot
+    if (ctx.msg.reply_to_message?.from?.id === bot.botInfo.id) {
+        logger.info('Direct reply to bot');
+        ctx.m.getChat().lastUse = Date.now();
         return next();
     }
 
@@ -309,20 +324,6 @@ bot.on('message', (ctx, next) => {
         );
         ctx.info.isRandom = true;
         return next();
-    }
-
-    if (
-        testMessage(config.tendToIgnore, msg.text) &&
-        // If message is longer than 25 symbols - maybe it's useful
-        msg.text.length < 25 &&
-        probability(config.tendToIgnoreProbability)
-    ) {
-        logger.info(
-            `Ignoring because of tend to ignore "${
-                sliceMessage(msg.text, 50)
-            }"`,
-        );
-        return;
     }
 
     if (probability(config.randomReplyProbability)) {
