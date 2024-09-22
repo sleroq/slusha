@@ -14,6 +14,7 @@ import {
     makeHistory,
     probability,
     removeBotName,
+    sliceMessage,
     testMessage,
 } from './lib/helpers.ts';
 import { replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
@@ -157,7 +158,7 @@ bot.on('message', (ctx, next) => {
         testMessage(config.tendToReply, msg.text) &&
         probability(config.tendToReplyProbability)
     ) {
-        logger.info('Replying because of tend to reply');
+        logger.info(`Replying because of tend to reply "${sliceMessage(msg.text, 50)}"`);
         ctx.info.isRandom = true;
         return next();
     }
@@ -166,7 +167,7 @@ bot.on('message', (ctx, next) => {
         testMessage(config.tendToIgnore, msg.text) &&
         probability(config.tendToIgnoreProbability)
     ) {
-        logger.info('Ignoring because of tend to ignore');
+        logger.info(`Ignoring because of tend to ignore "${sliceMessage(msg.text, 50)}"`);
         return;
     }
 
@@ -263,6 +264,12 @@ bot.on('message', async (ctx) => {
         bot.botInfo.first_name,
         bot.botInfo.username,
     );
+
+    // Delete first line if it ends with "):"
+    if (replyText.match(/^.*\)\s*:\s*$/)) {
+        replyText = replyText.replace(/^.*:\s*/, '');
+        logger.info('Deleted first line because it ends with "):"');
+    }
 
     replyText = replyText.trim();
 
