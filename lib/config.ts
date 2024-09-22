@@ -1,16 +1,10 @@
 import { z } from 'https://deno.land/x/zod@v3.23.8/mod.ts';
-import { GoogleGenerativeAIProvider, GoogleGenerativeAIProvider, GoogleGenerativeAIProviderSettings, google } from 'npm:@ai-sdk/google';
-import { generateText } from 'npm:ai';
+import { GoogleGenerativeAIProvider } from 'npm:@ai-sdk/google';
 
 function isValidRegex(val: unknown): val is RegExp {
-    if (typeof val !== 'string') return false;
+    if (val instanceof RegExp) return true;
 
-    try {
-        new RegExp(val);
-        return true;
-    } catch (e) {
-        return false;
-    }
+    return false;
 }
 
 const configSchema = z.object({
@@ -27,10 +21,10 @@ const configSchema = z.object({
         messageMaxLength: z.number().default(2000),
     }),
     startMessage: z.string(),
-    names: z.array(z.string(), z.custom(isValidRegex)),
-    tendToReply: z.array(z.string(), z.custom(isValidRegex)),
+    names: z.array(z.union([z.string(), z.custom(isValidRegex)])),
+    tendToReply: z.array(z.union([z.string(), z.custom(isValidRegex)])),
     tendToReplyProbability: z.number().default(50),
-    tendToIgnore: z.array(z.string(), z.custom(isValidRegex)),
+    tendToIgnore: z.array(z.union([z.string(), z.custom(isValidRegex)])),
     tendToIgnoreProbability: z.number().default(90),
     randomReplyProbability: z.number().default(1),
     nepons: z.array(z.string()),
@@ -41,7 +35,10 @@ const configSchema = z.object({
     chatLastUseNotes: z.number().default(3),
 });
 
-type SafetySettings = Exclude<Parameters<GoogleGenerativeAIProvider>[1], undefined>['safetySettings'];
+type SafetySettings = Exclude<
+    Parameters<GoogleGenerativeAIProvider>[1],
+    undefined
+>['safetySettings'];
 
 export const safetySettings: SafetySettings = [
     {
