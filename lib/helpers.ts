@@ -124,10 +124,12 @@ export async function makeHistory(
         history.splice(0, history.length - messagesLimit);
     }
 
-    const prompt: Prompt = [];
+    let prompt: Prompt = [];
     for (let i = 0; i < history.length; i++) {
         const message = history[i];
-        const username = message.sender.username ? ` (@${message.sender.username})` : '';
+        const username = message.sender.username
+            ? ` (@${message.sender.username})`
+            : '';
         let context = `${message.sender.name}${username}`;
         if (!usernames) {
             context = `${message.sender.name}`;
@@ -202,8 +204,7 @@ export async function makeHistory(
 
                     if (
                         'video' in repliedTo &&
-                        repliedTo.video &&
-                        repliedTo.video.thumbnail?.file_id && images
+                        repliedTo.video?.thumbnail?.file_id && images
                     ) {
                         let videoContent: ImagePart[] = [];
 
@@ -299,7 +300,7 @@ export async function makeHistory(
         }
 
         if (
-            message.info.video && message.info.video.thumbnail?.file_id &&
+            message.info.video?.thumbnail?.file_id &&
             images
         ) {
             let videoContent: ImagePart[] = [];
@@ -324,6 +325,31 @@ export async function makeHistory(
             content,
         });
     }
+
+    // Filter out messages with no parts
+    prompt = prompt.filter((message) => {
+        if (typeof message.content === 'string') {
+            return message.content.length > 0;
+        }
+
+        if (message.content.length === 0) {
+            logger.warn('Empty part: ', message.content, prompt, history);
+            return false;
+        }
+
+        return message.content.some((part) => {
+            if ('text' in part) {
+                return part.text.length > 0;
+            }
+
+            if ('image' in part && part.image.length > 0) {
+                return true;
+            }
+
+            logger.warn('Empty part: ', part, prompt, history);
+            return false;
+        });
+    });
 
     return prompt;
 }

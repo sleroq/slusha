@@ -231,13 +231,9 @@ bot.on('message', async (ctx, next) => {
     const messages: Prompt = [
         {
             role: 'system',
-            content: config.ai.prompt,
-        },
-        ...context,
-        {
-            role: 'user',
             content: config.ai.notesPrompt,
         },
+        ...context,
     ];
 
     const start = Date.now();
