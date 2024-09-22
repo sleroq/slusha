@@ -106,6 +106,7 @@ bot.command('start', (ctx) => ctx.reply(config.startMessage));
 
 bot.command('forget', async (ctx) => {
     ctx.m.clear();
+    ctx.m.getChat().notes = [];
     await ctx.reply('История очищена');
 });
 
