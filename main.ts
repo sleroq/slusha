@@ -491,14 +491,18 @@ setInterval(async () => {
     }
 }, 60 * 60 * 1000);
 
-// Save memory on exit
-Deno.addSignalListener('SIGINT', async () => {
+async function gracefulShutdown() {
     try {
         await memory.save();
         logger.info('Memory saved on exit');
     } catch (error) {
         throw new Werror(error, 'Saving memory on exit');
     } finally {
+        bot.stop();
         Deno.exit();
     }
-});
+}
+
+// Save memory on exit
+Deno.addSignalListener('SIGINT', gracefulShutdown);
+Deno.addSignalListener('SIGTERM', gracefulShutdown);
