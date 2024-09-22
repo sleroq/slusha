@@ -36,6 +36,7 @@ bot.on('message', (ctx, next) => {
     // Init custom context
     ctx.memory = memory;
     ctx.m = new ChatMemory(memory, ctx.chat);
+    ctx.info = { isRandom: false };
 
     // Save all messages to memory
     let replyTo: ChatMessage['replyTo'] | undefined;
@@ -158,7 +159,9 @@ bot.on('message', (ctx, next) => {
         testMessage(config.tendToReply, msg.text) &&
         probability(config.tendToReplyProbability)
     ) {
-        logger.info(`Replying because of tend to reply "${sliceMessage(msg.text, 50)}"`);
+        logger.info(
+            `Replying because of tend to reply "${sliceMessage(msg.text, 50)}"`,
+        );
         ctx.info.isRandom = true;
         return next();
     }
@@ -167,7 +170,11 @@ bot.on('message', (ctx, next) => {
         testMessage(config.tendToIgnore, msg.text) &&
         probability(config.tendToIgnoreProbability)
     ) {
-        logger.info(`Ignoring because of tend to ignore "${sliceMessage(msg.text, 50)}"`);
+        logger.info(
+            `Ignoring because of tend to ignore "${
+                sliceMessage(msg.text, 50)
+            }"`,
+        );
         return;
     }
 
@@ -199,8 +206,6 @@ bot.on('message', async (ctx) => {
         role: 'user',
         content: config.ai.finalPrompt,
     });
-
-    console.log(`Messages to send to AI:`, messages);
 
     const time = new Date().getTime();
 
@@ -240,7 +245,9 @@ bot.on('message', async (ctx) => {
     } catch (error) {
         logger.error('Could not get response: ', error);
 
-        await ctx.reply(getRandomNepon(config));
+        if (!ctx.info.isRandom) {
+            await ctx.reply(getRandomNepon(config));
+        }
         return;
     }
 
@@ -253,17 +260,21 @@ bot.on('message', async (ctx) => {
     );
 
     let replyText = response.text;
-    // Remove emojis
-    replyText = replyText.replace(
-        /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/g,
-        '',
-    );
 
     replyText = removeBotName(
         replyText,
         bot.botInfo.first_name,
         bot.botInfo.username,
     );
+
+    // Remove emojis if message has text
+    const textSansEmojis = replyText.replace(
+        /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/g,
+        '',
+    );
+    if (textSansEmojis.trim().length > 0) {
+        replyText = textSansEmojis;
+    }
 
     // Delete first line if it ends with "):"
     const replyLines = replyText.split('\n');
@@ -277,13 +288,27 @@ bot.on('message', async (ctx) => {
 
     logger.info('Response:', replyText);
 
+    if (replyText.length === 0) {
+        logger.warn(
+            `Empty response from AI: "${response.text}" => "${replyText}"`,
+        );
+
+        if (!ctx.info.isRandom) {
+            await ctx.reply(getRandomNepon(config));
+        }
+
+        return;
+    }
+
     let replyInfo;
     try {
         replyInfo = await replyWithMarkdown(ctx, replyText);
     } catch (error) {
         logger.error('Could not reply to user: ', error);
 
-        await ctx.reply(getRandomNepon(config));
+        if (!ctx.info.isRandom) {
+            await ctx.reply(getRandomNepon(config));
+        }
         return;
     }
 
