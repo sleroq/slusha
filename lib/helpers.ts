@@ -192,7 +192,10 @@ export async function makeHistory(
         ];
 
         // Download files attached to messages
-        if (message.info.photo && (i === history.length - 1 || i === history.length - 2)) {
+        if (
+            message.info.photo &&
+            (i === history.length - 1 || i === history.length - 2)
+        ) {
             let photoContent: ImagePart[] = [];
             try {
                 photoContent = await getPhotoContent(

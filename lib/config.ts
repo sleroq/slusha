@@ -51,7 +51,7 @@ function resolveEnv() {
     if (!aiToken) throw new Error('AI_TOKEN is required');
 
     Deno.env.set('GOOGLE_GENERATIVE_AI_API_KEY', aiToken);
-    
+
     return { botToken, aiToken };
 }
 
@@ -79,4 +79,3 @@ export default async function resolveConfig(): Promise<Config> {
         aiToken: env.aiToken,
     };
 }
-

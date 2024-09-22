@@ -14,4 +14,3 @@ export async function replyWithMarkdown(ctx: SlushaContext, text: string) {
     }
     return res;
 }
-

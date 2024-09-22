@@ -7,7 +7,15 @@ import { ChatMemory, ChatMessage, loadMemory } from './lib/memory.ts';
 import { generateText } from 'npm:ai';
 import { google } from 'npm:@ai-sdk/google';
 
-import { deleteOldFiles, getRandomNepon, getText, makeHistory, probability, removeBotName, testMessage } from './lib/helpers.ts';
+import {
+    deleteOldFiles,
+    getRandomNepon,
+    getText,
+    makeHistory,
+    probability,
+    removeBotName,
+    testMessage,
+} from './lib/helpers.ts';
 import { replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
 import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
 
@@ -117,17 +125,23 @@ bot.on('message', (ctx, next) => {
 
     // Mentined bot's name
     if (new RegExp(`(${config.names.join('|')})`, 'gmi').test(msg.text)) {
-        logger.info('Replying because of mentioned bot\'s name');
+        logger.info("Replying because of mentioned bot's name");
         return next();
     }
 
-    if (testMessage(config.tendToReply, msg.text) && probability(config.tendToReplyProbability)) {
+    if (
+        testMessage(config.tendToReply, msg.text) &&
+        probability(config.tendToReplyProbability)
+    ) {
         logger.info('Replying because of tend to reply');
         ctx.info.isRandom = true;
         return next();
     }
 
-    if (testMessage(config.tendToIgnore, msg.text) && probability(config.tendToIgnoreProbability)) {
+    if (
+        testMessage(config.tendToIgnore, msg.text) &&
+        probability(config.tendToIgnoreProbability)
+    ) {
         logger.info('Ignoring because of tend to ignore');
         return;
     }
@@ -148,7 +162,7 @@ bot.on('message', async (ctx) => {
         {
             messagesLimit: config.ai.messagesToPass,
             symbolLimit: config.ai.messageMaxLength,
-        }
+        },
     );
 
     messages.unshift({
@@ -205,7 +219,11 @@ bot.on('message', async (ctx) => {
 
     const title = ctx.chat.title ?? ctx.chat.first_name;
     const username = ctx.chat.username ?? '';
-    logger.info('Time to get response:', (new Date().getTime() - time) / 1000, `for "${title}" (@${username})`);
+    logger.info(
+        'Time to get response:',
+        (new Date().getTime() - time) / 1000,
+        `for "${title}" (@${username})`,
+    );
 
     let replyText = response.text;
     // Remove emojis
@@ -214,7 +232,11 @@ bot.on('message', async (ctx) => {
         '',
     );
 
-    replyText = removeBotName(replyText, bot.botInfo.first_name, bot.botInfo.username);
+    replyText = removeBotName(
+        replyText,
+        bot.botInfo.first_name,
+        bot.botInfo.username,
+    );
 
     replyText = replyText.trim();
 
@@ -277,4 +299,3 @@ Deno.addSignalListener('SIGINT', async () => {
         Deno.exit();
     }
 });
-
