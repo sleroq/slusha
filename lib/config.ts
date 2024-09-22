@@ -32,6 +32,7 @@ const configSchema = z.object({
     randomReplyProbability: z.number().default(1),
     nepons: z.array(z.string()),
     filesMaxAge: z.number().default(72),
+    adminIds: z.array(z.number()).optional(),
 });
 
 export type UserConfig = z.infer<typeof configSchema>;

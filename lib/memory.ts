@@ -42,6 +42,7 @@ export interface Chat {
     history: ChatMessage[];
     lastUse: number;
     info: TgChat;
+    chatModel?: string;
 }
 
 export class Memory {

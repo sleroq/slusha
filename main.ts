@@ -81,6 +81,30 @@ bot.command('forget', async (ctx) => {
     await ctx.reply('История очищена');
 });
 
+bot.command('model', ctx => {
+    // Check if user is admin
+    if (!config.adminIds || !ctx.msg.from || !config.adminIds.includes(ctx.msg.from.id)) {
+        return;
+    }
+
+    const args = ctx.msg.text.split(' ').map((arg) => arg.trim()).filter((arg) => arg !== '');
+
+    // If no parameter is passed, show current model
+    if (args.length === 1) {
+        return ctx.reply(ctx.m.getChat().chatModel ?? config.ai.model);
+    }
+
+    // If parameter is passed, set new model
+    const newModel = args[1];
+    if (newModel === 'default') {
+        ctx.m.getChat().chatModel = undefined;
+        return ctx.reply('Model reset');
+    }
+    
+    ctx.m.getChat().chatModel = newModel;
+    return ctx.reply(`Model set to ${newModel}`);
+});
+
 bot.use(limit(
     {
         // Allow only 1 message to be handled every 2 seconds.
@@ -179,11 +203,13 @@ bot.on('message', async (ctx) => {
 
     const time = new Date().getTime();
 
+    const model = ctx.m.getChat().chatModel ?? config.ai.model;
+
     let response;
     try {
         response = await generateText({
             model: google(
-                config.ai.model,
+                model,
                 {
                     safetySettings: [
                         {

@@ -96,4 +96,9 @@ export default {
     tendToIgnoreProbability: 90,
 
     filesMaxAge: 72,
+
+    adminIds: [
+        308552322,
+        855109381,
+    ],
 }
