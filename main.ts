@@ -322,7 +322,7 @@ bot.on('message', (ctx, next) => {
 
 // Get response from AI
 bot.on('message', async (ctx) => {
-    ctx.m.getChat().lastUse = Date.now();
+    const typing = doTyping(ctx, logger);
 
     const messages = await makeHistory(
         bot,
@@ -469,6 +469,8 @@ bot.on('message', async (ctx) => {
         isSummary: false,
         info: ctx.message,
     });
+
+    typing.abort();
 });
 
 void bot.start();

@@ -1,3 +1,4 @@
+import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
 import { SlushaContext } from './setup-bot.ts';
 
 export async function replyWithMarkdown(ctx: SlushaContext, text: string) {
@@ -13,4 +14,24 @@ export async function replyWithMarkdown(ctx: SlushaContext, text: string) {
         });
     }
     return res;
+}
+
+export function doTyping(ctx: SlushaContext, logger: Logger) {
+    const controller = new AbortController();
+
+    async function type() {
+        try {
+            await ctx.replyWithChatAction('typing', {}, controller.signal);
+        } catch (error) {
+            logger.error('Could not send typing signal: ', error);
+        }
+    }
+
+    void type();
+
+    setTimeout(() => {
+        controller.abort();
+    }, 60 * 1000); // 1 minute timeout
+
+    return controller;
 }
