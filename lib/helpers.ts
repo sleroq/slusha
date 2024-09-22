@@ -21,6 +21,7 @@ import { SlushaContext } from './telegram/setup-bot.ts';
 import { exists } from 'https://deno.land/x/logger@v1.1.1/fs.ts';
 import ky from 'https://esm.sh/ky@1.7.2';
 import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
+import Werror from './werror.ts';
 
 export function getRandomInt(min: number, max: number) {
     min = Math.ceil(min);
@@ -53,6 +54,7 @@ interface HistoryOptions {
     symbolLimit: number;
     messagesLimit: number;
     usernames?: boolean;
+    images?: boolean;
 }
 
 export type Prompt = Array<
@@ -61,7 +63,6 @@ export type Prompt = Array<
 
 async function getPhotoContent(
     bot: Bot<SlushaContext>,
-    logger: Logger,
     photos: PhotoSize[],
 ): Promise<Array<ImagePart>> {
     const files = [];
@@ -86,11 +87,7 @@ async function getPhotoContent(
     try {
         file = await downloadFile(bot, photo.file_id);
     } catch (error) {
-        logger.error(
-            'Could not download file: ',
-            error,
-        );
-        return [];
+        throw new Werror(error, 'Could not download file');
     }
 
     files.push(file);
@@ -101,6 +98,18 @@ async function getPhotoContent(
     }));
 }
 
+async function getFileContent(
+    bot: Bot<SlushaContext>,
+    fileId: string,
+): Promise<Array<ImagePart>> {
+    const stickerFile = await downloadFile(bot, fileId);
+
+    return [{
+        type: 'image',
+        image: stickerFile,
+    }];
+}
+
 export async function makeHistory(
     bot: Bot<SlushaContext>,
     logger: Logger,
@@ -109,6 +118,7 @@ export async function makeHistory(
 ): Promise<Prompt> {
     const { symbolLimit, messagesLimit } = options;
     const usernames = options?.usernames ?? true;
+    const images = options?.images ?? true;
 
     if (history.length > messagesLimit) {
         history.splice(0, history.length - messagesLimit);
@@ -126,10 +136,12 @@ export async function makeHistory(
         if (message.replyTo && !message.sender.myself) {
             // Add original message if this is last message in history
             if (i == history.length - 1) {
+                const repliedTo = message.replyTo;
+
                 // If replied is before last message, there is nothing to add
-                if (message.replyTo.id !== history[i - 1].id) {
+                if (repliedTo.id !== history[i - 1].id) {
                     const replyText = sliceMessage(
-                        message.replyTo.text,
+                        repliedTo.text,
                         symbolLimit,
                     );
 
@@ -143,13 +155,16 @@ export async function makeHistory(
                         },
                     ];
 
-                    if ('photo' in message.replyTo) {
+                    if (
+                        ('photo' in repliedTo) &&
+                        repliedTo.photo?.length &&
+                        images
+                    ) {
                         let photoContent: ImagePart[] = [];
                         try {
                             photoContent = await getPhotoContent(
                                 bot,
-                                logger,
-                                message.replyTo.photo,
+                                repliedTo.photo,
                             );
                         } catch (error) {
                             logger.error(
@@ -159,6 +174,52 @@ export async function makeHistory(
                         }
 
                         content = content.concat(photoContent);
+                    }
+
+                    // Get sticker images too
+                    if ('sticker' in repliedTo && repliedTo.sticker) {
+                        let stickerContent: ImagePart[] = [];
+
+                        let fileId = repliedTo.sticker.file_id;
+                        if (repliedTo.sticker.thumbnail?.file_id) {
+                            fileId = repliedTo.sticker.thumbnail?.file_id;
+                        }
+
+                        try {
+                            stickerContent = await getFileContent(
+                                bot,
+                                fileId,
+                            );
+                        } catch (error) {
+                            logger.error(
+                                'Could not download file: ',
+                                error,
+                            );
+                        }
+
+                        content = content.concat(stickerContent);
+                    }
+
+                    if (
+                        'video' in repliedTo &&
+                        repliedTo.video &&
+                        repliedTo.video.thumbnail?.file_id && images
+                    ) {
+                        let videoContent: ImagePart[] = [];
+
+                        try {
+                            videoContent = await getFileContent(
+                                bot,
+                                repliedTo.video.thumbnail.file_id,
+                            );
+                        } catch (error) {
+                            logger.error(
+                                'Could not download file: ',
+                                error,
+                            );
+                        }
+
+                        content = content.concat(videoContent);
                     }
 
                     prompt.push({
@@ -193,14 +254,14 @@ export async function makeHistory(
 
         // Download files attached to messages
         if (
-            message.info.photo &&
-            (i === history.length - 1 || i === history.length - 2)
+            message.info.photo?.length &&
+            (i === history.length - 1 || i === history.length - 2) &&
+            images
         ) {
             let photoContent: ImagePart[] = [];
             try {
                 photoContent = await getPhotoContent(
                     bot,
-                    logger,
                     message.info.photo,
                 );
             } catch (error) {
@@ -211,6 +272,51 @@ export async function makeHistory(
             }
 
             content = content.concat(photoContent);
+        }
+
+        // Get sticker images too
+        if (message.info.sticker) {
+            let stickerContent: ImagePart[] = [];
+
+            let fileId = message.info.sticker.file_id;
+            if (message.info.sticker.thumbnail?.file_id) {
+                fileId = message.info.sticker.thumbnail?.file_id;
+            }
+
+            try {
+                stickerContent = await getFileContent(
+                    bot,
+                    fileId,
+                );
+            } catch (error) {
+                logger.error(
+                    'Could not download file: ',
+                    error,
+                );
+            }
+
+            content = content.concat(stickerContent);
+        }
+
+        if (
+            message.info.video && message.info.video.thumbnail?.file_id &&
+            images
+        ) {
+            let videoContent: ImagePart[] = [];
+
+            try {
+                videoContent = await getFileContent(
+                    bot,
+                    message.info.video.thumbnail.file_id,
+                );
+            } catch (error) {
+                logger.error(
+                    'Could not download file: ',
+                    error,
+                );
+            }
+
+            content = content.concat(videoContent);
         }
 
         prompt.push({

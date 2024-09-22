@@ -1,4 +1,6 @@
 import { z } from 'https://deno.land/x/zod@v3.23.8/mod.ts';
+import { GoogleGenerativeAIProvider, GoogleGenerativeAIProvider, GoogleGenerativeAIProviderSettings, google } from 'npm:@ai-sdk/google';
+import { generateText } from 'npm:ai';
 
 function isValidRegex(val: unknown): val is RegExp {
     if (typeof val !== 'string') return false;
@@ -14,12 +16,13 @@ function isValidRegex(val: unknown): val is RegExp {
 const configSchema = z.object({
     ai: z.object({
         model: z.string(),
+        notesModel: z.string().optional(),
         temperature: z.number(),
         topK: z.number(),
         topP: z.number(),
         prompt: z.string(),
         finalPrompt: z.string(),
-        notesPrompt: z.string().optional(),
+        notesPrompt: z.string(),
         messagesToPass: z.number().default(5),
         messageMaxLength: z.number().default(2000),
     }),
@@ -33,8 +36,31 @@ const configSchema = z.object({
     nepons: z.array(z.string()),
     filesMaxAge: z.number().default(72),
     adminIds: z.array(z.number()).optional(),
-    historyMaxLength: z.number().default(100),
+    maxNotesToStore: z.number().default(5),
+    maxMessagesToStore: z.number().default(100),
+    chatLastUseNotes: z.number().default(3),
 });
+
+type SafetySettings = Exclude<Parameters<GoogleGenerativeAIProvider>[1], undefined>['safetySettings'];
+
+export const safetySettings: SafetySettings = [
+    {
+        category: 'HARM_CATEGORY_HARASSMENT',
+        threshold: 'BLOCK_NONE',
+    },
+    {
+        category: 'HARM_CATEGORY_HATE_SPEECH',
+        threshold: 'BLOCK_NONE',
+    },
+    {
+        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+        threshold: 'BLOCK_NONE',
+    },
+    {
+        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+        threshold: 'BLOCK_NONE',
+    },
+];
 
 export type UserConfig = z.infer<typeof configSchema>;
 

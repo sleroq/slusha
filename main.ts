@@ -20,6 +20,11 @@ import {
 } from './lib/helpers.ts';
 import { replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
 import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
+import {
+    PhotoSize,
+    Sticker,
+    Video,
+} from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
 
 const memory = await loadMemory();
 
@@ -42,6 +47,24 @@ bot.on('message', (ctx, next) => {
     // Save all messages to memory
     let replyTo: ChatMessage['replyTo'] | undefined;
     if (ctx.msg.reply_to_message && ctx.msg.reply_to_message.from) {
+        let sticker: Sticker | undefined;
+        let video: Video | undefined;
+        let photo: PhotoSize[] | undefined;
+        let media_group_id: string | undefined;
+
+        if (ctx.msg.reply_to_message.sticker) {
+            sticker = ctx.msg.reply_to_message.sticker;
+        }
+
+        if (ctx.msg.reply_to_message.video) {
+            video = ctx.msg.reply_to_message.video;
+        }
+
+        if (ctx.msg.reply_to_message.photo) {
+            photo = ctx.msg.reply_to_message.photo;
+            media_group_id = ctx.msg.reply_to_message.media_group_id;
+        }
+
         replyTo = {
             id: ctx.msg.reply_to_message.message_id,
             sender: {
@@ -52,8 +75,10 @@ bot.on('message', (ctx, next) => {
             text: getText(
                 ctx.msg.reply_to_message,
             ) ?? '',
-            photo: ctx.msg.reply_to_message.photo,
-            media_group_id: ctx.msg.reply_to_message.media_group_id,
+            photo,
+            media_group_id,
+            sticker,
+            video,
         };
     }
 
@@ -108,7 +133,7 @@ bot.command('model', (ctx) => {
         ctx.m.getChat().chatModel = undefined;
         return ctx.reply('Model reset');
     }
-    
+
     ctx.m.getChat().chatModel = newModel;
     return ctx.reply(`Model set to ${newModel}`);
 });
@@ -241,7 +266,7 @@ bot.on('message', (ctx, next) => {
     const msg = ctx.m.getLastMessage();
 
     // Ignore if text is empty
-    if (!msg.text) {
+    if (!msg.text && !('photo' in msg.info)) {
         return;
     }
 

@@ -2,6 +2,8 @@ import {
     Chat as TgChat,
     Message,
     PhotoSize,
+    Sticker,
+    Video,
 } from 'https://deno.land/x/grammy@v1.30.0/types.deno.ts';
 import logger from './logger.ts';
 
@@ -20,6 +22,8 @@ type ReplyTo =
         photo: PhotoSize[];
         media_group_id?: string;
     }
+    | { id: number; sender: Sender; text: string; sticker?: Sticker }
+    | { id: number; sender: Sender; text: string; video?: Video }
     | {
         id: number;
         sender: Sender;
