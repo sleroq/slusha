@@ -2,7 +2,7 @@ import {
     Sticker,
     Update,
 } from 'https://deno.land/x/grammy@v1.30.0/types.deno.ts';
-import { ChatMessage } from './memory.ts';
+import { ChatMessage, ReplyTo } from './memory.ts';
 import {
     Message,
     PhotoSize,
@@ -21,7 +21,7 @@ import { SlushaContext } from './telegram/setup-bot.ts';
 import { exists } from 'https://deno.land/x/logger@v1.1.1/fs.ts';
 import ky from 'https://esm.sh/ky@1.7.2';
 import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
-import Werror from './werror.ts';
+import { ReplyMessage } from './telegram/tg-helpers.ts';
 
 export function getRandomInt(min: number, max: number) {
     min = Math.ceil(min);
@@ -61,13 +61,39 @@ export type Prompt = Array<
     CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage
 >;
 
-async function getPhotoContent(
-    bot: Bot<SlushaContext>,
-    photos: PhotoSize[],
-): Promise<Array<ImagePart>> {
-    const files = [];
+async function downloadFile(bot: Bot<SlushaContext>, fileId: string) {
+    const filePath = `./tmp/${fileId}`;
+    if (await exists(filePath)) {
+        return await Deno.readFile(filePath);
+    }
 
-    const photo = photos.sort((a, b) => {
+    const file = await bot.api.getFile(fileId);
+
+    const downloadUrl =
+        `https://api.telegram.org/file/bot${bot.token}/${file.file_path}`;
+
+    const arrayBuffer = await ky.get(downloadUrl).arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+
+    await Deno.writeFile(filePath, buffer);
+
+    return buffer;
+}
+
+async function getFileContent(
+    bot: Bot<SlushaContext>,
+    fileId: string,
+): Promise<ImagePart> {
+    const stickerFile = await downloadFile(bot, fileId);
+
+    return {
+        type: 'image',
+        image: stickerFile,
+    };
+}
+
+function chooseSize(photos: PhotoSize[]): PhotoSize {
+    return photos.sort((a, b) => {
         if (!a.file_size || !b.file_size) {
             return 0;
         }
@@ -82,32 +108,107 @@ async function getPhotoContent(
 
         return 0;
     })[0];
-
-    let file: Uint8Array;
-    try {
-        file = await downloadFile(bot, photo.file_id);
-    } catch (error) {
-        throw new Werror(error, 'Could not download file');
-    }
-
-    files.push(file);
-
-    return files.map((file) => ({
-        type: 'image',
-        image: file,
-    }));
 }
 
-async function getFileContent(
+async function getAttachments(
     bot: Bot<SlushaContext>,
-    fileId: string,
-): Promise<Array<ImagePart>> {
-    const stickerFile = await downloadFile(bot, fileId);
+    logger: Logger,
+    msg: ChatMessage | ReplyTo,
+): Promise<ImagePart[]> {
+    const parts: ImagePart[] = [];
 
-    return [{
-        type: 'image',
-        image: stickerFile,
-    }];
+    if (msg.info.photo) {
+        const size = chooseSize(msg.info.photo);
+        try {
+            parts.push(await getFileContent(bot, size.file_id));
+        } catch (error) {
+            logger.error(
+                'Could not download photo: ',
+                error,
+            );
+        }
+    }
+
+    if (msg.info.sticker) {
+        const { sticker } = msg.info;
+        let stickerImageId = undefined;
+        if (sticker.is_video || sticker.is_animated) {
+            stickerImageId = sticker.thumbnail?.file_id;
+        } else {
+            stickerImageId = sticker.file_id;
+        }
+
+        if (!stickerImageId) {
+            logger.warn('Sticker has no file_id: ', sticker);
+            return parts;
+        }
+
+        try {
+            parts.push(await getFileContent(bot, stickerImageId));
+        } catch (error) {
+            logger.error(
+                'Could not download sticker: ',
+                error,
+            );
+            return parts;
+        }
+    }
+
+    if (msg.info.video) {
+        const thumbnailId = msg.info.video.thumbnail?.file_id;
+        if (!thumbnailId) {
+            logger.warn('Video has no thumbnail: ', msg.info.video);
+            return parts;
+        }
+
+        try {
+            parts.push(await getFileContent(bot, thumbnailId));
+        } catch (error) {
+            logger.error(
+                'Could not download video thumbnail: ',
+                error,
+            );
+            return parts;
+        }
+    }
+
+    if (msg.info.animation) {
+        const thumbnailId = msg.info.animation.thumbnail?.file_id;
+        if (!thumbnailId) {
+            logger.warn('Animation has no file_id: ', msg.info.animation);
+            return parts;
+        }
+
+        try {
+            parts.push(await getFileContent(bot, thumbnailId));
+        } catch (error) {
+            logger.error(
+                'Could not download animation thumbnail: ',
+                error,
+            );
+            return parts;
+        }
+    }
+
+    if (msg.info.video_note) {
+        const thumbnailId = msg.info.video_note.thumbnail?.file_id;
+        if (!thumbnailId) {
+            logger.warn('Video note has no file_id: ', msg.info.video_note);
+            return parts;
+        }
+
+        try {
+            parts.push(await getFileContent(bot, thumbnailId));
+        } catch (error) {
+            logger.error(
+                'Could not download video note thumbnail: ',
+                error,
+            );
+            return parts;
+        }
+    }
+
+    return parts;
 }
 
 export async function makeHistory(
@@ -126,116 +227,84 @@ export async function makeHistory(
 
     let prompt: Prompt = [];
     for (let i = 0; i < history.length; i++) {
-        const message = history[i];
-        const username = message.sender.username
-            ? ` (@${message.sender.username})`
-            : '';
-        let context = `${message.sender.name}${username}`;
-        if (!usernames) {
-            context = `${message.sender.name}`;
+        const msg = history[i];
+        const sender = msg.info.from;
+
+        const username = sender?.username ? ` (@${sender.username})` : '';
+        const name = sender?.first_name ?? 'User';
+
+        // This is a message passed to ai
+        let context = `${name}`;
+
+        if (usernames && username) {
+            context += username;
         }
 
-        if (message.replyTo && !message.sender.myself) {
-            // Add original message if this is last message in history
-            if (i == history.length - 1) {
-                const repliedTo = message.replyTo;
+        // If message is a reply add info about it
+        if (msg.replyTo) {
+            const replyName = msg.replyTo.info.from?.first_name ?? 'User';
+            context += ` (in reply to: ${replyName})`;
+        }
 
-                // If replied is before last message, there is nothing to add
-                if (repliedTo.id !== history[i - 1].id) {
-                    const replyText = sliceMessage(
-                        repliedTo.text,
-                        symbolLimit,
+        // If this is last message in history
+        // and message is reply but not from bot
+        // and replied message is not in 5 messages before current one
+        // add context about original message so ai can follow conversation
+        if (msg.replyTo) {
+            const reply = msg.replyTo;
+            const prevIndex = i - 5 < 0 ? 0 : i - 5;
+            if (!history.slice(prevIndex, i).some((msg) => msg.id === reply.id)) {
+                const replyName = reply.info.from?.first_name ?? 'User';
+                let replyText = `(quoted message from ${replyName}):\n`;
+                replyText += sliceMessage(reply.text, symbolLimit);
+
+                const isItFromMe = reply.info.from?.id === bot.botInfo.id;
+                if (isItFromMe) {
+                    prompt.push(
+                        {
+                            role: 'assistant',
+                            content: replyText,
+                        },
                     );
-
-                    // Add message user replied to before the last one
-                    // for ai to understand context
-
-                    let content: Array<TextPart | ImagePart> = [
+                    // Add attachments only if it's replied by last message
+                } else if (
+                    history[history.length - 1].id === msg.id && msg.replyTo &&
+                    !msg.isMyself
+                ) {
+                    let replyContent: Array<TextPart | ImagePart> = [
                         {
                             type: 'text',
                             text: replyText,
                         },
                     ];
 
-                    if (
-                        ('photo' in repliedTo) &&
-                        repliedTo.photo?.length &&
-                        images
-                    ) {
-                        let photoContent: ImagePart[] = [];
-                        try {
-                            photoContent = await getPhotoContent(
-                                bot,
-                                repliedTo.photo,
-                            );
-                        } catch (error) {
-                            logger.error(
-                                'Could not download file: ',
-                                error,
-                            );
-                        }
-
-                        content = content.concat(photoContent);
+                    let parts: ImagePart[] = [];
+                    try {
+                        parts = await getAttachments(bot, logger, reply);
+                    } catch (error) {
+                        logger.error(
+                            'Could not download reply attachments: ',
+                            error,
+                        );
                     }
 
-                    // Get sticker images too
-                    if ('sticker' in repliedTo && repliedTo.sticker) {
-                        let stickerContent: ImagePart[] = [];
-
-                        let fileId = repliedTo.sticker.file_id;
-                        if (repliedTo.sticker.thumbnail?.file_id) {
-                            fileId = repliedTo.sticker.thumbnail?.file_id;
-                        }
-
-                        try {
-                            stickerContent = await getFileContent(
-                                bot,
-                                fileId,
-                            );
-                        } catch (error) {
-                            logger.error(
-                                'Could not download file: ',
-                                error,
-                            );
-                        }
-
-                        content = content.concat(stickerContent);
+                    if (parts.length > 0) {
+                        replyContent = replyContent.concat(parts);
                     }
 
-                    if (
-                        'video' in repliedTo &&
-                        repliedTo.video?.thumbnail?.file_id && images
-                    ) {
-                        let videoContent: ImagePart[] = [];
-
-                        try {
-                            videoContent = await getFileContent(
-                                bot,
-                                repliedTo.video.thumbnail.file_id,
-                            );
-                        } catch (error) {
-                            logger.error(
-                                'Could not download file: ',
-                                error,
-                            );
-                        }
-
-                        content = content.concat(videoContent);
-                    }
-
-                    prompt.push({
-                        role: 'user',
-                        content,
-                    });
+                    prompt.push(
+                        {
+                            role: 'user',
+                            content: replyContent,
+                        },
+                    );
                 }
             }
-
-            context += ` (in reply to: ${message.replyTo.sender.name})`;
         }
 
-        context += ':\n' + sliceMessage(message.text, symbolLimit);
+        context += ':\n' + sliceMessage(msg.text, symbolLimit);
 
-        if (message.sender.myself) {
+        if (msg.isMyself) {
             prompt.push({
                 role: 'assistant',
                 content: [{
@@ -253,71 +322,13 @@ export async function makeHistory(
             },
         ];
 
-        // Download files attached to messages
-        if (
-            message.info.photo?.length &&
-            (i === history.length - 1 || i === history.length - 2) &&
-            images
-        ) {
-            let photoContent: ImagePart[] = [];
-            try {
-                photoContent = await getPhotoContent(
-                    bot,
-                    message.info.photo,
-                );
-            } catch (error) {
-                logger.error(
-                    'Could not download file: ',
-                    error,
-                );
+        // If message is in the last 5 messages in history
+        // download image attachments
+        if (images && history.slice(-5).some((msg) => msg.id === msg.id)) {
+            const parts = await getAttachments(bot, logger, msg);
+            if (parts.length > 0) {
+                content = content.concat(parts);
             }
-
-            content = content.concat(photoContent);
-        }
-
-        // Get sticker images too
-        if (message.info.sticker) {
-            let stickerContent: ImagePart[] = [];
-
-            let fileId = message.info.sticker.file_id;
-            if (message.info.sticker.thumbnail?.file_id) {
-                fileId = message.info.sticker.thumbnail?.file_id;
-            }
-
-            try {
-                stickerContent = await getFileContent(
-                    bot,
-                    fileId,
-                );
-            } catch (error) {
-                logger.error(
-                    'Could not download file: ',
-                    error,
-                );
-            }
-
-            content = content.concat(stickerContent);
-        }
-
-        if (
-            message.info.video?.thumbnail?.file_id &&
-            images
-        ) {
-            let videoContent: ImagePart[] = [];
-
-            try {
-                videoContent = await getFileContent(
-                    bot,
-                    message.info.video.thumbnail.file_id,
-                );
-            } catch (error) {
-                logger.error(
-                    'Could not download file: ',
-                    error,
-                );
-            }
-
-            content = content.concat(videoContent);
         }
 
         prompt.push({
@@ -327,6 +338,7 @@ export async function makeHistory(
     }
 
     // Filter out messages with no parts
+    // Idk why but sometimes it happens
     prompt = prompt.filter((message) => {
         if (typeof message.content === 'string') {
             return message.content.length > 0;
@@ -377,30 +389,6 @@ export async function deleteOldFiles(logger: Logger, maxAge: number) {
         }
     }
 }
-
-async function downloadFile(bot: Bot<SlushaContext>, fileId: string) {
-    const filePath = `./tmp/${fileId}`;
-    if (await exists(filePath)) {
-        return await Deno.readFile(filePath);
-    }
-
-    const file = await bot.api.getFile(fileId);
-
-    const downloadUrl =
-        `https://api.telegram.org/file/bot${bot.token}/${file.file_path}`;
-
-    const arrayBuffer = await ky.get(downloadUrl).arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
-
-    await Deno.writeFile(filePath, buffer);
-
-    return buffer;
-}
-
-type ReplyMessage = Exclude<
-    Message.CommonMessage['reply_to_message'],
-    undefined
->;
 
 export function getText(
     msg:
@@ -500,4 +488,22 @@ export function testMessage(regexs: Array<string | RegExp>, text: string) {
 
         return regex.test(text);
     });
+}
+
+export function prettyPrintPrompt(prompt: Prompt, limit = 100) {
+    return prompt.map((message) => {
+        if (typeof message.content === 'string') {
+            return message.role + ': ' + message.content;
+        }
+
+        return message.role + ': ' + message.content.map((content) => {
+            if ('text' in content) {
+                return content.text.replaceAll('\n', ' ');
+            }
+
+            if ('image' in content) {
+                return '[image]';
+            }
+        }).join('\n');
+    }).slice(-limit).join('\n');
 }

@@ -2,7 +2,7 @@ import Werror from './lib/werror.ts';
 import logger from './lib/logger.ts';
 import resolveConfig, { Config, safetySettings } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
-import { ChatMemory, ChatMessage, loadMemory } from './lib/memory.ts';
+import { ChatMemory, loadMemory, ReplyTo } from './lib/memory.ts';
 
 import { generateText } from 'npm:ai';
 import { google } from 'npm:@ai-sdk/google';
@@ -12,6 +12,7 @@ import {
     getRandomNepon,
     getText,
     makeHistory,
+    prettyPrintPrompt,
     probability,
     Prompt,
     removeBotName,
@@ -20,11 +21,6 @@ import {
 } from './lib/helpers.ts';
 import { doTyping, replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
 import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
-import {
-    PhotoSize,
-    Sticker,
-    Video,
-} from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
 
 const memory = await loadMemory();
 
@@ -45,55 +41,24 @@ bot.on('message', (ctx, next) => {
     ctx.info = { isRandom: false };
 
     // Save all messages to memory
-    let replyTo: ChatMessage['replyTo'] | undefined;
+    let replyTo: ReplyTo | undefined;
     if (ctx.msg.reply_to_message && ctx.msg.reply_to_message.from) {
-        let sticker: Sticker | undefined;
-        let video: Video | undefined;
-        let photo: PhotoSize[] | undefined;
-        let media_group_id: string | undefined;
-
-        if (ctx.msg.reply_to_message.sticker) {
-            sticker = ctx.msg.reply_to_message.sticker;
-        }
-
-        if (ctx.msg.reply_to_message.video) {
-            video = ctx.msg.reply_to_message.video;
-        }
-
-        if (ctx.msg.reply_to_message.photo) {
-            photo = ctx.msg.reply_to_message.photo;
-            media_group_id = ctx.msg.reply_to_message.media_group_id;
-        }
-
         replyTo = {
             id: ctx.msg.reply_to_message.message_id,
-            sender: {
-                id: ctx.msg.reply_to_message.from.id,
-                name: ctx.msg.reply_to_message.from.first_name,
-                username: ctx.msg.reply_to_message.from.username,
-            },
             text: getText(
                 ctx.msg.reply_to_message,
             ) ?? '',
-            photo,
-            media_group_id,
-            sticker,
-            video,
+            isMyself: false,
+            info: ctx.msg.reply_to_message,
         };
     }
 
     // Save every message to memory
     ctx.m.addMessage({
         id: ctx.msg.message_id,
-        sender: {
-            id: ctx.msg.from.id,
-            name: ctx.msg.from.first_name,
-            username: ctx.msg.from.username,
-        },
-        replyTo,
-        date: ctx.msg.date,
         text: getText(ctx.msg) ?? '',
-        isSummary: false,
+        replyTo,
+        isMyself: false,
         info: ctx.message,
     });
 
@@ -206,6 +171,7 @@ bot.on('message', async (ctx, next) => {
 
     const model = config.ai.notesModel ?? config.ai.model;
 
+    // TODO: Make different funciton for notes history
     let context: Prompt;
     try {
         context = await makeHistory(
@@ -225,12 +191,18 @@ bot.on('message', async (ctx, next) => {
         return next();
     }
 
+    const prompt = config.ai.prompt + '\n' + config.ai.notesPrompt;
+
     const messages: Prompt = [
         {
             role: 'system',
-            content: config.ai.notesPrompt,
+            content: prompt,
         },
         ...context,
+        {
+            role: 'user',
+            content: config.ai.notesPrompt,
+        }
     ];
 
     const start = Date.now();
@@ -385,25 +357,7 @@ bot.on('message', async (ctx) => {
 
     const model = ctx.m.getChat().chatModel ?? config.ai.model;
 
-    // Print pretty log message to know what is sent to AI
-    logger.info(
-        'Sending to AI:',
-        messages.map((message) => {
-            if (typeof message.content === 'string') {
-                return message.role + ': ' + message.content;
-            }
-
-            return message.role + ': ' + message.content.map((content) => {
-                if ('text' in content) {
-                    return content.text.replaceAll('\n', ' ');
-                }
-
-                if ('image' in content) {
-                    return '[image]';
-                }
-            }).join('\n');
-        }).slice(-5).join('\n'),
-    );
+    console.log(prettyPrintPrompt(messages));
 
     let response;
     try {
@@ -487,15 +441,8 @@ bot.on('message', async (ctx) => {
     // Save bot's reply
     ctx.m.addMessage({
         id: replyInfo.message_id,
-        sender: {
-            id: bot.botInfo.id,
-            name: bot.botInfo.first_name,
-            username: bot.botInfo.username,
-            myself: true,
-        },
-        date: replyInfo.date,
         text: replyText,
-        isSummary: false,
+        isMyself: true,
         info: ctx.message,
     });
 

@@ -1,27 +1,41 @@
 import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
 import { SlushaContext } from './setup-bot.ts';
+import { Message } from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
 
 export async function replyWithMarkdown(ctx: SlushaContext, text: string) {
+    let parts = [text];
+    // If message is too long, split it into multiple messages
+    if (text.length > 4096) {
+        parts = text.split('\n');
+    }
+
     let res;
-    try {
-        res = await ctx.reply(text, {
-            // reply_to_message_id: ctx.msg?.message_id,
-            parse_mode: 'Markdown',
-        });
-    } catch (_) { // Retry without markdown
-        res = await ctx.reply(text, {
-            // reply_to_message_id: ctx.msg?.message_id,
-        });
+    for (const part of parts) {
+        try {
+            res = await ctx.reply(part, {
+                // reply_to_message_id: ctx.msg?.message_id,
+                parse_mode: 'Markdown',
+            });
+        } catch (_) { // Retry without markdown
+            res = await ctx.reply(text, {
+                // reply_to_message_id: ctx.msg?.message_id,
+            });
+        }
     }
     return res;
 }
 
+// FIXME: This shit does not work because it's not long enough, has some internal timeout
 export function doTyping(ctx: SlushaContext, logger: Logger) {
     const controller = new AbortController();
 
     async function type() {
         try {
-            await ctx.replyWithChatAction('typing', {}, controller.signal);
+            await ctx.replyWithChatAction(
+                'typing',
+                undefined,
+                controller.signal,
+            );
         } catch (error) {
             logger.error('Could not send typing signal: ', error);
         }
@@ -35,3 +49,8 @@ export function doTyping(ctx: SlushaContext, logger: Logger) {
 
     return controller;
 }
+
+export type ReplyMessage = Exclude<
+    Message.CommonMessage['reply_to_message'],
+    undefined
+>;

@@ -1,42 +1,22 @@
 import {
     Chat as TgChat,
     Message,
-    PhotoSize,
-    Sticker,
-    Video,
 } from 'https://deno.land/x/grammy@v1.30.0/types.deno.ts';
 import logger from './logger.ts';
+import { ReplyMessage } from './telegram/tg-helpers.ts';
 
-export interface Sender {
+export interface ReplyTo {
     id: number;
-    name: string;
-    username: string | undefined;
-    myself?: boolean;
+    text: string;
+    info: ReplyMessage;
+    isMyself: boolean;
 }
-
-type ReplyTo =
-    | {
-        id: number;
-        sender: Sender;
-        text: string;
-        photo: PhotoSize[];
-        media_group_id?: string;
-    }
-    | { id: number; sender: Sender; text: string; sticker?: Sticker }
-    | { id: number; sender: Sender; text: string; video?: Video }
-    | {
-        id: number;
-        sender: Sender;
-        text: string;
-    };
 
 export interface ChatMessage {
     id: number;
-    sender: Sender;
-    replyTo?: ReplyTo;
-    date: number;
     text: string;
-    isSummary: boolean;
+    replyTo?: ReplyTo;
+    isMyself: boolean;
     info: Message;
 }
 
