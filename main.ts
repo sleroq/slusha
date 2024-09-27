@@ -64,7 +64,47 @@ bot.on('message', (ctx, next) => {
 
     ctx.m.removeOldMessages(config.maxMessagesToStore);
 
-    return next();
+    async function handleNext() {
+        try {
+            await next();
+        } catch (error) {
+            logger.error('Could not handle message: ', error);
+        }
+    }
+
+    // TODO: Make sure this will not cause any concurrency issues (how)
+
+    // Wait for half a second before replying
+    // to make sure user is finished typing
+    setTimeout(async () => {
+        // If user is sent something after this message, drop current one
+
+        const history = ctx.m.getHistory();
+
+        // Get last message from this user in chat
+        const lastUserMessage = history.filter((msg) =>
+            msg.info.from?.id === ctx.msg.from?.id
+        ).slice(-1)[0];
+        if (!lastUserMessage) {
+            logger.info('Replying but could not find last message from user');
+            await handleNext();
+            return;
+        }
+
+        if (lastUserMessage.id !== ctx.msg.message_id) {
+            // Dropping message because user sent something new
+            return;
+        }
+
+        if (ctx.m.getLastMessage().id !== lastUserMessage.id) {
+            // If user's last message is followed by messages from other users
+            // then add info to which user to reply
+            ctx.info.userToReply = ctx.msg.from?.username ??
+                ctx.chat.first_name;
+        }
+
+        await handleNext();
+    }, config.responseDelay * 1000);
 });
 
 bot.command('start', (ctx) => ctx.reply(config.startMessage));
@@ -348,9 +388,17 @@ bot.on('message', async (ctx) => {
         content: config.ai.prompt,
     });
 
+    let finalPrompt = config.ai.finalPrompt;
+    if (ctx.info.userToReply) {
+        finalPrompt +=
+            ` Ответь только на последнее сообщение от ${ctx.info.userToReply}.`;
+    } else {
+        finalPrompt += ` Ответь только на последнее сообщение.`;
+    }
+
     messages.push({
         role: 'user',
-        content: config.ai.finalPrompt,
+        content: finalPrompt,
     });
 
     const time = new Date().getTime();

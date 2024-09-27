@@ -107,4 +107,9 @@ export default {
     // Chats which don't use AI for more than chatLastUseNotes days
     // will not get updated summary every 50 messages
     chatLastUseNotes: 3,
+
+    // Time in seconds after which bot will start typing
+    // to prevent from replying on every message in media group
+    // or give user time to finish prompt consisting of multiple messages
+    responseDelay: 2,
 }

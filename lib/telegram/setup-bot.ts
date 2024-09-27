@@ -5,6 +5,7 @@ import { ChatMemory, Memory } from '../memory.ts';
 
 interface RequestInfo {
     isRandom: boolean;
+    userToReply?: string;
 }
 
 export type SlushaContext = Context & {
