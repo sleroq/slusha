@@ -275,14 +275,15 @@ export async function makeHistory(
             context += ` (in reply to: ${replyName})`;
         }
 
-        // If this is last message in history
-        // and message is reply but not from bot
+        // If message is reply but not from bot
         // and replied message is not in 5 messages before current one
         // add context about original message so ai can follow conversation
         if (msg.replyTo) {
             const reply = msg.replyTo;
             const prevIndex = i - 5 < 0 ? 0 : i - 5;
-            if (!history.slice(prevIndex, i).some((msg) => msg.id === reply.id)) {
+            if (
+                !history.slice(prevIndex, i).some((msg) => msg.id === reply.id)
+            ) {
                 const replyName = reply.info.from?.first_name ?? 'User';
                 let replyText = `(quoted message from ${replyName}):\n`;
                 replyText += sliceMessage(reply.text, symbolLimit);
@@ -295,10 +296,11 @@ export async function makeHistory(
                             content: replyText,
                         },
                     );
-                    // Add attachments only if it's replied by last message
+                    // Add attachments only if it's replied by last 3 messages
                 } else if (
-                    history[history.length - 1].id === msg.id && msg.replyTo &&
-                    !msg.isMyself
+                    history.slice(-3).some((m) => m.id === msg.id) &&
+                    !msg.isMyself &&
+                    images
                 ) {
                     let replyContent: Array<TextPart | ImagePart> = [
                         {
