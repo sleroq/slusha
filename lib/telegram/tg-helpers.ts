@@ -22,10 +22,15 @@ export async function replyWithMarkdown(ctx: SlushaContext, text: string) {
             });
         }
     }
+
+    if (!res) {
+        throw new Error('Could not reply to user for some reason');
+    }
+
     return res;
 }
 
-// FIXME: This shit does not work because it's not long enough, has some internal timeout
+// FIXME: This does not work because it's not long enough, some internal timeout
 export function doTyping(ctx: SlushaContext, logger: Logger) {
     const controller = new AbortController();
 
