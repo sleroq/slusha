@@ -1,8 +1,8 @@
 # Slusha
 
-Smartest girl in your telegram group
+Smartest girl in telegram.
 
-> Try it out - t.me/sl_chatbot
+> Try it out - [@sl_chatbot](https://t.me/sl_chatbot)
 
 ## Requirements
 
