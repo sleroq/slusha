@@ -368,28 +368,42 @@ bot.use(limit(
 bot.on('message', async (ctx) => {
     const typing = doTyping(ctx, logger);
 
-    const messages = await makeHistory(
-        bot,
-        logger,
-        ctx.m.getHistory(),
-        {
-            messagesLimit: config.ai.messagesToPass,
-            symbolLimit: config.ai.messageMaxLength,
-        },
-    );
+    const messages: Prompt = [];
+
+    messages.push({
+        role: 'system',
+        content: config.ai.prompt,
+    });
 
     // If we have nots, add them to messages
     if (ctx.m.getChat().notes.length > 0) {
         messages.push({
-            role: 'user',
+            role: 'assistant',
             content: `Chat notes:\n${ctx.m.getChat().notes.join('\n')}`,
         });
     }
 
-    messages.unshift({
-        role: 'system',
-        content: config.ai.prompt,
-    });
+    let history = [];
+    try {
+        history = await makeHistory(
+            bot,
+            logger,
+            ctx.m.getHistory(),
+            {
+                messagesLimit: config.ai.messagesToPass,
+                symbolLimit: config.ai.messageMaxLength,
+            },
+        );
+    } catch (error) {
+        logger.error('Could not get history: ', error);
+
+        if (!ctx.info.isRandom) {
+            await ctx.reply(getRandomNepon(config));
+        }
+        return;
+    }
+
+    messages.push(...history);
 
     let finalPrompt = config.ai.finalPrompt;
     if (ctx.info.userToReply) {
