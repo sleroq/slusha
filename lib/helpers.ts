@@ -353,7 +353,7 @@ export async function makeHistory(
 
         // If message is in the last 5 messages in history
         // download image attachments
-        if (images && history.slice(-5).some((msg) => msg.id === msg.id)) {
+        if (images && history.slice(-5).some((m) => m.id === msg.id)) {
             const parts = await getAttachments(bot, logger, msg);
             if (parts.length > 0) {
                 content = content.concat(parts);
