@@ -19,7 +19,7 @@ extensions=(
     ""
     "apple-x86_64"
     "apple-aarch64"
-    "pc-windows-msvc"
+    "exe"
 )
 
 for i in "${!targets[@]}"; do
@@ -27,7 +27,7 @@ for i in "${!targets[@]}"; do
     ext=${extensions[i]}
 
     deno compile \
-        --output "out/slusha$ext" \
+        --output "out/slusha.$ext" \
         --target "$target" \
         --allow-net \
         --allow-env \
