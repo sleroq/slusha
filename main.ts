@@ -319,7 +319,12 @@ bot.on('message', (ctx, next) => {
     }
 
     // Mentined bot's name
-    if (new RegExp(`(${config.names.join('|')})`, 'gmi').test(msg.text)) {
+    if (
+        new RegExp(`(${config.names.join('|')})`, 'gmi').test(msg.text) &&
+        // Ignore forwarded messages with bot's name
+        !(msg.info.forward_origin?.type === 'user' &&
+            msg.info.forward_origin.sender_user.id === bot.botInfo.id)
+    ) {
         logger.info("Replying because of mentioned bot's name");
         return next();
     }
