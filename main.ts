@@ -211,7 +211,7 @@ bot.on('message', async (ctx, next) => {
 
     const model = config.ai.notesModel ?? config.ai.model;
 
-    // TODO: Make different funciton for notes history
+    // TODO: Make different function for notes history
     let context: Prompt;
     try {
         context = await makeHistory(
@@ -242,7 +242,7 @@ bot.on('message', async (ctx, next) => {
         {
             role: 'user',
             content: config.ai.notesPrompt,
-        }
+        },
     ];
 
     const start = Date.now();
@@ -346,7 +346,7 @@ bot.use(limit(
         limit: 20,
 
         // This is called when the limit is exceeded.
-        onLimitExceeded: ctx => {
+        onLimitExceeded: (ctx) => {
             logger.warn('Skipping message because rate limit exceeded');
             return ctx.reply('Рейтлимитим тебя');
         },
