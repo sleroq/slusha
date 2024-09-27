@@ -58,7 +58,7 @@ export class Memory {
     }
 
     save() {
-        const jsonData = JSON.stringify(this, null, 2);
+        const jsonData = JSON.stringify(this);
 
         return Deno.writeTextFile('memory.json', jsonData);
     }
