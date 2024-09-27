@@ -264,8 +264,10 @@ bot.on('message', async (ctx, next) => {
         return next();
     }
 
+    const chatName = ctx.chat.title ?? ctx.chat.first_name;
+
     logger.info(
-        'Time to generate notes:',
+        `Time to generate notes in chat ${chatName}:`,
         (Date.now() - start) / 1000,
     );
 
@@ -425,8 +427,8 @@ bot.on('message', async (ctx) => {
         return;
     }
 
-    const name = ctx.from?.username ?? ctx.chat.first_name;
-    const username = ctx.from?.username ? `(@${ctx.from.username})` : '';
+    const name = ctx.chat.first_name ?? ctx.chat.title;
+    const username = ctx.chat?.username ? `(@${ctx.chat.username})` : '';
     logger.info(
         'Time to get response:',
         (new Date().getTime() - time) / 1000,
