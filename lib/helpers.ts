@@ -44,6 +44,35 @@ export function removeBotName(
     return response.replace(regexName, '');
 }
 
+export function fixAIResponse(response: string) {
+    // Remove emojis if message has text
+    const textSansEmojis = response.replace(
+        /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/g,
+        '',
+    );
+    if (textSansEmojis.trim().length > 0) {
+        response = textSansEmojis;
+    }
+
+    // Replace ** with * to make it compatible with telegram markdown
+    response = response.replace(/(?<!\*)\*{1,2}(?!\*)/gm, '*');
+
+    // Replace trailing spaces if line does not have code blocks
+    // Probably artifacts from removed emojis, idk
+    if (!response.includes('`')) {
+        response = response.replace(/\s+$/, ' ');
+    }
+
+    // Delete first line if it ends with "):"
+    const replyLines = response.split('\n');
+    const firstLint = replyLines[0];
+    if (firstLint.match(/^.*\)\s*:\s*$/)) {
+        response = replyLines.slice(1).join('\n');
+    }
+
+    return response.trim();
+}
+
 export function sliceMessage(message: string, maxLength: number): string {
     return message.length > maxLength
         ? message.slice(0, maxLength) + '...'

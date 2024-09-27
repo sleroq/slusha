@@ -9,6 +9,7 @@ import { google } from 'npm:@ai-sdk/google';
 
 import {
     deleteOldFiles,
+    fixAIResponse,
     getRandomNepon,
     getText,
     makeHistory,
@@ -271,7 +272,7 @@ bot.on('message', async (ctx, next) => {
         (Date.now() - start) / 1000,
     );
 
-    const summaryText = response.text;
+    const summaryText = fixAIResponse(response.text);
 
     ctx.m.getChat().lastNotes = ctx.msg.message_id;
     ctx.m.getChat().notes.push(summaryText);
@@ -443,24 +444,7 @@ bot.on('message', async (ctx) => {
         bot.botInfo.username,
     );
 
-    // Remove emojis if message has text
-    const textSansEmojis = replyText.replace(
-        /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/g,
-        '',
-    );
-    if (textSansEmojis.trim().length > 0) {
-        replyText = textSansEmojis;
-    }
-
-    // Delete first line if it ends with "):"
-    const replyLines = replyText.split('\n');
-    const firstLint = replyLines[0];
-    if (firstLint.match(/^.*\)\s*:\s*$/)) {
-        replyText = replyLines.slice(1).join('\n');
-        logger.info('Deleted first line because it ends with "):"');
-    }
-
-    replyText = replyText.trim();
+    replyText = fixAIResponse(replyText);
 
     logger.info('Response:', replyText);
 
