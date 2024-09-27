@@ -409,7 +409,7 @@ export async function deleteOldFiles(logger: Logger, maxAge: number) {
         if (await exists(filePath)) {
             const stat = await Deno.stat(filePath);
             const mtime = stat.mtime?.getTime() ?? 0;
-            const age = (Date.now() - mtime) / (1000 * 60 * 60);
+            const age = (Date.now() - mtime) / (1000 * 60 * 60 * 24);
 
             if (age > maxAge || stat.mtime === null) {
                 logger.info(`Deleting old file: ${file.name}`);
