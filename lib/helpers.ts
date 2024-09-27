@@ -271,8 +271,14 @@ export async function makeHistory(
 
         // If message is a reply add info about it
         if (msg.replyTo) {
-            const replyName = msg.replyTo.info.from?.first_name ?? 'User';
-            context += ` (in reply to: ${replyName})`;
+            if (msg.replyTo.info.from?.id !== bot.botInfo.id) {
+                const replyName = msg.replyTo.info.from?.first_name ?? 'User';
+                context += ` (in reply to: ${replyName})`;
+            }
+
+            if (msg.replyTo.info.quote?.is_manual) {
+                context += ` (quoted) > ${msg.replyTo.info.quote.text}`;
+            }
         }
 
         // If message is reply but not from bot
