@@ -210,6 +210,9 @@ bot.on('message', async (ctx, next) => {
         return next();
     }
 
+    // Set last notes to prevent retries
+    ctx.m.getChat().lastNotes = ctx.msg.message_id;
+
     const model = config.ai.notesModel ?? config.ai.model;
 
     // TODO: Make different function for notes history
@@ -227,8 +230,6 @@ bot.on('message', async (ctx, next) => {
         );
     } catch (error) {
         logger.error('Could not get history: ', error);
-        // Set last notes to prevent retries
-        ctx.m.getChat().lastNotes = ctx.msg.message_id;
         return next();
     }
 
@@ -259,9 +260,6 @@ bot.on('message', async (ctx, next) => {
         });
     } catch (error) {
         logger.error('Could not get summary: ', error);
-        // Set last notes to prevent retries
-        ctx.m.getChat().lastNotes = ctx.msg.message_id;
-
         return next();
     }
 
@@ -274,7 +272,6 @@ bot.on('message', async (ctx, next) => {
 
     const summaryText = fixAIResponse(response.text);
 
-    ctx.m.getChat().lastNotes = ctx.msg.message_id;
     ctx.m.getChat().notes.push(summaryText);
 
     ctx.m.removeOldNotes(config.maxNotesToStore);
