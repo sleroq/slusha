@@ -14,12 +14,23 @@ export type SlushaContext = Context & {
     m: ChatMemory;
 };
 
-export default function setupBot(config: Config) {
+export default function setupBot(config: Config, memory: Memory) {
     Deno.mkdir('./tmp', { recursive: true });
 
     const bot = new Bot<SlushaContext>(config.botToken);
 
     bot.catch((error) => logger.error(error));
+
+    bot.use((ctx, next) => {
+        // Init custom context
+        ctx.memory = memory;
+        if (ctx.chat) {
+            ctx.m = new ChatMemory(memory, ctx.chat);
+        }
+        ctx.info = { isRandom: false };
+
+        return next();
+    });
 
     return bot;
 }

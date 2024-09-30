@@ -3,7 +3,8 @@ import {
     Message,
 } from 'https://deno.land/x/grammy@v1.30.0/types.deno.ts';
 import logger from './logger.ts';
-import { ReplyMessage } from './telegram/tg-helpers.ts';
+import { ReplyMessage } from './telegram/helpers.ts';
+import { Character } from './charhub/api.ts';
 
 export interface ReplyTo {
     id: number;
@@ -27,6 +28,7 @@ export interface Chat {
     lastUse: number;
     info: TgChat;
     chatModel?: string;
+    character?: Character;
 }
 
 export class Memory {

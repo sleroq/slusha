@@ -5,7 +5,7 @@ import { Message } from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
 export async function replyWithMarkdown(ctx: SlushaContext, text: string) {
     let parts = [text];
     // If message is too long, split it into multiple messages
-    if (text.length > 4096) {
+    if (text.length >= 4096) {
         parts = text.split('\n');
     }
 

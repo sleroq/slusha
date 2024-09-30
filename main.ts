@@ -20,10 +20,10 @@ import {
     sliceMessage,
     testMessage,
 } from './lib/helpers.ts';
-import { doTyping, replyWithMarkdown } from './lib/telegram/tg-helpers.ts';
+import { doTyping, replyWithMarkdown } from './lib/telegram/helpers.ts';
 import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
-
-const memory = await loadMemory();
+import character from './lib/telegram/bot/character.ts';
+import msgDelay from './lib/telegram/bot/msg-delay.ts';
 
 let config: Config;
 try {
@@ -33,14 +33,11 @@ try {
     Deno.exit(1);
 }
 
-const bot = setupBot(config);
+const memory = await loadMemory();
+
+const bot = setupBot(config, memory);
 
 bot.on('message', (ctx, next) => {
-    // Init custom context
-    ctx.memory = memory;
-    ctx.m = new ChatMemory(memory, ctx.chat);
-    ctx.info = { isRandom: false };
-
     // Save all messages to memory
     let replyTo: ReplyTo | undefined;
     if (ctx.msg.reply_to_message && ctx.msg.reply_to_message.from) {
@@ -65,47 +62,7 @@ bot.on('message', (ctx, next) => {
 
     ctx.m.removeOldMessages(config.maxMessagesToStore);
 
-    async function handleNext() {
-        try {
-            await next();
-        } catch (error) {
-            logger.error('Could not handle message: ', error);
-        }
-    }
-
-    // TODO: Make sure this will not cause any concurrency issues (how)
-
-    // Wait for half a second before replying
-    // to make sure user is finished typing
-    setTimeout(async () => {
-        // If user is sent something after this message, drop current one
-
-        const history = ctx.m.getHistory();
-
-        // Get last message from this user in chat
-        const lastUserMessage = history.filter((msg) =>
-            msg.info.from?.id === ctx.msg.from?.id
-        ).slice(-1)[0];
-        if (!lastUserMessage) {
-            logger.info('Replying but could not find last message from user');
-            await handleNext();
-            return;
-        }
-
-        if (lastUserMessage.id !== ctx.msg.message_id) {
-            // Dropping message because user sent something new
-            return;
-        }
-
-        if (ctx.m.getLastMessage().id !== lastUserMessage.id) {
-            // If user's last message is followed by messages from other users
-            // then add info to which user to reply
-            ctx.info.userToReply = ctx.msg.from?.username ??
-                ctx.chat.first_name;
-        }
-
-        await handleNext();
-    }, config.responseDelay * 1000);
+    return next();
 });
 
 bot.command('start', (ctx) => ctx.reply(config.startMessage));
@@ -115,6 +72,10 @@ bot.command('forget', async (ctx) => {
     ctx.m.getChat().notes = [];
     await ctx.reply('История очищена');
 });
+
+bot.use(character);
+
+bot.use(msgDelay(config));
 
 bot.command('model', (ctx) => {
     // Check if user is admin
@@ -233,7 +194,14 @@ bot.on('message', async (ctx, next) => {
         return next();
     }
 
-    const prompt = config.ai.prompt + '\n' + config.ai.notesPrompt;
+    let prompt = config.ai.prePrompt;
+    const character = ctx.m.getChat().character;
+    if (character) {
+        prompt += character.description;
+    } else {
+        prompt += config.ai.prompt;
+    }
+    prompt += '\n' + config.ai.notesPrompt;
 
     const messages: Prompt = [
         {
@@ -372,9 +340,17 @@ bot.on('message', async (ctx) => {
 
     const messages: Prompt = [];
 
+    let prompt = config.ai.prePrompt;
+    const character = ctx.m.getChat().character;
+    if (character) {
+        prompt += character.description;
+    } else {
+        prompt += config.ai.prompt;
+    }
+
     messages.push({
         role: 'system',
-        content: config.ai.prompt,
+        content: prompt,
     });
 
     // If we have nots, add them to messages
@@ -420,12 +396,12 @@ bot.on('message', async (ctx) => {
         content: finalPrompt,
     });
 
-    const time = new Date().getTime();
-
     const model = ctx.m.getChat().chatModel ?? config.ai.model;
 
-    console.log(prettyPrintPrompt(messages));
+    const time = new Date().getTime();
+    logger.info(prettyPrintPrompt(messages));
 
+    // TODO: Fix repeating replies
     let response;
     try {
         response = await generateText({
@@ -437,20 +413,13 @@ bot.on('message', async (ctx) => {
         });
     } catch (error) {
         logger.error('Could not get response: ', error);
+        // logger.info(prettyPrintPrompt(messages));
 
         if (!ctx.info.isRandom) {
             await ctx.reply(getRandomNepon(config));
         }
         return;
     }
-
-    const name = ctx.chat.first_name ?? ctx.chat.title;
-    const username = ctx.chat?.username ? `(@${ctx.chat.username})` : '';
-    logger.info(
-        'Time to get response:',
-        (new Date().getTime() - time) / 1000,
-        `for "${name}" ${username}`,
-    );
 
     let replyText = response.text;
 
@@ -462,7 +431,14 @@ bot.on('message', async (ctx) => {
 
     replyText = fixAIResponse(replyText);
 
-    logger.info('Response:', replyText);
+    const name = ctx.chat.first_name ?? ctx.chat.title;
+    const username = ctx.chat?.username ? `(@${ctx.chat.username})` : '';
+    logger.info(
+        'Time to get response:',
+        (new Date().getTime() - time) / 1000,
+        `for "${name}" ${username}. Response:`,
+        replyText,
+    );
 
     if (replyText.length === 0) {
         logger.warn(
