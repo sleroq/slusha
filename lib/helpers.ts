@@ -21,7 +21,7 @@ import { SlushaContext } from './telegram/setup-bot.ts';
 import { exists } from 'https://deno.land/x/logger@v1.1.1/fs.ts';
 import ky from 'https://esm.sh/ky@1.7.2';
 import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
-import { ReplyMessage } from './telegram/tg-helpers.ts';
+import { ReplyMessage } from './telegram/helpers.ts';
 
 export function getRandomInt(min: number, max: number) {
     min = Math.ceil(min);
@@ -60,7 +60,7 @@ export function fixAIResponse(response: string) {
     // Replace trailing spaces if line does not have code blocks
     // Probably artifacts from removed emojis, idk
     if (!response.includes('`')) {
-        response = response.replace(/\s+$/, ' ');
+        response = response.replaceAll(/\s+/gm, ' ');
     }
 
     // Delete first line if it ends with "):"
@@ -69,6 +69,8 @@ export function fixAIResponse(response: string) {
     if (firstLint.match(/^.*\)\s*:\s*$/)) {
         response = replyLines.slice(1).join('\n');
     }
+
+    response = response.replace(/^.+\(@.+\):/, '');
 
     return response.trim();
 }
