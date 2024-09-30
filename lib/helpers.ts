@@ -16,12 +16,11 @@ import {
     ImagePart,
     TextPart,
 } from 'npm:ai';
-import { Bot } from 'https://deno.land/x/grammy@v1.30.0/bot.ts';
-import { SlushaContext } from './telegram/setup-bot.ts';
 import { exists } from 'https://deno.land/x/logger@v1.1.1/fs.ts';
 import ky from 'https://esm.sh/ky@1.7.2';
 import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
 import { ReplyMessage } from './telegram/helpers.ts';
+import { Api, RawApi } from 'https://deno.land/x/grammy@v1.30.0/mod.ts';
 
 export function getRandomInt(min: number, max: number) {
     min = Math.ceil(min);
@@ -92,16 +91,16 @@ export type Prompt = Array<
     CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage
 >;
 
-async function downloadFile(bot: Bot<SlushaContext>, fileId: string) {
+async function downloadFile(api: Api<RawApi>, token: string, fileId: string) {
     const filePath = `./tmp/${fileId}`;
     if (await exists(filePath)) {
         return await Deno.readFile(filePath);
     }
 
-    const file = await bot.api.getFile(fileId);
+    const file = await api.getFile(fileId);
 
     const downloadUrl =
-        `https://api.telegram.org/file/bot${bot.token}/${file.file_path}`;
+        `https://api.telegram.org/file/bot${token}/${file.file_path}`;
 
     const arrayBuffer = await ky.get(downloadUrl).arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);
@@ -112,10 +111,11 @@ async function downloadFile(bot: Bot<SlushaContext>, fileId: string) {
 }
 
 async function getFileContent(
-    bot: Bot<SlushaContext>,
+    api: Api<RawApi>,
+    token: string,
     fileId: string,
 ): Promise<ImagePart> {
-    const stickerFile = await downloadFile(bot, fileId);
+    const stickerFile = await downloadFile(api, token, fileId);
 
     return {
         type: 'image',
@@ -142,7 +142,8 @@ function chooseSize(photos: PhotoSize[]): PhotoSize {
 }
 
 async function getAttachments(
-    bot: Bot<SlushaContext>,
+    api: Api<RawApi>,
+    token: string,
     logger: Logger,
     msg: ChatMessage | ReplyTo,
 ): Promise<ImagePart[]> {
@@ -151,7 +152,7 @@ async function getAttachments(
     if (msg.info.photo) {
         const size = chooseSize(msg.info.photo);
         try {
-            parts.push(await getFileContent(bot, size.file_id));
+            parts.push(await getFileContent(api, token, size.file_id));
         } catch (error) {
             logger.error(
                 'Could not download photo: ',
@@ -175,7 +176,7 @@ async function getAttachments(
         }
 
         try {
-            parts.push(await getFileContent(bot, stickerImageId));
+            parts.push(await getFileContent(api, token, stickerImageId));
         } catch (error) {
             logger.error(
                 'Could not download sticker: ',
@@ -193,7 +194,7 @@ async function getAttachments(
         }
 
         try {
-            parts.push(await getFileContent(bot, thumbnailId));
+            parts.push(await getFileContent(api, token, thumbnailId));
         } catch (error) {
             logger.error(
                 'Could not download video thumbnail: ',
@@ -211,7 +212,7 @@ async function getAttachments(
         }
 
         try {
-            parts.push(await getFileContent(bot, thumbnailId));
+            parts.push(await getFileContent(api, token, thumbnailId));
         } catch (error) {
             logger.error(
                 'Could not download animation thumbnail: ',
@@ -229,7 +230,7 @@ async function getAttachments(
         }
 
         try {
-            parts.push(await getFileContent(bot, thumbnailId));
+            parts.push(await getFileContent(api, token, thumbnailId));
         } catch (error) {
             logger.error(
                 'Could not download video note thumbnail: ',
@@ -243,7 +244,8 @@ async function getAttachments(
 }
 
 export async function makeHistory(
-    bot: Bot<SlushaContext>,
+    botInfo: { token: string; id: number },
+    api: Api<RawApi>,
     logger: Logger,
     history: ChatMessage[],
     options: HistoryOptions,
@@ -273,7 +275,7 @@ export async function makeHistory(
 
         // If message is a reply add info about it
         if (msg.replyTo) {
-            if (msg.replyTo.info.from?.id !== bot.botInfo.id) {
+            if (msg.replyTo.info.from?.id !== botInfo.id) {
                 const replyName = msg.replyTo.info.from?.first_name ?? 'User';
                 context += ` (in reply to: ${replyName})`;
             }
@@ -296,7 +298,7 @@ export async function makeHistory(
                 let replyText = `(quoted message from ${replyName}):\n`;
                 replyText += sliceMessage(reply.text, symbolLimit);
 
-                const isItFromMe = reply.info.from?.id === bot.botInfo.id;
+                const isItFromMe = reply.info.from?.id === botInfo.id;
                 if (isItFromMe) {
                     prompt.push(
                         {
@@ -319,7 +321,12 @@ export async function makeHistory(
 
                     let parts: ImagePart[] = [];
                     try {
-                        parts = await getAttachments(bot, logger, reply);
+                        parts = await getAttachments(
+                            api,
+                            botInfo.token,
+                            logger,
+                            reply,
+                        );
                     } catch (error) {
                         logger.error(
                             'Could not download reply attachments: ',
@@ -364,7 +371,7 @@ export async function makeHistory(
         // If message is in the last 5 messages in history
         // download image attachments
         if (images && history.slice(-5).some((m) => m.id === msg.id)) {
-            const parts = await getAttachments(bot, logger, msg);
+            const parts = await getAttachments(api, botInfo.token, logger, msg);
             if (parts.length > 0) {
                 content = content.concat(parts);
             }
@@ -549,9 +556,9 @@ export function prettyPrintPrompt(prompt: Prompt, limit = 100) {
 
 export function escapeHtml(unsafe: string): string {
     return unsafe
-         .replace(/&/g, "&amp;")
-         .replace(/</g, "&lt;")
-         .replace(/>/g, "&gt;")
-         .replace(/"/g, "&quot;")
-         .replace(/'/g, "&#039;");
- }
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}

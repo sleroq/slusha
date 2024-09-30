@@ -2,7 +2,7 @@ import Werror from './lib/werror.ts';
 import logger from './lib/logger.ts';
 import resolveConfig, { Config, safetySettings } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
-import { ChatMemory, loadMemory, ReplyTo } from './lib/memory.ts';
+import { loadMemory } from './lib/memory.ts';
 
 import { generateText } from 'npm:ai';
 import { google } from 'npm:@ai-sdk/google';
@@ -11,7 +11,6 @@ import {
     deleteOldFiles,
     fixAIResponse,
     getRandomNepon,
-    getText,
     makeHistory,
     prettyPrintPrompt,
     probability,
@@ -24,6 +23,7 @@ import { doTyping, replyWithMarkdown } from './lib/telegram/helpers.ts';
 import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
 import character from './lib/telegram/bot/character.ts';
 import msgDelay from './lib/telegram/bot/msg-delay.ts';
+import notes from './lib/telegram/bot/notes.ts';
 
 let config: Config;
 try {
@@ -35,35 +35,7 @@ try {
 
 const memory = await loadMemory();
 
-const bot = setupBot(config, memory);
-
-bot.on('message', (ctx, next) => {
-    // Save all messages to memory
-    let replyTo: ReplyTo | undefined;
-    if (ctx.msg.reply_to_message && ctx.msg.reply_to_message.from) {
-        replyTo = {
-            id: ctx.msg.reply_to_message.message_id,
-            text: getText(
-                ctx.msg.reply_to_message,
-            ) ?? '',
-            isMyself: false,
-            info: ctx.msg.reply_to_message,
-        };
-    }
-
-    // Save every message to memory
-    ctx.m.addMessage({
-        id: ctx.msg.message_id,
-        text: getText(ctx.msg) ?? '',
-        replyTo,
-        isMyself: false,
-        info: ctx.message,
-    });
-
-    ctx.m.removeOldMessages(config.maxMessagesToStore);
-
-    return next();
-});
+const bot = await setupBot(config, memory);
 
 bot.command('start', (ctx) => ctx.reply(config.startMessage));
 
@@ -143,109 +115,7 @@ bot.use(limit(
     },
 ));
 
-// Generate summary about chat every 50 messages
-// if bot was used in last 3 days
-bot.on('message', async (ctx, next) => {
-    // Skip for private chats
-    if (ctx.msg.chat.type === 'private') {
-        return next();
-    }
-
-    if (
-        ctx.m.getChat().lastUse <
-            (Date.now() - config.chatLastUseNotes * 24 * 60 * 60 * 1000)
-    ) {
-        return next();
-    }
-
-    // Skip if there are less than 20 messages in chat history
-    if (ctx.m.getHistory().length < 20) {
-        return next();
-    }
-
-    // Check if 50 messages from last notes
-    if (
-        ctx.m.getChat().lastNotes &&
-        ctx.msg.message_id - ctx.m.getChat().lastNotes < 50
-    ) {
-        return next();
-    }
-
-    // Set last notes to prevent retries
-    ctx.m.getChat().lastNotes = ctx.msg.message_id;
-
-    const model = config.ai.notesModel ?? config.ai.model;
-
-    // TODO: Make different function for notes history
-    let context: Prompt;
-    try {
-        context = await makeHistory(
-            bot,
-            logger,
-            ctx.m.getHistory(),
-            {
-                messagesLimit: 50,
-                symbolLimit: config.ai.messageMaxLength / 3,
-                images: false,
-            },
-        );
-    } catch (error) {
-        logger.error('Could not get history: ', error);
-        return next();
-    }
-
-    let prompt = config.ai.prePrompt;
-    const character = ctx.m.getChat().character;
-    if (character) {
-        prompt += character.description;
-    } else {
-        prompt += config.ai.prompt;
-    }
-    prompt += '\n' + config.ai.notesPrompt;
-
-    const messages: Prompt = [
-        {
-            role: 'system',
-            content: prompt,
-        },
-        ...context,
-        {
-            role: 'user',
-            content: config.ai.notesPrompt,
-        },
-    ];
-
-    const start = Date.now();
-
-    let response;
-    try {
-        response = await generateText({
-            model: google(model, { safetySettings }),
-            messages,
-            temperature: config.ai.temperature,
-            topK: config.ai.topK,
-            topP: config.ai.topP,
-        });
-    } catch (error) {
-        logger.error('Could not get summary: ', error);
-        return next();
-    }
-
-    const chatName = ctx.chat.title ?? ctx.chat.first_name;
-
-    logger.info(
-        `Time to generate notes in chat ${chatName}:`,
-        (Date.now() - start) / 1000,
-    );
-
-    const summaryText = fixAIResponse(response.text);
-
-    ctx.m.getChat().notes.push(summaryText);
-
-    ctx.m.removeOldNotes(config.maxNotesToStore);
-
-    return next();
-});
+bot.use(notes(config, bot.botInfo.id));
 
 // Decide if we should reply to user
 bot.on('message', (ctx, next) => {
@@ -369,7 +239,8 @@ bot.on('message', async (ctx) => {
     let history = [];
     try {
         history = await makeHistory(
-            bot,
+            { token: bot.token, id: bot.botInfo.id },
+            bot.api,
             logger,
             ctx.m.getHistory(),
             {
