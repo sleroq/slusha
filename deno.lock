@@ -540,6 +540,8 @@
     "https://deno.land/x/zod@v3.23.8/mod.ts": "ec6e2b1255c1a350b80188f97bd0a6bac45801bb46fc48f50b9763aa66046039",
     "https://deno.land/x/zod@v3.23.8/types.ts": "1b172c90782b1eaa837100ebb6abd726d79d6c1ec336350c8e851e0fd706bf5c",
     "https://esm.sh/ky@1.7.2": "5238ce1d59e224c5ac583a5d5a77f455d74860cbdc54f09bc170c7469983b7d5",
-    "https://esm.sh/v135/ky@1.7.2/denonext/ky.mjs": "b5a85e5c12a91004096c4acf413d55cbc659139fb95455136aebcb73916ef95c"
+    "https://esm.sh/v135/ky@1.7.2/denonext/distribution.js": "94512ec5ba35217ee9585641a262cc273f5b10b62a5e27d5a07eb99de452199d",
+    "https://esm.sh/v135/ky@1.7.2/denonext/ky.mjs": "b5a85e5c12a91004096c4acf413d55cbc659139fb95455136aebcb73916ef95c",
+    "https://esm.sh/v135/ky@1.7.2/distribution/index.js": "46169037a8f55fe44a4f42de4ec13827b7a898531acedd2b056fc13b31e5a09c"
   }
 }
