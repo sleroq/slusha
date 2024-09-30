@@ -256,6 +256,11 @@ bot.on('message', (ctx, next) => {
         return;
     }
 
+    // Ignore if message is from itself
+    if (msg.info.via_bot?.id === bot.botInfo.id) {
+        return;
+    }
+
     // Direct message
     if (ctx.msg.chat.type === 'private') {
         logger.info('Direct message');
