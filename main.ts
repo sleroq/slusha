@@ -47,8 +47,6 @@ bot.command('forget', async (ctx) => {
 
 bot.use(character);
 
-bot.use(msgDelay(config));
-
 bot.command('model', (ctx) => {
     // Check if user is admin
     if (
@@ -95,26 +93,7 @@ bot.command('summary', (ctx) => {
     return ctx.reply(notes.join('\n'));
 });
 
-bot.use(limit(
-    {
-        // Allow only 1 message to be handled every 2 seconds.
-        timeFrame: 2000,
-        limit: 1,
-
-        // This is called when the limit is exceeded.
-        onLimitExceeded: () => {
-            // logger.info('Skipping message because rate limit exceeded');
-        },
-
-        keyGenerator: (ctx) => {
-            if (ctx.hasChatType(['group', 'supergroup'])) {
-                return ctx.chat.id.toString();
-            }
-
-            return ctx.from?.id.toString();
-        },
-    },
-));
+bot.use(msgDelay(config));
 
 bot.use(notes(config, bot.botInfo.id));
 
@@ -187,6 +166,28 @@ bot.on('message', (ctx, next) => {
         return next();
     }
 });
+
+bot.use(limit(
+    {
+        // Allow only 1 message to be handled every 2 seconds.
+        timeFrame: 2000,
+        limit: 1,
+
+        // This is called when the limit is exceeded.
+        onLimitExceeded: () => {
+            // logger.info('Skipping message because rate limit exceeded');
+        },
+
+        keyGenerator: (ctx) => {
+            if (ctx.hasChatType(['group', 'supergroup'])) {
+                return ctx.chat.id.toString();
+            }
+
+            return ctx.from?.id.toString();
+        },
+    },
+));
+
 
 bot.use(limit(
     {
