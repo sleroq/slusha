@@ -24,7 +24,7 @@ export default {
     startMessage: 'Привет! Я Слюша, бот-гений.',
 
     ai: {
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.0-flash-exp',
         // prePromt is used with chub.ai prompts and with default prompt
         prePrompt,
         // prompt is default character, can be replaced with chub.ai prompts
