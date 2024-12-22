@@ -19,7 +19,7 @@ const configSchema = z.object({
         finalPrompt: z.string(),
         notesPrompt: z.string(),
         messagesToPass: z.number().default(5),
-        messageMaxLength: z.number().default(2000),
+        messageMaxLength: z.number().default(4096),
     }),
     startMessage: z.string(),
     names: z.array(z.union([z.string(), z.custom(isValidRegex)])),

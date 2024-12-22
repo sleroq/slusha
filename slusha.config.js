@@ -35,7 +35,7 @@ export default {
         topK: 5,
         topP: 0.8,
         messagesToPass: 20,
-        messageMaxLength: 2000,
+        messageMaxLength: 4096,
     },
 
     names: [
