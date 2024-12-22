@@ -55,12 +55,13 @@ bot.command('model', (ctx) => {
         !config.adminIds || !ctx.msg.from ||
         !config.adminIds.includes(ctx.msg.from.id)
     ) {
-        return;
+        return ctx.reply('Not admin ' + ctx.msg.from?.id + ' ' + JSON.stringify(config.adminIds));
     }
 
-    const args = ctx.msg.text.split(' ').map((arg) => arg.trim()).filter((
-        arg,
-    ) => arg !== '');
+    const args = ctx.msg.text
+        .split(' ')
+        .map((arg) => arg.trim())
+        .filter((arg) => arg !== '');
 
     // If no parameter is passed, show current model
     if (args.length === 1) {
