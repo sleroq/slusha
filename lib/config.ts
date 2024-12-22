@@ -35,6 +35,7 @@ const configSchema = z.object({
     maxMessagesToStore: z.number().default(100),
     chatLastUseNotes: z.number().default(3),
     responseDelay: z.number().default(2),
+    dropPendingUpdates: z.boolean().default(true),
 });
 
 type SafetySettings = Exclude<

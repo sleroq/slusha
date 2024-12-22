@@ -351,7 +351,7 @@ bot.on('message', async (ctx) => {
     typing.abort();
 });
 
-void bot.start();
+void bot.start({ drop_pending_updates: config.dropPendingUpdates });
 
 // Save memory every minute
 setInterval(async () => {

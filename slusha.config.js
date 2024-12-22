@@ -122,4 +122,8 @@ export default {
     // to prevent from replying on every message in media group
     // or give user time to finish prompt consisting of multiple messages
     responseDelay: 2,
+
+    // Drops pending messages if any when bot was down
+    // When false, bot will try respond to all of them at once so may hit AI proveder rate limit
+    dropPendingUpdates: true,
 }
