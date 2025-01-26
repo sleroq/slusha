@@ -21,6 +21,12 @@ export interface ChatMessage {
     info: Message;
 }
 
+export interface OptOutUser {
+    id: number;
+    username?: string;
+    first_name: string;
+}
+
 export interface Chat {
     notes: string[];
     lastNotes: number;
@@ -29,6 +35,7 @@ export interface Chat {
     info: TgChat;
     chatModel?: string;
     character?: Character;
+    optOutUsers: OptOutUser[];
 }
 
 export class Memory {
@@ -51,6 +58,7 @@ export class Memory {
                 history: [],
                 lastUse: Date.now(),
                 info: tgChat,
+                optOutUsers: [],
             };
 
             this.chats[tgChat.id] = chat;
@@ -61,6 +69,10 @@ export class Memory {
 
     save() {
         const jsonData = JSON.stringify(this);
+
+        for (const chat of Object.values(this.chats)) {
+            this.chats[chat.info.id].optOutUsers = [];
+        }
 
         return Deno.writeTextFile('memory.json', jsonData);
     }

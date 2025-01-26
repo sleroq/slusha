@@ -115,7 +115,6 @@ bot.inlineQuery(/.*/, async (ctx) => {
     const query = args.join(' ');
     logger.info(`Query: ${query}`, `Page: ${page}`);
 
-    // TODO: Pagination
     let characters;
     try {
         characters = await getCharacters(query, page);

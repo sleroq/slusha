@@ -2,7 +2,11 @@ import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
 import { SlushaContext } from './setup-bot.ts';
 import { Message } from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
 
-export async function replyWithMarkdown(ctx: SlushaContext, text: string) {
+export async function replyWithMarkdown<X>(
+    ctx: SlushaContext,
+    text: string,
+    other?: X
+) {
     let parts = [text];
     // If message is too long, split it into multiple messages
     if (text.length >= 3000) {
@@ -14,6 +18,7 @@ export async function replyWithMarkdown(ctx: SlushaContext, text: string) {
         try {
             res = await ctx.reply(part, {
                 // reply_to_message_id: ctx.msg?.message_id,
+                ...other,
                 parse_mode: 'Markdown',
             });
         } catch (_) { // Retry without markdown

@@ -34,6 +34,10 @@ export default async function setupBot(config: Config, memory: Memory) {
     });
 
     bot.on('message', (ctx, next) => {
+        if (ctx.m.getChat().optOutUsers.find((u) => u.id === ctx.from?.id)) {
+            return;
+        }
+
         // Save all messages to memory
         let replyTo: ReplyTo | undefined;
         if (ctx.msg.reply_to_message && ctx.msg.reply_to_message.from) {

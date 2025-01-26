@@ -22,6 +22,7 @@ import {
 import { doTyping, replyWithMarkdown } from './lib/telegram/helpers.ts';
 import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
 import character from './lib/telegram/bot/character.ts';
+import optOut from './lib/telegram/bot/opt-out.ts';
 import msgDelay from './lib/telegram/bot/msg-delay.ts';
 import notes from './lib/telegram/bot/notes.ts';
 
@@ -46,6 +47,7 @@ bot.command('forget', async (ctx) => {
 });
 
 bot.use(character);
+bot.use(optOut);
 
 bot.command('model', (ctx) => {
     // Check if user is admin
@@ -53,7 +55,10 @@ bot.command('model', (ctx) => {
         !config.adminIds || !ctx.msg.from ||
         !config.adminIds.includes(ctx.msg.from.id)
     ) {
-        return ctx.reply('Not admin ' + ctx.msg.from?.id + ' ' + JSON.stringify(config.adminIds));
+        return ctx.reply(
+            'Not admin ' + ctx.msg.from?.id + ' ' +
+                JSON.stringify(config.adminIds),
+        );
     }
 
     const args = ctx.msg.text
@@ -188,7 +193,6 @@ bot.use(limit(
     },
 ));
 
-
 bot.use(limit(
     {
         // Allow only 20 message to be handled every 10 minutes.
@@ -277,7 +281,7 @@ bot.on('message', async (ctx) => {
     const model = ctx.m.getChat().chatModel ?? config.ai.model;
 
     const time = new Date().getTime();
-    logger.info(prettyPrintPrompt(messages));
+    // logger.info(prettyPrintPrompt(messages));
 
     // TODO: Fix repeating replies
     let response;
@@ -291,7 +295,7 @@ bot.on('message', async (ctx) => {
         });
     } catch (error) {
         logger.error('Could not get response: ', error);
-        // logger.info(prettyPrintPrompt(messages));
+        logger.info(prettyPrintPrompt(messages));
 
         if (!ctx.info.isRandom) {
             await ctx.reply(getRandomNepon(config));
@@ -322,6 +326,7 @@ bot.on('message', async (ctx) => {
         logger.warn(
             `Empty response from AI: "${response.text}" => "${replyText}"`,
         );
+        logger.info(prettyPrintPrompt(messages));
 
         if (!ctx.info.isRandom) {
             await ctx.reply(getRandomNepon(config));
