@@ -32,5 +32,6 @@ for i in "${!targets[@]}"; do
         --allow-net \
         --allow-env \
         --allow-write \
+        --allow-import \
         --allow-read main.ts
 done
