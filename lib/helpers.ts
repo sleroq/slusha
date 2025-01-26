@@ -403,15 +403,14 @@ export async function deleteOldFiles(logger: Logger, maxAge: number) {
     for await (const file of files) {
         const filePath = `./tmp/${file.name}`;
 
-        if (await exists(filePath)) {
-            const stat = await Deno.stat(filePath);
-            const mtime = stat.mtime?.getTime() ?? 0;
-            const age = (Date.now() - mtime) / (1000 * 60 * 60 * 24);
+        const stat = await Deno.stat(filePath);
 
-            if (age > maxAge || stat.mtime === null) {
-                logger.info(`Deleting old file: ${file.name}`);
-                await Deno.remove(filePath);
-            }
+        const mtime = stat.mtime?.getTime() ?? 0;
+        const age = (Date.now() - mtime) / (1000 * 60 * 60);
+
+        if (age > maxAge || stat.mtime === null) {
+            logger.info(`Deleting old file: ${file.name}`);
+            await Deno.remove(filePath);
         }
     }
 }
