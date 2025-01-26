@@ -93,7 +93,7 @@ bot.inlineQuery(/.*/, async (ctx) => {
 
     const chatId = parseInt(args[0]?.replace('@', ''));
     if (isNaN(chatId)) {
-        return ctx.answerInlineQuery([noChatIdErrorResult], { cache_time: 0 });
+        return ctx.answerInlineQuery([noChatIdErrorResult]);
     }
     args.splice(0, 1);
 
