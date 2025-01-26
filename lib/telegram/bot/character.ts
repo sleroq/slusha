@@ -47,6 +47,43 @@ const noChatIdErrorResult = InlineQueryResultBuilder
         'Открой поиск через команду /character',
     );
 
+function errorResult(chatId: number) {
+    return InlineQueryResultBuilder
+        .article('696969', 'Поиск по имени персонажа в Chub.ai', {
+            description: 'Ошибка при поиске персонажа, попробуйте еще раз',
+            reply_markup: new InlineKeyboard()
+                .switchInlineCurrent('Поиск', `@${chatId} `),
+        })
+        .text('Ошибка при поиске персонажа');
+}
+
+function headerResult(chatId: number, query: string) {
+    return InlineQueryResultBuilder
+        .article('696969', 'Поиск по имени персонажа в Chub.ai', {
+            description: 'Результаты:',
+            thumbnail_url: 'https://chub.ai/logo_cataract.png',
+            reply_markup: new InlineKeyboard()
+                .switchInlineCurrent('Поиск', `@${chatId} ${query}`),
+        })
+        .text('Персонажи отсюда: https://venus.chub.ai/characters');
+}
+
+function notFoundResult(chatId: number) {
+    return InlineQueryResultBuilder
+        .article(
+            'Ничего не найдено',
+            'Попробуйте искать что-нибудь другое',
+            {
+                description: 'Ничего не найдено',
+                thumbnail_url:
+                    'https://imgs.search.brave.com/g1uD8EeI5LKrOZlyrIsyEtHoHvDxV4TWWjSqjQSsndQ/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9jZG4u/cGl4YWJheS5jb20v/cGhvdG8vMjAxNy8w/My8xMy8wNy8yOC9j/b21tdW5pY2F0aW9u/LTIxMzg5ODBfNjQw/LmpwZw',
+                reply_markup: new InlineKeyboard()
+                    .switchInlineCurrent('Поиск', `@${chatId} `),
+            },
+        )
+        .text('Ничего не найдено');
+}
+
 bot.inlineQuery(/.*/, async (ctx) => {
     // TODO: Check if user is admin
     const args = ctx.inlineQuery.query
@@ -84,47 +121,15 @@ bot.inlineQuery(/.*/, async (ctx) => {
         characters = await getCharacters(query, page);
     } catch (error) {
         logger.error('Could not get characters: ', error);
-
-        const errorResult = InlineQueryResultBuilder
-            .article('696969', 'Поиск по имени персонажа в Chub.ai', {
-                description: 'Ошибка при поиске персонажа, попробуйте еще раз',
-            })
-            .text('Ошибка при поиске персонажа');
-
-        return ctx.answerInlineQuery([errorResult], { cache_time: 0 });
+        return ctx.answerInlineQuery([errorResult(chatId)], { cache_time: 0 });
     }
 
     const results: InlineQueryResultArticle[] = [];
 
-    const keyboard = new InlineKeyboard()
-        .switchInlineCurrent('Поиск', `@${chatId} `);
-
-    const header = InlineQueryResultBuilder
-        .article('696969', 'Поиск по имени персонажа в Chub.ai', {
-            description: 'Результаты:',
-            thumbnail_url: 'https://chub.ai/logo_cataract.png',
-            reply_markup: keyboard,
-        })
-        .text('Персонажи отсюда: https://venus.chub.ai/characters');
-
-    results.push(header);
+    results.push(headerResult(chatId, query));
 
     if (characters.length === 0) {
-        results.push(
-            InlineQueryResultBuilder
-                .article(
-                    'Ничего не найдено',
-                    'Попробуйте искать что-нибудь другое',
-                    {
-                        description: 'Ничего не найдено',
-                        thumbnail_url:
-                            'https://imgs.search.brave.com/g1uD8EeI5LKrOZlyrIsyEtHoHvDxV4TWWjSqjQSsndQ/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9jZG4u/cGl4YWJheS5jb20v/cGhvdG8vMjAxNy8w/My8xMy8wNy8yOC9j/b21tdW5pY2F0aW9u/LTIxMzg5ODBfNjQw/LmpwZw',
-                        reply_markup: keyboard,
-                    },
-                )
-                .text('Ничего не найдено'),
-        );
-
+        results.push(notFoundResult(chatId));
         return ctx.answerInlineQuery(results);
     }
 
