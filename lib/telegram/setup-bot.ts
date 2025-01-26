@@ -34,7 +34,10 @@ export default async function setupBot(config: Config, memory: Memory) {
     });
 
     bot.on('message', (ctx, next) => {
-        if (ctx.m.getChat().optOutUsers.find((u) => u.id === ctx.from?.id)) {
+        if (
+            ctx.m.getChat().optOutUsers.find((u) => u.id === ctx.from?.id) &&
+            (!ctx.msg.text || !['/optin', '/optout'].includes(ctx.msg.text))
+        ) {
             return;
         }
 

@@ -1,30 +1,89 @@
 import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
 import { SlushaContext } from './setup-bot.ts';
-import { Message } from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
+import { Message, ParseMode } from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
 
-export async function replyWithMarkdown<X>(
+// Thanks cloud sonnet for this function hopefully it works
+function splitMessage(message: string, maxLength = 3000) {
+    // Input validation
+    if (!message || typeof message !== 'string') {
+        throw new Error('Message must be a non-empty string');
+    }
+    if (maxLength <= 0) {
+        throw new Error('Max length must be positive');
+    }
+
+    const parts = [];
+    let currentIndex = 0;
+
+    while (currentIndex < message.length) {
+        let endIndex = currentIndex + maxLength;
+
+        // If we're not at the end of the message
+        if (endIndex < message.length) {
+            // Look for the last space within the limit
+            const lastSpace = message.lastIndexOf(' ', endIndex);
+
+            // If we found a space within the limit, break at the space
+            if (lastSpace > currentIndex) {
+                endIndex = lastSpace;
+            }
+            // If no space found, force break at maxLength
+        }
+
+        // Extract the part and trim whitespace
+        const part = message.slice(currentIndex, endIndex).trim();
+
+        // Only add non-empty parts
+        if (part) {
+            parts.push(part);
+        }
+
+        // Move to next chunk
+        currentIndex = endIndex + 1;
+    }
+
+    return parts;
+}
+
+async function replyGeneric<X>(
     ctx: SlushaContext,
     text: string,
-    other?: X
+    reply: boolean,
+    parse_mode: ParseMode,
+    other?: X,
 ) {
     let parts = [text];
     // If message is too long, split it into multiple messages
     if (text.length >= 3000) {
-        parts = text.split('\n');
+        // split by 3000 symbols
+        parts = splitMessage(text, 3000);
     }
 
     let res;
     for (const part of parts) {
-        try {
-            res = await ctx.reply(part, {
-                // reply_to_message_id: ctx.msg?.message_id,
-                ...other,
-                parse_mode: 'Markdown',
-            });
-        } catch (_) { // Retry without markdown
-            res = await ctx.reply(text, {
-                // reply_to_message_id: ctx.msg?.message_id,
-            });
+        if (reply) {
+            try {
+                res = await ctx.reply(part, {
+                    parse_mode,
+                    ...other,
+                });
+            } catch (_) { // Retry without markdown
+                res = await ctx.reply(text, {
+                    // reply_to_message_id: ctx.msg?.message_id,
+                });
+            }
+        } else {
+            try {
+                res = await ctx.reply(part, {
+                    parse_mode,
+                    reply_to_message_id: ctx.msg?.message_id,
+                    ...other,
+                });
+            } catch (_) { // Retry without markdown
+                res = await ctx.reply(text, {
+                    reply_to_message_id: ctx.msg?.message_id,
+                });
+            }
         }
     }
 
@@ -33,6 +92,22 @@ export async function replyWithMarkdown<X>(
     }
 
     return res;
+}
+
+export function replyWithHTML<X>(
+    ctx: SlushaContext,
+    text: string,
+    other?: X,
+) {
+    return replyGeneric(ctx, text, false, "HTML", other);
+}
+
+export function replyWithMarkdown<X>(
+    ctx: SlushaContext,
+    text: string,
+    other?: X,
+) {
+    return replyGeneric(ctx, text, false, "MarkdownV2", other);
 }
 
 // FIXME: This does not work because it's not long enough, some internal timeout

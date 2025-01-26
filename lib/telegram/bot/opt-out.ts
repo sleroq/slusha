@@ -2,7 +2,7 @@ import { Composer } from 'https://deno.land/x/grammy@v1.30.0/composer.ts';
 import { SlushaContext } from '../setup-bot.ts';
 import { InlineKeyboard } from 'https://deno.land/x/grammy@v1.30.0/convenience/keyboard.ts';
 import { OptOutUser } from '../../memory.ts';
-import { replyWithMarkdown } from '../helpers.ts';
+import { replyWithHTML } from '../helpers.ts';
 import logger from '../../logger.ts';
 
 const bot = new Composer<SlushaContext>();
@@ -12,7 +12,7 @@ function formatOptOutUsers(users: OptOutUser[]) {
 
     message += users.map((u) => {
         if (u.username) {
-            return `- [${u.first_name}](https://t.me/${u.username})`;
+            return `<a href="https://t.me/${u.username}">${u.first_name}</a>`;
         } else {
             return u.first_name;
         }
@@ -26,7 +26,9 @@ bot.command('optout', (ctx) => {
         return;
     }
 
-    let message = '*Слюша больше не будет видеть твои сообщения в этом чате.*';
+    let message =
+        '<b>Слюша больше не будет видеть твои сообщения в этом чате.</b>\n' +
+        '<span class="tg-spoiler">за исключением прямого ответа другого пользователя на твое сообщение с упоминанием слюши</span>';
 
     const optOutUsers = ctx.m.getChat().optOutUsers;
 
@@ -42,7 +44,7 @@ bot.command('optout', (ctx) => {
         message += formatOptOutUsers(optOutUsers);
     }
 
-    return replyWithMarkdown(ctx, message, {
+    return replyWithHTML(ctx, message, {
         reply_markup: new InlineKeyboard().text('Вернуться', 'opt-in'),
         link_preview_options: {
             is_disabled: true,
@@ -74,7 +76,7 @@ async function optIn(ctx: SlushaContext, id: number, reply: boolean) {
     }
 
     if (reply) {
-        return replyWithMarkdown(ctx, message, {
+        return replyWithHTML(ctx, message, {
             link_preview_options: {
                 is_disabled: true,
             },
@@ -83,7 +85,7 @@ async function optIn(ctx: SlushaContext, id: number, reply: boolean) {
 
     try {
         await ctx.editMessageText(message, {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             link_preview_options: {
                 is_disabled: true,
             },
