@@ -18,5 +18,8 @@
     "semiColons": true,
     "singleQuote": true,
     "proseWrap": "preserve"
+  },
+  "imports": {
+    "@ai-sdk/google": "npm:@ai-sdk/google@^1.1.3"
   }
 }
