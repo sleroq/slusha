@@ -65,10 +65,12 @@ async function replyGeneric<X>(
             try {
                 res = await ctx.reply(part, {
                     parse_mode,
+                    reply_to_message_id: ctx.msg?.message_id,
                     ...other,
                 });
             } catch (_) { // Retry without markdown
                 res = await ctx.reply(text, {
+                    reply_to_message_id: ctx.msg?.message_id,
                     // reply_to_message_id: ctx.msg?.message_id,
                 });
             }
@@ -76,12 +78,10 @@ async function replyGeneric<X>(
             try {
                 res = await ctx.reply(part, {
                     parse_mode,
-                    reply_to_message_id: ctx.msg?.message_id,
                     ...other,
                 });
             } catch (_) { // Retry without markdown
                 res = await ctx.reply(text, {
-                    reply_to_message_id: ctx.msg?.message_id,
                 });
             }
         }
@@ -99,7 +99,7 @@ export function replyWithHTML<X>(
     text: string,
     other?: X,
 ) {
-    return replyGeneric(ctx, text, false, "HTML", other);
+    return replyGeneric(ctx, text, true, "HTML", other);
 }
 
 export function replyWithMarkdown<X>(
@@ -107,7 +107,7 @@ export function replyWithMarkdown<X>(
     text: string,
     other?: X,
 ) {
-    return replyGeneric(ctx, text, false, "MarkdownV2", other);
+    return replyGeneric(ctx, text, true, "MarkdownV2", other);
 }
 
 // FIXME: This does not work because it's not long enough, some internal timeout
