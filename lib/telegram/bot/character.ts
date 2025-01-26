@@ -6,7 +6,7 @@ import {
 } from 'https://deno.land/x/grammy@v1.30.0/mod.ts';
 import { SlushaContext } from '../setup-bot.ts';
 import { InlineQueryResultArticle } from 'https://deno.land/x/grammy_types@v3.14.0/inline.ts';
-import { getCharacter, getCharacters } from '../../charhub/api.ts';
+import { getCharacter, getCharacters, pageSize } from '../../charhub/api.ts';
 import { escapeHtml } from '../../helpers.ts';
 import { ChatMemory } from '../../memory.ts';
 import logger from '../../logger.ts';
@@ -39,6 +39,14 @@ bot.command('character', async (ctx) => {
     );
 });
 
+const noChatIdErrorResult = InlineQueryResultBuilder
+    .article('696969', 'Нет поиска', {
+        description: 'Так просто искать нельзя, используй команду /character',
+    })
+    .text(
+        'Открой поиск через команду /character',
+    );
+
 bot.inlineQuery(/.*/, async (ctx) => {
     // TODO: Check if user is admin
     const args = ctx.inlineQuery.query
@@ -48,26 +56,32 @@ bot.inlineQuery(/.*/, async (ctx) => {
 
     const chatId = parseInt(args[0]?.replace('@', ''));
     if (isNaN(chatId)) {
-        const errorResult = InlineQueryResultBuilder
-            .article('696969', 'Поиск по имени персонажа в Chub.ai', {
-                description:
-                    'Необходимо указать чат. Используйте команду /character',
-            })
-            .text(
-                'Для информации о поиске персонажа используйте команду /character',
-            );
+        return ctx.answerInlineQuery([noChatIdErrorResult], { cache_time: 0 });
+    }
+    args.splice(0, 1);
 
-        return ctx.answerInlineQuery([errorResult], { cache_time: 0 });
+    const pageArgIndex = args.indexOf('/p');
+    let page = 1;
+    if (pageArgIndex !== -1) {
+        const pageArg = args[pageArgIndex + 1];
+
+        const pageParsed = parseInt(pageArg);
+        if (isNaN(pageParsed)) {
+            args.splice(pageArgIndex, 1);
+        } else {
+            page = pageParsed;
+            args.splice(pageArgIndex, 2);
+        }
     }
 
     // from 2nd arg to the end
-    const query = args.slice(1).join(' ');
-    logger.info(`Query: ${query}`);
+    const query = args.join(' ');
+    logger.info(`Query: ${query}`, `Page: ${page}`);
 
     // TODO: Pagination
     let characters;
     try {
-        characters = await getCharacters(query);
+        characters = await getCharacters(query, page);
     } catch (error) {
         logger.error('Could not get characters: ', error);
 
@@ -82,11 +96,37 @@ bot.inlineQuery(/.*/, async (ctx) => {
 
     const results: InlineQueryResultArticle[] = [];
 
+    const keyboard = new InlineKeyboard()
+        .switchInlineCurrent('Поиск', `@${chatId} `);
+
     const header = InlineQueryResultBuilder
-        .article('696969', 'Поиск по имени персонажа в Chub.ai')
-        .text('https://venus.chub.ai/characters');
+        .article('696969', 'Поиск по имени персонажа в Chub.ai', {
+            description: 'Результаты:',
+            thumbnail_url: 'https://chub.ai/logo_cataract.png',
+            reply_markup: keyboard,
+        })
+        .text('Персонажи отсюда: https://venus.chub.ai/characters');
 
     results.push(header);
+
+    if (characters.length === 0) {
+        results.push(
+            InlineQueryResultBuilder
+                .article(
+                    'Ничего не найдено',
+                    'Попробуйте искать что-нибудь другое',
+                    {
+                        description: 'Ничего не найдено',
+                        thumbnail_url:
+                            'https://imgs.search.brave.com/g1uD8EeI5LKrOZlyrIsyEtHoHvDxV4TWWjSqjQSsndQ/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9jZG4u/cGl4YWJheS5jb20v/cGhvdG8vMjAxNy8w/My8xMy8wNy8yOC9j/b21tdW5pY2F0aW9u/LTIxMzg5ODBfNjQw/LmpwZw',
+                        reply_markup: keyboard,
+                    },
+                )
+                .text('Ничего не найдено'),
+        );
+
+        return ctx.answerInlineQuery(results);
+    }
 
     for (const character of characters) {
         const url = `https://venus.chub.ai/characters/${character.fullPath}`;
@@ -126,6 +166,29 @@ bot.inlineQuery(/.*/, async (ctx) => {
         results.push(result);
     }
 
+    if (characters.length == pageSize) {
+        const nextPageKeyboard = new InlineKeyboard()
+            .switchInlineCurrent(
+                'Следующая страница',
+                `@${chatId} /p ${page + 1} ${query}`,
+            );
+
+        results.push(
+            InlineQueryResultBuilder
+                .article(
+                    'Следующая страница',
+                    'кликай чтобы открыть следующую страницу',
+                    {
+                        description: 'Поиск - Следующая страница',
+                        thumbnail_url:
+                            'https://imgs.search.brave.com/6T6lo-oOr54SXQjAYk66hQUadauJQe69QkXl2EE-4Mw/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9nZXRk/cmF3aW5ncy5jb20v/ZnJlZS1pY29uL25l/eHQtcGFnZS1pY29u/LTY3LnBuZw',
+                        reply_markup: nextPageKeyboard,
+                    },
+                )
+                .text('Следующая страница'),
+        );
+    }
+
     return ctx.answerInlineQuery(results);
 });
 
@@ -150,8 +213,18 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     }
 
     if (args[2] === 'default') {
+        let slushaBackKeyboard = new InlineKeyboard()
+            .switchInlineCurrent('Поиск', `@${chatId} `);
+
         if (chat.character === undefined) {
             return ctx.answerCallbackQuery('Слюша уже стоит');
+        } else {
+            slushaBackKeyboard = new InlineKeyboard()
+                .switchInlineCurrent('Поиск', `@${chatId} `)
+                .text(
+                    `Вернуть ${chat.character.name}`,
+                    `set ${chatId} ${chat.character.id}`,
+                );
         }
 
         chat.character = undefined;
@@ -161,7 +234,10 @@ bot.callbackQuery(/set.*/, async (ctx) => {
                 ctx.answerCallbackQuery('Установлена Слюша'),
                 ctx.api.sendMessage(
                     chatId,
-                    `${ctx.from.first_name} установил персонажа Слюша`,
+                    `${ctx.from.first_name} вернул Слюшу`,
+                    {
+                        reply_markup: slushaBackKeyboard,
+                    },
                 ),
             ]);
         } catch (error) {

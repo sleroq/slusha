@@ -51,11 +51,13 @@ export interface SearchResult {
     nodes: CharacterResult[];
 }
 
-export async function getCharacters(query = '') {
+export const pageSize = 20;
+
+export async function getCharacters(query = '', page = 1) {
     const url = new URL('https://api.chub.ai/api/characters/search');
     url.searchParams.set('excludetopics', 'nsfw');
-    url.searchParams.set('first', '20');
-    url.searchParams.set('page', '1');
+    url.searchParams.set('first', String(pageSize));
+    url.searchParams.set('page', String(page));
     url.searchParams.set('namespace', 'characters');
     url.searchParams.set('search', query);
     url.searchParams.set('include_forks', 'true');
@@ -97,7 +99,7 @@ interface Extensions {
     world: string;
 }
 
-export interface Character {
+interface CharacterResponse {
     alternate_greetings: string[];
     character_book: string;
     character_version: string;
@@ -113,6 +115,10 @@ export interface Character {
     scenario: string;
     system_prompt: string;
     tags: string[];
+}
+
+export interface Character extends CharacterResponse {
+    id: number;
 }
 
 interface DownloadResponse {
@@ -141,5 +147,5 @@ export async function getCharacter(id: number) {
         mode: 'cors',
     }).json<DownloadResponse>();
 
-    return response.data;
+    return { ...response.data, id };
 }
