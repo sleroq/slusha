@@ -7,6 +7,7 @@ import { SlushaContext } from '../setup-bot.ts';
 import { InlineQueryResultArticle } from 'https://deno.land/x/grammy_types@v3.14.0/inline.ts';
 import { getCharacter, getCharacters } from '../../charhub/api.ts';
 import { escapeHtml } from '../../helpers.ts';
+import { ChatMemory } from '../../memory.ts';
 import logger from '../../logger.ts';
 
 const bot = new Composer<SlushaContext>();
@@ -137,6 +138,10 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     if (isNaN(chatId)) {
         return ctx.answerCallbackQuery('Invalid chat id');
     }
+
+    // Manually set chat by query id cause it's not available in ctx
+    const chatInfo = ctx.memory.chats[chatId].info;
+    ctx.m = new ChatMemory(ctx.memory, chatInfo);
 
     const chat = ctx.memory.chats[chatId];
     if (!chat) {
