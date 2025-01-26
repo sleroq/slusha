@@ -1,5 +1,6 @@
 import {
     Composer,
+    GrammyError,
     InlineKeyboard,
     InlineQueryResultBuilder,
 } from 'https://deno.land/x/grammy@v1.30.0/mod.ts';
@@ -149,14 +150,34 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     }
 
     if (args[2] === 'default') {
+        if (chat.character === undefined) {
+            return ctx.answerCallbackQuery('Слюша уже стоит');
+        }
+
         chat.character = undefined;
+
+        try {
+            await Promise.all([
+                ctx.answerCallbackQuery('Установлена Слюша'),
+                ctx.api.sendMessage(
+                    chatId,
+                    `${ctx.from.first_name} установил персонажа Слюша`,
+                ),
+            ]);
+        } catch (error) {
+            logger.error('Could not notify character change: ', error);
+        }
+
         ctx.m.clear();
-        return ctx.answerCallbackQuery('Установлена Слюша');
     }
 
     const characterId = parseInt(args[2]);
     if (isNaN(characterId)) {
         return ctx.answerCallbackQuery('Invalid character id');
+    }
+
+    if (chat.character?.id === characterId) {
+        return ctx.answerCallbackQuery('Этот персонаж уже установлен');
     }
 
     let character;
@@ -181,7 +202,13 @@ bot.callbackQuery(/set.*/, async (ctx) => {
             },
         );
     } catch (error) {
-        logger.error('Could not edit message: ', error);
+        // Ignore if message is not modified errors
+        if (
+            !(error instanceof GrammyError &&
+                error.description.includes('message is not modified'))
+        ) {
+            logger.error('Could not edit message: ', error);
+        }
     }
 
     const keyboard2 = new InlineKeyboard()
