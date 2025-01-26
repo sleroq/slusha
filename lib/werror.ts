@@ -7,5 +7,7 @@ export default class Werror extends Error {
         } else {
             throw new Error('error in Werror is not an instance of "Error"');
         }
+
+        super(msg);
     }
 }
