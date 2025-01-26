@@ -20,6 +20,7 @@
     "proseWrap": "preserve"
   },
   "imports": {
-    "@ai-sdk/google": "npm:@ai-sdk/google@^1.1.3"
+    "@ai-sdk/google": "npm:@ai-sdk/google@^1.1.3",
+    "grammy": "https://deno.land/x/grammy@v1.34.0/mod.ts"
   }
 }
