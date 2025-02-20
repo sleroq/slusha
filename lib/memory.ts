@@ -104,6 +104,7 @@ export class ChatMemory {
     }
 
     getLastMessage() {
+        // TODO: Fix this
         return this.getHistory().slice(-1)[0];
     }
 

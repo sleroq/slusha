@@ -4,17 +4,15 @@ import resolveConfig, { Config, safetySettings } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
 import { loadMemory } from './lib/memory.ts';
 
-import { generateText } from 'npm:ai';
+import { CoreMessage, generateText } from 'npm:ai';
 import { google } from 'npm:@ai-sdk/google';
 
 import {
     deleteOldFiles,
     fixAIResponse,
     getRandomNepon,
-    makeHistory,
     prettyPrintPrompt,
     probability,
-    Prompt,
     removeBotName,
     sliceMessage,
     testMessage,
@@ -25,6 +23,7 @@ import character from './lib/telegram/bot/character.ts';
 import optOut from './lib/telegram/bot/opt-out.ts';
 import msgDelay from './lib/telegram/bot/msg-delay.ts';
 import notes from './lib/telegram/bot/notes.ts';
+import { makeHistory } from './lib/history.ts';
 
 let config: Config;
 try {
@@ -219,7 +218,7 @@ bot.use(limit(
 bot.on('message', async (ctx) => {
     const typing = doTyping(ctx, logger);
 
-    const messages: Prompt = [];
+    const messages: CoreMessage[] = [];
 
     let prompt = config.ai.prePrompt;
     const character = ctx.m.getChat().character;
@@ -281,7 +280,9 @@ bot.on('message', async (ctx) => {
     const model = ctx.m.getChat().chatModel ?? config.ai.model;
 
     const time = new Date().getTime();
-    // logger.info(prettyPrintPrompt(messages));
+
+    logger.info(prettyPrintPrompt(messages));
+    // logger.info(messages);
 
     // TODO: Fix repeating replies
     let response;

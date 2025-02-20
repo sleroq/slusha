@@ -1,10 +1,11 @@
 import { Composer } from 'https://deno.land/x/grammy@v1.30.0/composer.ts';
 import { google } from 'npm:@ai-sdk/google';
-import { generateText } from 'npm:ai';
+import { CoreMessage, generateText } from 'npm:ai';
 import { Config, safetySettings } from '../../config.ts';
-import { Prompt, makeHistory, fixAIResponse } from '../../helpers.ts';
+import { fixAIResponse } from '../../helpers.ts';
 import logger from '../../logger.ts';
 import { SlushaContext } from '../setup-bot.ts';
+import { makeHistory } from '../../history.ts';
 
 export default function notes(config: Config, botId: number) {
     const bot = new Composer<SlushaContext>();
@@ -43,7 +44,7 @@ export default function notes(config: Config, botId: number) {
         const model = config.ai.notesModel ?? config.ai.model;
 
         // TODO: Make different function for notes history
-        let context: Prompt;
+        let context: CoreMessage[] = [];
         try {
             context = await makeHistory(
                 { token: config.botToken, id: botId },
@@ -70,7 +71,7 @@ export default function notes(config: Config, botId: number) {
         }
         prompt += '\n' + config.ai.notesPrompt;
 
-        const messages: Prompt = [
+        const messages: CoreMessage[] = [
             {
                 role: 'system',
                 content: prompt,
@@ -87,7 +88,9 @@ export default function notes(config: Config, botId: number) {
         let response;
         try {
             response = await generateText({
-                model: google(model, { safetySettings }),
+                model: google(model, {
+                    safetySettings,
+                }),
                 messages,
                 temperature: config.ai.temperature,
                 topK: config.ai.topK,

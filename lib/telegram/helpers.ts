@@ -1,6 +1,9 @@
-import Logger from 'https://deno.land/x/logger@v1.1.1/logger.ts';
+import { Logger } from '@deno-library/logger';
 import { SlushaContext } from './setup-bot.ts';
-import { Message, ParseMode } from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
+import {
+    Message,
+    ParseMode,
+} from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
 
 // Thanks cloud sonnet for this function hopefully it works
 function splitMessage(message: string, maxLength = 3000) {
@@ -45,12 +48,12 @@ function splitMessage(message: string, maxLength = 3000) {
     return parts;
 }
 
-async function replyGeneric<X>(
+async function replyGeneric<Other>(
     ctx: SlushaContext,
     text: string,
     reply: boolean,
     parse_mode: ParseMode,
-    other?: X,
+    other?: Other,
 ) {
     let parts = [text];
     // If message is too long, split it into multiple messages
@@ -81,8 +84,7 @@ async function replyGeneric<X>(
                     ...other,
                 });
             } catch (_) { // Retry without markdown
-                res = await ctx.reply(text, {
-                });
+                res = await ctx.reply(text);
             }
         }
     }
@@ -94,23 +96,22 @@ async function replyGeneric<X>(
     return res;
 }
 
-export function replyWithHTML<X>(
+export function replyWithHTML<Other>(
     ctx: SlushaContext,
     text: string,
-    other?: X,
+    other?: Other,
 ) {
-    return replyGeneric(ctx, text, true, "HTML", other);
+    return replyGeneric(ctx, text, true, 'HTML', other);
 }
 
-export function replyWithMarkdown<X>(
+export function replyWithMarkdown<Other>(
     ctx: SlushaContext,
     text: string,
-    other?: X,
+    other?: Other,
 ) {
-    return replyGeneric(ctx, text, true, "MarkdownV2", other);
+    return replyGeneric(ctx, text, true, 'Markdown', other);
 }
 
-// FIXME: This does not work because it's not long enough, some internal timeout
 export function doTyping(ctx: SlushaContext, logger: Logger) {
     const controller = new AbortController();
 
@@ -126,13 +127,28 @@ export function doTyping(ctx: SlushaContext, logger: Logger) {
         }
     }
 
+    let isTyping = true;
+
     void type();
+    const typingInterval = setInterval(() => void type(), 5000);
 
-    setTimeout(() => {
+    function stop() {
+        clearInterval(typingInterval);
         controller.abort();
-    }, 60 * 1000); // 1 minute timeout
+        isTyping = false;
+    }
 
-    return controller;
+    // Stop after 1 minute
+    setTimeout(() => {
+        if (!isTyping) {
+            return;
+        }
+
+        logger.info('Stopping typing after 1 minute (something went wrong)');
+        stop();
+    }, 60 * 1000);
+
+    return { abort: stop };
 }
 
 export type ReplyMessage = Exclude<

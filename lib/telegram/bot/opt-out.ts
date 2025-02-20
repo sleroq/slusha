@@ -65,8 +65,8 @@ bot.command('optin', (ctx) => {
 });
 
 async function optIn(ctx: SlushaContext, id: number, reply: boolean) {
-    const wasOptedIn = ctx.m.getChat().optOutUsers.find((u) => u.id === id);
-    const verb = wasOptedIn ? 'уже' : 'снова';
+    const wasOptedIn = ctx.m.getChat().optOutUsers.some((u) => u.id === id);
+    const verb = wasOptedIn ? 'снова': 'уже';
     let message = `Ура, Слюша ${verb} видит твои сообщения`;
 
     ctx.m.getChat().optOutUsers = ctx.m.getChat().optOutUsers.filter((u) =>
