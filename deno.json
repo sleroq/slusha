@@ -20,9 +20,9 @@
     "proseWrap": "preserve"
   },
   "imports": {
-    "ai": "npm:ai@^4.1.9",
-    "@ai-sdk/google": "npm:@ai-sdk/google@^1.1.5",
-    "@deno-library/logger": "jsr:@deno-library/logger@^1.1.8",
+    "ai": "npm:ai@^4.1.45",
+    "@ai-sdk/google": "npm:@ai-sdk/google@^1.1.16",
+    "@deno-library/logger": "jsr:@deno-library/logger@^1.1.9",
     "grammy": "https://deno.land/x/grammy@v1.34.0/mod.ts"
   }
 }
