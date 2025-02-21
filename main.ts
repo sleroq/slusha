@@ -106,7 +106,13 @@ bot.on('message', (ctx, next) => {
     const msg = ctx.m.getLastMessage();
 
     // Ignore if text is empty
-    if (!msg.text && !('photo' in msg.info)) {
+    if (
+        !msg.text &&
+        !('video' in msg.info) &&
+        !('voice' in msg.info) &&
+        !('video_note' in msg.info) &&
+        !('photo' in msg.info)
+    ) {
         return;
     }
 
@@ -118,6 +124,29 @@ bot.on('message', (ctx, next) => {
     // Direct message
     if (ctx.msg.chat.type === 'private') {
         logger.info('Direct message');
+        return next();
+    }
+
+    // Direct reply to bot
+    if (ctx.msg.reply_to_message?.from?.id === bot.botInfo.id) {
+        logger.info('Direct reply to bot');
+        ctx.m.getChat().lastUse = Date.now();
+        return next();
+    }
+
+    // Mentined bot's name
+    if (msg.text.includes(bot.botInfo.username)) {
+        logger.info("Replying because of mentioned bot's username");
+        return next();
+    }
+
+    if (
+        new RegExp(`(${config.names.join('|')})`, 'gmi').test(msg.text) &&
+        // Ignore forwarded messages with bot's name
+        !(msg.info.forward_origin?.type === 'user' &&
+            msg.info.forward_origin.sender_user.id === bot.botInfo.id)
+    ) {
+        logger.info("Replying because of mentioned bot's name");
         return next();
     }
 
@@ -133,24 +162,6 @@ bot.on('message', (ctx, next) => {
         //     }"`,
         // );
         return;
-    }
-
-    // Direct reply to bot
-    if (ctx.msg.reply_to_message?.from?.id === bot.botInfo.id) {
-        logger.info('Direct reply to bot');
-        ctx.m.getChat().lastUse = Date.now();
-        return next();
-    }
-
-    // Mentined bot's name
-    if (
-        new RegExp(`(${config.names.join('|')})`, 'gmi').test(msg.text) &&
-        // Ignore forwarded messages with bot's name
-        !(msg.info.forward_origin?.type === 'user' &&
-            msg.info.forward_origin.sender_user.id === bot.botInfo.id)
-    ) {
-        logger.info("Replying because of mentioned bot's name");
-        return next();
     }
 
     if (

@@ -54,7 +54,7 @@ export default function notes(config: Config, botId: number) {
                 {
                     messagesLimit: 50,
                     symbolLimit: config.ai.messageMaxLength / 3,
-                    images: false,
+                    attachments: false,
                 },
             );
         } catch (error) {

@@ -12,7 +12,7 @@ import Logger from '@deno-library/logger';
 export interface FileContent {
     type: 'file';
     mimeType: string;
-    data: Uint8Array;
+    data: Uint8Array | ArrayBuffer;
 }
 
 export interface TextPart {
@@ -22,7 +22,7 @@ export interface TextPart {
 
 export interface ImagePart {
     type: 'image';
-    image: Uint8Array | URL;
+    image: Uint8Array | ArrayBuffer | URL | string;
     mimeType?: string;
 }
 
@@ -34,7 +34,7 @@ interface HistoryOptions {
     symbolLimit: number;
     messagesLimit: number;
     usernames?: boolean;
-    images?: boolean;
+    attachments?: boolean;
 }
 
 export async function makeHistory(
@@ -46,7 +46,7 @@ export async function makeHistory(
 ): Promise<CoreMessage[]> {
     const { symbolLimit, messagesLimit } = options;
     const usernames = options?.usernames ?? true;
-    const images = options?.images ?? true;
+    const attachAttachments = options?.attachments ?? true;
 
     if (history.length > messagesLimit) {
         history.splice(0, history.length - messagesLimit);
@@ -105,9 +105,9 @@ export async function makeHistory(
                 } else if (
                     history.slice(-3).some((m) => m.id === msg.id) &&
                     !msg.isMyself &&
-                    images
+                    attachAttachments
                 ) {
-                    const replyContent: MessageContent = [
+                    let replyContent: MessageContent = [
                         {
                             type: 'text',
                             text: replyText,
@@ -129,6 +129,10 @@ export async function makeHistory(
                         );
                     }
 
+                    if (parts.length > 0) {
+                        replyContent = replyContent.concat(parts);
+                    }
+
                     prompt.push(
                         {
                             role: 'user',
@@ -137,17 +141,6 @@ export async function makeHistory(
                             content: replyContent,
                         },
                     );
-
-                    if (parts.length > 0) {
-                        prompt.push(
-                            {
-                                role: 'user',
-                                // FIXME: when npm:ai fixes types
-                                // @ts-expect-error npm:ai types don't work
-                                content: parts,
-                            },
-                        );
-                    }
                 }
             }
         }
@@ -165,12 +158,24 @@ export async function makeHistory(
             continue;
         }
 
-        const content: MessageContent = [
+        let content: MessageContent = [
             {
                 type: 'text',
                 text: context,
             },
         ];
+
+        // If message is in the last 5 messages in history (or if attachment is voice)
+        // download image attachments
+        if (
+            msg.info.voice || (attachAttachments && history.slice(-5).some((m) => m.id === msg.id))
+        ) {
+            const parts = await getAttachments(api, botInfo.token, logger, msg);
+
+            if (parts.length > 0) {
+                content = content.concat(parts);
+            }
+        }
 
         prompt.push({
             role: 'user',
@@ -178,24 +183,6 @@ export async function makeHistory(
             // @ts-expect-error npm:ai types don't work
             content,
         });
-
-        // If message is in the last 5 messages in history
-        // download image attachments
-        if (images && history.slice(-5).some((m) => m.id === msg.id)) {
-            const parts = await getAttachments(api, botInfo.token, logger, msg);
-            if (parts.length > 0) {
-                // content = content.concat(parts);
-                prompt.push(
-                    {
-                        role: 'user',
-                        // FIXME: when npm:ai fixes types
-                        // @ts-expect-error npm:ai types don't work
-                        content: parts,
-                    },
-                );
-            }
-        }
-
     }
 
     return prompt;
@@ -223,8 +210,21 @@ async function getAttachments(
 
     if (msg.info.sticker) {
         const { sticker } = msg.info;
+
+        if (sticker.is_video) {
+            const file = await downloadFile(api, token, sticker.file_id);
+
+            parts.push({
+                type: 'file',
+                data: file,
+                mimeType: 'video/webm',
+            });
+
+            return parts;
+        }
+
         let stickerImageId = undefined;
-        if (sticker.is_video || sticker.is_animated) {
+        if (sticker.is_animated) {
             stickerImageId = sticker.thumbnail?.file_id;
         } else {
             stickerImageId = sticker.file_id;
@@ -252,7 +252,6 @@ async function getAttachments(
     if (msg.info.video) {
         const video = msg.info.video;
         if (
-            false &&
             video.file_size && video.mime_type &&
             video.file_size <= 1024 * 1024 * 20
         ) {
@@ -260,8 +259,8 @@ async function getAttachments(
 
             parts.push({
                 type: 'file',
-                mimeType: video.mime_type,
                 data: file,
+                mimeType: video.mime_type,
             });
         } else {
             const thumbnailId = msg.info.video.thumbnail?.file_id;
@@ -283,39 +282,51 @@ async function getAttachments(
     }
 
     if (msg.info.animation) {
-        const thumbnailId = msg.info.animation.thumbnail?.file_id;
-        if (!thumbnailId) {
-            logger.warn('Animation has no file_id: ', msg.info.animation);
+        const { animation } = msg.info;
+
+        if (!animation.mime_type) {
+            logger.warn('Animation has no mime_type: ', animation);
             return parts;
         }
 
-        try {
-            parts.push(await getImageContent(api, token, thumbnailId));
-        } catch (error) {
-            logger.error(
-                'Could not download animation thumbnail: ',
-                error,
-            );
-            return parts;
-        }
+        const file = await downloadFile(api, token, animation.file_id);
+        const mimeType = animation.mime_type;
+
+        parts.push({
+            type: 'file',
+            data: file,
+            mimeType,
+        });
     }
 
     if (msg.info.video_note) {
-        const thumbnailId = msg.info.video_note.thumbnail?.file_id;
-        if (!thumbnailId) {
-            logger.warn('Video note has no file_id: ', msg.info.video_note);
+        const { video_note: viNote } = msg.info;
+
+        const file = await downloadFile(api, token, viNote.file_id);
+
+        parts.push({
+            type: 'file',
+            data: file,
+            mimeType: 'video/mp4',
+        });
+    }
+
+    if (msg.info.voice) {
+        const { voice } = msg.info;
+
+        if (!voice.mime_type) {
+            logger.warn('Audio has no mime_type: ', voice);
             return parts;
         }
 
-        try {
-            parts.push(await getImageContent(api, token, thumbnailId));
-        } catch (error) {
-            logger.error(
-                'Could not download video note thumbnail: ',
-                error,
-            );
-            return parts;
-        }
+        const file = await downloadFile(api, token, voice.file_id);
+        const mimeType = voice.mime_type;
+
+        parts.push({
+            type: 'file',
+            data: file,
+            mimeType,
+        });
     }
 
     return parts;
