@@ -1,7 +1,8 @@
 import {
     Chat as TgChat,
     Message,
-} from 'https://deno.land/x/grammy@v1.30.0/types.deno.ts';
+} from 'grammy_types';
+import { User } from 'grammy';
 import logger from './logger.ts';
 import { ReplyMessage } from './telegram/helpers.ts';
 import { Character } from './charhub/api.ts';

@@ -1,5 +1,5 @@
-import { z } from 'https://deno.land/x/zod@v3.23.8/mod.ts';
-import { GoogleGenerativeAIProvider } from 'npm:@ai-sdk/google';
+import { z } from 'zod';
+import { GoogleGenerativeAIProvider } from '@ai-sdk/google';
 
 function isValidRegex(val: unknown): val is RegExp {
     if (val instanceof RegExp) return true;

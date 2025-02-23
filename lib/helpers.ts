@@ -1,21 +1,12 @@
-import {
-    Sticker,
-    Update,
-} from 'https://deno.land/x/grammy@v1.30.0/types.deno.ts';
-import {
-    Message,
-    PhotoSize,
-} from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
 import { Config } from './config.ts';
-import {
-    CoreMessage,
-} from 'npm:ai';
-import { exists } from 'https://deno.land/x/logger@v1.1.1/fs.ts';
-import ky from 'https://esm.sh/ky@1.7.2';
+import { CoreMessage } from 'ai';
+import ky from 'ky';
 import { ReplyMessage } from './telegram/helpers.ts';
-import { Api, RawApi } from 'https://deno.land/x/grammy@v1.30.0/mod.ts';
+import { Api, RawApi } from 'grammy';
 import { Logger } from '@deno-library/logger';
 import { ImagePart } from './history.ts';
+import { exists } from '@std/fs';
+import { Sticker } from 'grammy_types';
 
 export function getRandomInt(min: number, max: number) {
     min = Math.ceil(min);
@@ -55,7 +46,11 @@ export function sliceMessage(message: string, maxLength: number): string {
         : message;
 }
 
-export async function downloadFile(api: Api<RawApi>, token: string, fileId: string) {
+export async function downloadFile(
+    api: Api<RawApi>,
+    token: string,
+    fileId: string,
+) {
     const filePath = `./tmp/${fileId}`;
     if (await exists(filePath)) {
         return await Deno.readFile(filePath);

@@ -1,4 +1,4 @@
-import ky from 'https://esm.sh/v135/ky@1.7.2/distribution/index.js';
+import ky from 'ky';
 
 export interface CharacterResult {
     id: number;

@@ -3,13 +3,13 @@ import {
     GrammyError,
     InlineKeyboard,
     InlineQueryResultBuilder,
-} from 'https://deno.land/x/grammy@v1.30.0/mod.ts';
+} from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
-import { InlineQueryResultArticle } from 'https://deno.land/x/grammy_types@v3.14.0/inline.ts';
 import { getCharacter, getCharacters, pageSize } from '../../charhub/api.ts';
 import { escapeHtml } from '../../helpers.ts';
 import { ChatMemory } from '../../memory.ts';
 import logger from '../../logger.ts';
+import { InlineQueryResultArticle } from 'grammy_types';
 
 const bot = new Composer<SlushaContext>();
 

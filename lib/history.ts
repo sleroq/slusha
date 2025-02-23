@@ -1,4 +1,4 @@
-import { Api, RawApi } from 'https://deno.land/x/grammy@v1.30.0/mod.ts';
+import { Api, RawApi } from 'grammy';
 import { CoreMessage } from 'npm:ai';
 import {
     chooseSize,
@@ -7,7 +7,9 @@ import {
     sliceMessage,
 } from './helpers.ts';
 import { ChatMessage, ReplyTo } from './memory.ts';
-import Logger from '@deno-library/logger';
+import { Message } from 'grammy_types';
+import { Logger } from 'jsr:@deno-library/logger';
+import logger from './logger.ts';
 
 export interface FileContent {
     type: 'file';

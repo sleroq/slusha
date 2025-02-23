@@ -4,8 +4,8 @@ import resolveConfig, { Config, safetySettings } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
 import { loadMemory } from './lib/memory.ts';
 
-import { CoreMessage, generateText } from 'npm:ai';
-import { google } from 'npm:@ai-sdk/google';
+import { CoreMessage, generateText } from 'ai';
+import { google } from '@ai-sdk/google';
 
 import {
     deleteOldFiles,
@@ -18,7 +18,7 @@ import {
     testMessage,
 } from './lib/helpers.ts';
 import { doTyping, replyWithMarkdown } from './lib/telegram/helpers.ts';
-import { limit } from 'https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts';
+import { limit } from 'grammy_ratelimiter';
 import character from './lib/telegram/bot/character.ts';
 import optOut from './lib/telegram/bot/opt-out.ts';
 import msgDelay from './lib/telegram/bot/msg-delay.ts';

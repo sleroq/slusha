@@ -1,17 +1,30 @@
 {
   "compilerOptions": {
-    "lib": ["deno.window", "deno.unstable"],
+    "lib": [
+      "deno.window",
+      "deno.unstable"
+    ],
     "strict": true
   },
   "lint": {
-    "include": ["*.ts", "lib/"],
+    "include": [
+      "*.ts",
+      "lib/"
+    ],
     "rules": {
-      "tags": ["recommended"],
-      "exclude": ["no-unused-vars"]
+      "tags": [
+        "recommended"
+      ],
+      "exclude": [
+        "no-unused-vars"
+      ]
     }
   },
   "fmt": {
-    "include": ["*.ts", "lib/"],
+    "include": [
+      "*.ts",
+      "lib/"
+    ],
     "useTabs": false,
     "lineWidth": 80,
     "indentWidth": 4,
@@ -23,6 +36,11 @@
     "ai": "npm:ai@^4.1.45",
     "@ai-sdk/google": "npm:@ai-sdk/google@^1.1.16",
     "@deno-library/logger": "jsr:@deno-library/logger@^1.1.9",
-    "grammy": "https://deno.land/x/grammy@v1.34.0/mod.ts"
+    "grammy": "https://deno.land/x/grammy@v1.34.0/mod.ts",
+    "grammy_types": "https://deno.land/x/grammy_types@v3.19.0/mod.ts",
+    "ky": "https://esm.sh/ky@1.7.5",
+    "grammy_ratelimiter": "https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts",
+    "zod": "https://deno.land/x/zod@v3.23.8/mod.ts",
+    "@std/fs": "jsr:@std/fs@^1.0.6"
   }
 }

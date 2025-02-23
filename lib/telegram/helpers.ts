@@ -1,9 +1,6 @@
 import { Logger } from '@deno-library/logger';
 import { SlushaContext } from './setup-bot.ts';
-import {
-    Message,
-    ParseMode,
-} from 'https://deno.land/x/grammy_types@v3.14.0/message.ts';
+import { ParseMode, Message } from 'grammy_types';
 
 // Thanks cloud sonnet for this function hopefully it works
 function splitMessage(message: string, maxLength = 3000) {

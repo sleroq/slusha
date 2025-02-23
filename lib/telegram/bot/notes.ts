@@ -1,4 +1,4 @@
-import { Composer } from 'https://deno.land/x/grammy@v1.30.0/composer.ts';
+import { Composer } from 'grammy';
 import { google } from 'npm:@ai-sdk/google';
 import { CoreMessage, generateText } from 'npm:ai';
 import { Config, safetySettings } from '../../config.ts';
