@@ -14,7 +14,7 @@ import logger from './logger.ts';
 export interface FileContent {
     type: 'file';
     mimeType: string;
-    data: Uint8Array | ArrayBuffer;
+    data: Uint8Array | ArrayBuffer | string;
 }
 
 export interface TextPart {
@@ -210,7 +210,7 @@ async function constructMsg(
         text: prettyInputMessage,
     });
 
-    if (attachAttachments) {
+    if (attachAttachments && role === 'user') {
         let attachments: MessageContent = [];
         try {
             attachments = await getAttachments(api, botInfo.token, msg);
@@ -254,7 +254,7 @@ export async function makeHistoryV2(
         let attachAttachments = options.attachments ?? true;
 
         // If message is too old, don't attach attachments
-        if (i < history.length - 10) {
+        if (i < history.length - 5) {
             attachAttachments = false;
         }
 
@@ -289,9 +289,9 @@ export async function makeHistoryV2(
             const size = JSON.stringify(msgRes).length;
 
             if (
-                totalBytes + size >= bytesLimit * 0.95
+                totalBytes + size >= bytesLimit
             ) {
-                logger.info('Skipping old messages because prompt is too big');
+                logger.info(`Skipping old messages because prompt is too big ${size} (${totalBytes + size} > ${bytesLimit})`);
                 break;
             }
 
@@ -468,7 +468,7 @@ async function getAttachments(
     if (msg.info.photo) {
         const size = chooseSize(msg.info.photo);
         try {
-            parts.push(await getImageContent(api, token, size.file_id));
+            parts.push(await getImageContent(api, token, size.file_id, 'image/jpeg'));
         } catch (error) {
             logger.error(
                 'Could not download photo: ',
@@ -481,7 +481,7 @@ async function getAttachments(
         const { sticker } = msg.info;
 
         if (sticker.is_video) {
-            const file = await downloadFile(api, token, sticker.file_id);
+            const file = await downloadFile(api, token, sticker.file_id, 'video/webm');
 
             parts.push({
                 type: 'file',
@@ -505,7 +505,7 @@ async function getAttachments(
         }
 
         try {
-            parts.push(await getImageContent(api, token, stickerImageId));
+            parts.push(await getImageContent(api, token, stickerImageId, 'image/webp'));
         } catch (error) {
             logger.error(
                 'Could not download sticker: ',
@@ -524,12 +524,13 @@ async function getAttachments(
             video.file_size && video.mime_type &&
             video.file_size <= 1024 * 1024 * 20
         ) {
-            const file = await downloadFile(api, token, video.file_id);
+            const mimeType = video.mime_type;
+            const file = await downloadFile(api, token, video.file_id, mimeType);
 
             parts.push({
                 type: 'file',
                 data: file,
-                mimeType: video.mime_type,
+                mimeType: mimeType,
             });
         } else {
             const thumbnailId = msg.info.video.thumbnail?.file_id;
@@ -539,7 +540,7 @@ async function getAttachments(
             }
 
             try {
-                parts.push(await getImageContent(api, token, thumbnailId));
+                parts.push(await getImageContent(api, token, thumbnailId, 'image/jpeg'));
             } catch (error) {
                 logger.error(
                     'Could not download video thumbnail: ',
@@ -558,8 +559,8 @@ async function getAttachments(
             return parts;
         }
 
-        const file = await downloadFile(api, token, animation.file_id);
         const mimeType = animation.mime_type;
+        const file = await downloadFile(api, token, animation.file_id, mimeType);
 
         parts.push({
             type: 'file',
@@ -571,7 +572,7 @@ async function getAttachments(
     if (msg.info.video_note) {
         const { video_note: viNote } = msg.info;
 
-        const file = await downloadFile(api, token, viNote.file_id);
+        const file = await downloadFile(api, token, viNote.file_id, 'video/mp4');
 
         parts.push({
             type: 'file',
@@ -588,8 +589,8 @@ async function getAttachments(
             return parts;
         }
 
-        const file = await downloadFile(api, token, voice.file_id);
         const mimeType = voice.mime_type;
+        const file = await downloadFile(api, token, voice.file_id, mimeType);
 
         parts.push({
             type: 'file',

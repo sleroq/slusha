@@ -5,6 +5,8 @@ import { Logger } from '@deno-library/logger';
 import { ImagePart, supportedTypesMap } from './history.ts';
 import { exists } from '@std/fs';
 import { Message, PhotoSize, Sticker } from 'grammy_types';
+import { FileState, GoogleAIFileManager } from '@google/generative-ai/server';
+// import { encodeBase64 } from "@std/encoding/base64";
 
 export function getRandomInt(min: number, max: number) {
     min = Math.ceil(min);
@@ -22,14 +24,43 @@ export function sliceMessage(message: string, maxLength: number): string {
         : message;
 }
 
+const AI_TOKEN = Deno.env.get('AI_TOKEN');
+
+if (!AI_TOKEN) {
+    throw new Error('AI_TOKEN is required');
+}
+
+const fileManager = new GoogleAIFileManager(AI_TOKEN);
+
+async function uploadToGoogle(path: string, name: string, mimeType: string) {
+    const uploadResult = await fileManager.uploadFile(path, {
+        mimeType,
+        displayName: name,
+    });
+
+    let file = await fileManager.getFile(uploadResult.file.name);
+    while (file.state === FileState.PROCESSING) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        file = await fileManager.getFile(uploadResult.file.name);
+    }
+
+    if (file.state === FileState.FAILED) {
+        throw new Error('Audio processing failed.');
+    }
+
+    return file.uri;
+}
+
 export async function downloadFile(
     api: Api<RawApi>,
     token: string,
     fileId: string,
+    mimeType: string,
 ) {
     const filePath = `./tmp/${fileId}`;
     if (await exists(filePath)) {
-        return await Deno.readFile(filePath);
+        // return encodeBase64(await Deno.readFile(filePath))
+        return uploadToGoogle(filePath, fileId, mimeType);
     }
 
     const file = await api.getFile(fileId);
@@ -42,19 +73,22 @@ export async function downloadFile(
 
     await Deno.writeFile(filePath, buffer);
 
-    return buffer;
+    // return encodeBase64(buffer);
+    return uploadToGoogle(filePath, fileId, mimeType);
 }
 
 export async function getImageContent(
     api: Api<RawApi>,
     token: string,
     fileId: string,
+    mimeType: string,
 ): Promise<ImagePart> {
-    const file = await downloadFile(api, token, fileId);
+    const file = await downloadFile(api, token, fileId, mimeType);
 
     return {
         type: 'image',
         image: file,
+        mimeType,
     };
 }
 
