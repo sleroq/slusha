@@ -3,11 +3,13 @@
   "specifiers": {
     "jsr:@deno-library/logger@*": "1.1.9",
     "jsr:@deno-library/logger@^1.1.9": "1.1.9",
+    "jsr:@std/encoding@^1.0.7": "1.0.7",
     "jsr:@std/fmt@1.0.3": "1.0.3",
     "jsr:@std/fs@^1.0.6": "1.0.13",
     "jsr:@std/path@^1.0.8": "1.0.8",
     "npm:@ai-sdk/google@*": "1.1.16_zod@3.24.2",
     "npm:@ai-sdk/google@^1.1.16": "1.1.16_zod@3.24.2",
+    "npm:@google/generative-ai@0.22": "0.22.0",
     "npm:ai@*": "4.1.45",
     "npm:ai@^4.1.45": "4.1.45"
   },
@@ -18,6 +20,9 @@
         "jsr:@std/fmt",
         "jsr:@std/fs"
       ]
+    },
+    "@std/encoding@1.0.7": {
+      "integrity": "f631247c1698fef289f2de9e2a33d571e46133b38d042905e3eac3715030a82d"
     },
     "@std/fmt@1.0.3": {
       "integrity": "97765c16aa32245ff4e2204ecf7d8562496a3cb8592340a80e7e554e0bb9149f"
@@ -82,6 +87,9 @@
         "@ai-sdk/provider-utils@2.1.9",
         "zod-to-json-schema"
       ]
+    },
+    "@google/generative-ai@0.22.0": {
+      "integrity": "sha512-mLR3PDWCk5O/BWNyDvFDIiwKeXQmFGZ+kJFd9m73QrUPCFREttJyVbBPTW4y9CwTbaltLMDaLDfroCrRv5Bl8Q=="
     },
     "@opentelemetry/api@1.9.0": {
       "integrity": "sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg=="
@@ -274,8 +282,10 @@
   "workspace": {
     "dependencies": [
       "jsr:@deno-library/logger@^1.1.9",
+      "jsr:@std/encoding@^1.0.7",
       "jsr:@std/fs@^1.0.6",
       "npm:@ai-sdk/google@^1.1.16",
+      "npm:@google/generative-ai@0.22",
       "npm:ai@^4.1.45"
     ]
   }

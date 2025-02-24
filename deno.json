@@ -33,6 +33,8 @@
     "proseWrap": "preserve"
   },
   "imports": {
+    "@google/generative-ai": "npm:@google/generative-ai@^0.22.0",
+    "@std/encoding": "jsr:@std/encoding@^1.0.7",
     "ai": "npm:ai@^4.1.45",
     "@ai-sdk/google": "npm:@ai-sdk/google@^1.1.16",
     "@deno-library/logger": "jsr:@deno-library/logger@^1.1.9",
@@ -41,6 +43,6 @@
     "ky": "https://esm.sh/ky@1.7.5",
     "grammy_ratelimiter": "https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts",
     "zod": "https://deno.land/x/zod@v3.23.8/mod.ts",
-    "@std/fs": "jsr:@std/fs@^1.0.6"
+    "@std/fs": "jsr:@std/fs@^1.0.6",
   }
 }
