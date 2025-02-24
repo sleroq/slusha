@@ -32,6 +32,7 @@ export default async function setupBot(config: Config, memory: Memory) {
         return next();
     });
 
+    // TODO: Save other message types, like special events
     bot.on('message', (ctx, next) => {
         if (
             ctx.m.getChat().optOutUsers.find((u) => u.id === ctx.from?.id) &&
@@ -65,6 +66,8 @@ export default async function setupBot(config: Config, memory: Memory) {
 
         return next();
     });
+
+    // TODO: Add support for group to supergroup migration
 
     await bot.init();
 

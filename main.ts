@@ -2,7 +2,7 @@ import Werror from './lib/werror.ts';
 import logger from './lib/logger.ts';
 import resolveConfig, { Config, safetySettings } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
-import { loadMemory } from './lib/memory.ts';
+import { loadMemory, ReplyTo } from './lib/memory.ts';
 
 import { CoreMessage, generateText, Output } from 'ai';
 import { google } from '@ai-sdk/google';
@@ -374,12 +374,24 @@ bot.on('message', async (ctx) => {
             return;
         }
 
+        let replyTo: ReplyTo | undefined;
+        if (replyInfo.reply_to_message && replyInfo.reply_to_message.from) {
+            replyTo = {
+                id: replyInfo.reply_to_message.message_id,
+                text: replyInfo.reply_to_message.text ??
+                    replyInfo.reply_to_message.caption ?? '',
+                isMyself: false,
+                info: replyInfo.reply_to_message,
+            };
+        }
+
         // Save bot's reply
         ctx.m.addMessage({
             id: replyInfo.message_id,
             text: replyText,
             isMyself: true,
             info: replyInfo,
+            replyTo,
         });
 
         if (i === output.length - 1) {

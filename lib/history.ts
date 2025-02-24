@@ -40,23 +40,6 @@ interface HistoryOptions {
     attachments?: boolean;
 }
 
-// function resolveReplyThread(
-//   history: ChatMessage[],
-//   msg: ChatMessage,
-//   thread: ChatMessage[] = []
-// ): ChatMessage[] {
-//   const replyTo = msg.replyTo;
-//   if (replyTo) {
-//     const replyToMsg = history.find((m) => m.id === replyTo.id);
-//     if (replyToMsg) {
-//       resolveReplyThread(history, replyToMsg, thread);
-//     }
-//   }
-//
-//   thread.push(msg);
-//   return thread;
-// }
-
 function resolveReplyThread(
     history: ChatMessage[],
     msg: ChatMessage,
@@ -98,7 +81,7 @@ export const supportedTypesMap = new Map<keyof Message, PrintType>([
     ['voice', getAttachmentDefault],
 ]);
 
-const jsonTypes: Array<keyof Message> = [
+export const jsonTypes: Array<keyof Message> = [
     'audio',
     'document',
     'story',
