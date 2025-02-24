@@ -248,6 +248,19 @@ bot.on('message', async (ctx) => {
         });
     }
 
+    const activeMembers = ctx.m.getActiveMembers();
+    if (
+        ctx.chat.type !== 'private' &&
+        activeMembers.length > 0
+    ) {
+        const prettyMembersList = activeMembers.map((m) => `- ${m.first_name} (@${m.username})`).join('\n');
+
+        messages.push({
+            role: 'user',
+            content: `Chat: ${ctx.chat.title}, Active members:\n ${prettyMembersList}`,
+        });
+    }
+
     const savedHistory = ctx.m.getHistory();
 
     let history = [];

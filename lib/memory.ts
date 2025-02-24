@@ -1,8 +1,4 @@
-import {
-    Chat as TgChat,
-    Message,
-    User,
-} from 'grammy_types';
+import { Chat as TgChat, Message, User } from 'grammy_types';
 import logger from './logger.ts';
 import { ReplyMessage } from './telegram/helpers.ts';
 import { Character } from './charhub/api.ts';
@@ -33,7 +29,8 @@ export interface Member {
     username?: string;
     first_name: string;
     description: string;
-    info: User
+    info: User;
+    lastUse: number;
 }
 
 export interface Chat {
@@ -135,6 +132,47 @@ export class ChatMemory {
         if (notes.length > maxLength) {
             notes.splice(0, maxLength);
         }
+    }
+
+    updateUser(user: User) {
+        const chat = this.getChat();
+        if (!chat.members) {
+            chat.members = [];
+        }
+
+        const member: Member = {
+            id: user.id,
+            username: user.username,
+            first_name: user.first_name,
+            info: user,
+            description: '',
+            lastUse: Date.now(),
+        };
+
+        const userIndex = chat.members.findIndex((u) => u.id === user.id);
+        if (userIndex === -1) {
+            chat.members.push(member);
+        } else {
+            chat.members[userIndex] = member;
+        }
+    }
+
+    /**
+     * Returns list of active members in chat
+     * with last use less than 3 days ago
+     * @returns Member[]
+     */
+    getActiveMembers(days = 7, limit = 10) {
+        const chat = this.getChat();
+        if (!chat.members) {
+            return [];
+        }
+        
+        const activeMembers = chat.members.filter((m) =>
+            m.lastUse > Date.now() - 1000 * 60 * 60 * 24 * days
+        );
+
+        return activeMembers.slice(0, limit);
     }
 }
 
