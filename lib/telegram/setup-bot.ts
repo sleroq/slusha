@@ -62,6 +62,10 @@ export default async function setupBot(config: Config, memory: Memory) {
             info: ctx.message,
         });
 
+        if (ctx.from) {
+            ctx.m.updateUser(ctx.from)
+        }
+
         ctx.m.removeOldMessages(config.maxMessagesToStore);
 
         return next();
