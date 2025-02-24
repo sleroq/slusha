@@ -1,8 +1,8 @@
 import {
     Chat as TgChat,
     Message,
+    User,
 } from 'grammy_types';
-import { User } from 'grammy';
 import logger from './logger.ts';
 import { ReplyMessage } from './telegram/helpers.ts';
 import { Character } from './charhub/api.ts';
@@ -28,6 +28,14 @@ export interface OptOutUser {
     first_name: string;
 }
 
+export interface Member {
+    id: number;
+    username?: string;
+    first_name: string;
+    description: string;
+    info: User
+}
+
 export interface Chat {
     notes: string[];
     lastNotes: number;
@@ -37,6 +45,7 @@ export interface Chat {
     chatModel?: string;
     character?: Character;
     optOutUsers: OptOutUser[];
+    members: Member[];
 }
 
 export class Memory {
@@ -60,6 +69,7 @@ export class Memory {
                 lastUse: Date.now(),
                 info: tgChat,
                 optOutUsers: [],
+                members: [],
             };
 
             this.chats[tgChat.id] = chat;

@@ -1,8 +1,7 @@
-import { Bot, Context } from 'https://deno.land/x/grammy@v1.30.0/mod.ts';
+import { Bot, Context } from 'grammy';
 import logger from '../logger.ts';
 import { Config } from '../config.ts';
 import { ChatMemory, Memory, ReplyTo } from '../memory.ts';
-import { getText } from '../helpers.ts';
 
 interface RequestInfo {
     isRandom: boolean;
@@ -46,9 +45,8 @@ export default async function setupBot(config: Config, memory: Memory) {
         if (ctx.msg.reply_to_message && ctx.msg.reply_to_message.from) {
             replyTo = {
                 id: ctx.msg.reply_to_message.message_id,
-                text: getText(
-                    ctx.msg.reply_to_message,
-                ) ?? '',
+                text: ctx.msg.reply_to_message.text ??
+                    ctx.msg.reply_to_message.caption ?? '',
                 isMyself: false,
                 info: ctx.msg.reply_to_message,
             };
@@ -57,7 +55,7 @@ export default async function setupBot(config: Config, memory: Memory) {
         // Save every message to memory
         ctx.m.addMessage({
             id: ctx.msg.message_id,
-            text: getText(ctx.msg) ?? '',
+            text: ctx.msg.text ?? ctx.msg.caption ?? '',
             replyTo,
             isMyself: false,
             info: ctx.message,

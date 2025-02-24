@@ -2,7 +2,6 @@ import { Composer } from 'grammy';
 import { google } from 'npm:@ai-sdk/google';
 import { CoreMessage, generateText } from 'npm:ai';
 import { Config, safetySettings } from '../../config.ts';
-import { fixAIResponse } from '../../helpers.ts';
 import logger from '../../logger.ts';
 import { SlushaContext } from '../setup-bot.ts';
 import { makeHistory } from '../../history.ts';
@@ -55,6 +54,7 @@ export default function notes(config: Config, botId: number) {
                     messagesLimit: 50,
                     symbolLimit: config.ai.messageMaxLength / 3,
                     attachments: false,
+                    bytesLimit: config.ai.bytesLimit / 3,
                 },
             );
         } catch (error) {
@@ -108,7 +108,7 @@ export default function notes(config: Config, botId: number) {
             (Date.now() - start) / 1000,
         );
 
-        const summaryText = fixAIResponse(response.text);
+        const summaryText = response.text;
 
         ctx.m.getChat().notes.push(summaryText);
 

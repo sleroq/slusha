@@ -20,6 +20,7 @@ const configSchema = z.object({
         notesPrompt: z.string(),
         messagesToPass: z.number().default(5),
         messageMaxLength: z.number().default(4096),
+        bytesLimit: z.number().default(20 * 1024 * 1024),
     }),
     startMessage: z.string(),
     names: z.array(z.union([z.string(), z.custom(isValidRegex)])),

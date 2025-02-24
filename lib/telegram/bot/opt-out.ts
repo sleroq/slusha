@@ -1,9 +1,8 @@
-import { Composer } from 'https://deno.land/x/grammy@v1.30.0/composer.ts';
 import { SlushaContext } from '../setup-bot.ts';
-import { InlineKeyboard } from 'https://deno.land/x/grammy@v1.30.0/convenience/keyboard.ts';
 import { OptOutUser } from '../../memory.ts';
 import { replyWithHTML } from '../helpers.ts';
 import logger from '../../logger.ts';
+import { InlineKeyboard, Composer } from 'grammy';
 
 const bot = new Composer<SlushaContext>();
 
@@ -66,7 +65,7 @@ bot.command('optin', (ctx) => {
 
 async function optIn(ctx: SlushaContext, id: number, reply: boolean) {
     const wasOptedIn = ctx.m.getChat().optOutUsers.some((u) => u.id === id);
-    const verb = wasOptedIn ? 'снова': 'уже';
+    const verb = wasOptedIn ? 'снова' : 'уже';
     let message = `Ура, Слюша ${verb} видит твои сообщения`;
 
     ctx.m.getChat().optOutUsers = ctx.m.getChat().optOutUsers.filter((u) =>

@@ -4,26 +4,25 @@ import resolveConfig, { Config, safetySettings } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
 import { loadMemory } from './lib/memory.ts';
 
-import { CoreMessage, generateText } from 'ai';
+import { CoreMessage, generateText, Output } from 'ai';
 import { google } from '@ai-sdk/google';
 
 import {
     deleteOldFiles,
-    fixAIResponse,
     getRandomNepon,
-    prettyPrintPrompt,
+    msgTypeSupported,
     probability,
-    removeBotName,
     sliceMessage,
     testMessage,
 } from './lib/helpers.ts';
-import { doTyping, replyWithMarkdown } from './lib/telegram/helpers.ts';
+import { doTyping, replyWithMarkdownId } from './lib/telegram/helpers.ts';
 import { limit } from 'grammy_ratelimiter';
 import character from './lib/telegram/bot/character.ts';
 import optOut from './lib/telegram/bot/opt-out.ts';
 import msgDelay from './lib/telegram/bot/msg-delay.ts';
 import notes from './lib/telegram/bot/notes.ts';
-import { makeHistory } from './lib/history.ts';
+import { makeHistoryV2 } from './lib/history.ts';
+import z from 'zod';
 
 let config: Config;
 try {
@@ -108,10 +107,7 @@ bot.on('message', (ctx, next) => {
     // Ignore if text is empty
     if (
         !msg.text &&
-        !('video' in msg.info) &&
-        !('voice' in msg.info) &&
-        !('video_note' in msg.info) &&
-        !('photo' in msg.info)
+        !msgTypeSupported(msg.info)
     ) {
         return;
     }
@@ -252,15 +248,18 @@ bot.on('message', async (ctx) => {
         });
     }
 
+    const savedHistory = ctx.m.getHistory();
+
     let history = [];
     try {
-        history = await makeHistory(
+        history = await makeHistoryV2(
             { token: bot.token, id: bot.botInfo.id },
             bot.api,
             logger,
-            ctx.m.getHistory(),
+            savedHistory,
             {
                 messagesLimit: config.ai.messagesToPass,
+                bytesLimit: config.ai.bytesLimit,
                 symbolLimit: config.ai.messageMaxLength,
             },
         );
@@ -292,22 +291,27 @@ bot.on('message', async (ctx) => {
 
     const time = new Date().getTime();
 
-    logger.info(prettyPrintPrompt(messages));
-    // logger.info(messages);
+    console.log(messages);
 
     // TODO: Fix repeating replies
-    let response;
+    let result;
     try {
-        response = await generateText({
+        result = await generateText({
             model: google(model, { safetySettings }),
-            messages,
+            experimental_output: Output.object({
+                // @ts-expect-error TODO: Fix types
+                schema: z.array(z.object({
+                    text: z.string(),
+                    reply_to: z.string().optional(),
+                })),
+            }),
             temperature: config.ai.temperature,
             topK: config.ai.topK,
             topP: config.ai.topP,
+            messages,
         });
     } catch (error) {
         logger.error('Could not get response: ', error);
-        logger.info(prettyPrintPrompt(messages));
 
         if (!ctx.info.isRandom) {
             await ctx.reply(getRandomNepon(config));
@@ -315,15 +319,10 @@ bot.on('message', async (ctx) => {
         return;
     }
 
-    let replyText = response.text;
-
-    replyText = removeBotName(
-        replyText,
-        bot.botInfo.first_name,
-        bot.botInfo.username,
-    );
-
-    replyText = fixAIResponse(replyText);
+    const output = result.experimental_output as {
+        text: string;
+        reply_to?: string;
+    }[];
 
     const name = ctx.chat.first_name ?? ctx.chat.title;
     const username = ctx.chat?.username ? `(@${ctx.chat.username})` : '';
@@ -331,41 +330,66 @@ bot.on('message', async (ctx) => {
         'Time to get response:',
         (new Date().getTime() - time) / 1000,
         `for "${name}" ${username}. Response:`,
-        replyText,
+        output,
     );
 
-    if (replyText.length === 0) {
-        logger.warn(
-            `Empty response from AI: "${response.text}" => "${replyText}"`,
-        );
-        logger.info(prettyPrintPrompt(messages));
+    for (let i = 0; i < output.length; i++) {
+        const res = output[i];
+        const replyText = res.text;
 
-        if (!ctx.info.isRandom) {
-            await ctx.reply(getRandomNepon(config));
+        if (replyText.length === 0) {
+            logger.warn(
+                `Empty response from AI: "${replyText}"`,
+            );
+
+            if (!ctx.info.isRandom) {
+                await ctx.reply(getRandomNepon(config));
+            }
+
+            return;
         }
 
-        return;
-    }
-
-    let replyInfo;
-    try {
-        replyInfo = await replyWithMarkdown(ctx, replyText);
-    } catch (error) {
-        logger.error('Could not reply to user: ', error);
-
-        if (!ctx.info.isRandom) {
-            await ctx.reply(getRandomNepon(config));
+        let msgToReply;
+        if (res.reply_to) {
+            // Find latest message with this username
+            msgToReply = savedHistory.findLast((m) =>
+                m.info.from?.username === res.reply_to
+            );
         }
-        return;
-    }
 
-    // Save bot's reply
-    ctx.m.addMessage({
-        id: replyInfo.message_id,
-        text: replyText,
-        isMyself: true,
-        info: ctx.message,
-    });
+        let replyInfo;
+        try {
+            replyInfo = await replyWithMarkdownId(
+                ctx,
+                replyText,
+                msgToReply?.id,
+            );
+        } catch (error) {
+            logger.error('Could not reply to user: ', error);
+
+            if (!ctx.info.isRandom) {
+                await ctx.reply(getRandomNepon(config));
+            }
+
+            return;
+        }
+
+        // Save bot's reply
+        ctx.m.addMessage({
+            id: replyInfo.message_id,
+            text: replyText,
+            isMyself: true,
+            info: replyInfo,
+        });
+
+        if (i === output.length - 1) {
+            break;
+        }
+
+        const typingSpeed = 520; // symbol per minute
+        const msToWait = output[i + 1].text.length / typingSpeed * 60 * 1000;
+        await new Promise((resolve) => setTimeout(resolve, msToWait));
+    }
 
     typing.abort();
 });

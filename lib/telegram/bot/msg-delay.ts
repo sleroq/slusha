@@ -1,7 +1,7 @@
-import { Composer } from 'https://deno.land/x/grammy@v1.30.0/composer.ts';
 import logger from '../../logger.ts';
 import { SlushaContext } from '../setup-bot.ts';
 import { Config } from '../../config.ts';
+import { Composer } from 'grammy';
 
 export default function msgDelay(config: Config) {
     const bot = new Composer<SlushaContext>();

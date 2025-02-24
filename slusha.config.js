@@ -24,18 +24,19 @@ export default {
     startMessage: 'Привет! Я Слюша, бот-гений.',
 
     ai: {
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.0-flash',
         // prePromt is used with chub.ai prompts and with default prompt
         prePrompt,
         // prompt is default character, can be replaced with chub.ai prompts
         prompt,
-        notesPrompt: 'Напиши краткое обзор важных событий в трех-пяти пунктах без нумирации.',
-        finalPrompt: 'Answer must only contain have your reply text.',
+        notesPrompt: 'Напиши краткое обзор важных событий в трех-пяти пунктах без нумирации. Ответ должен содержать только пункты.',
+        finalPrompt: 'Answer must only contain have your reply. Answer must be short. Reply may contain multiple messages. Never use emoji.',
         temperature: 0.9,
         topK: 5,
         topP: 0.8,
-        messagesToPass: 20,
+        messagesToPass: 10,
         messageMaxLength: 4096,
+        bytesLimit: 20 * 1024 * 1024, // 20 MB
     },
 
     names: [
@@ -125,5 +126,5 @@ export default {
 
     // Drops pending messages if any when bot was down
     // When false, bot will try respond to all of them at once so may hit AI proveder rate limit
-    dropPendingUpdates: true,
+    dropPendingUpdates: false,
 }

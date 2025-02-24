@@ -35,8 +35,287 @@ type MessageContent = ContentPart[];
 interface HistoryOptions {
     symbolLimit: number;
     messagesLimit: number;
+    bytesLimit: number;
     usernames?: boolean;
     attachments?: boolean;
+}
+
+// function resolveReplyThread(
+//   history: ChatMessage[],
+//   msg: ChatMessage,
+//   thread: ChatMessage[] = []
+// ): ChatMessage[] {
+//   const replyTo = msg.replyTo;
+//   if (replyTo) {
+//     const replyToMsg = history.find((m) => m.id === replyTo.id);
+//     if (replyToMsg) {
+//       resolveReplyThread(history, replyToMsg, thread);
+//     }
+//   }
+//
+//   thread.push(msg);
+//   return thread;
+// }
+
+function resolveReplyThread(
+    history: ChatMessage[],
+    msg: ChatMessage,
+    thread: ChatMessage[] = [],
+): ChatMessage[] {
+    thread.push(msg);
+
+    const replyTo = msg.replyTo;
+    if (!replyTo) {
+        return thread;
+    }
+
+    const replyToMsg = history.find((m) => m.id === replyTo.id);
+    if (replyToMsg) {
+        return resolveReplyThread(history, replyToMsg, thread);
+    }
+
+    return thread;
+}
+
+type PrintType = (name: keyof Message, msg: Message) => string;
+
+function getAttachmentDefault(name: keyof Message) {
+    return `"${name}": true`;
+}
+
+function getStickerAttachment(name: keyof Message, msg: Message) {
+    return `"${name}": { "emoji": "${msg.sticker?.emoji}" }`;
+}
+
+export const supportedTypesMap = new Map<keyof Message, PrintType>([
+    ['animation', getAttachmentDefault],
+    ['video', getAttachmentDefault],
+    // ['audio', getAttachmentDefault],
+    // ['document', getAttachmentDefault],
+    ['photo', getAttachmentDefault],
+    ['sticker', getStickerAttachment],
+    ['video_note', getAttachmentDefault],
+    ['voice', getAttachmentDefault],
+]);
+
+const jsonTypes: Array<keyof Message> = [
+    'audio',
+    'document',
+    'story',
+    'contact',
+    'dice',
+    'game',
+    'poll',
+    'venue',
+    'location',
+    'new_chat_members',
+    'left_chat_member',
+    'new_chat_title',
+    'new_chat_photo',
+    'delete_chat_photo',
+    'group_chat_created',
+    'supergroup_chat_created',
+    'channel_chat_created',
+    'message_auto_delete_timer_changed',
+    'migrate_to_chat_id',
+    'migrate_from_chat_id',
+    'pinned_message',
+    'invoice',
+    'successful_payment',
+    'refunded_payment',
+    'users_shared',
+    'chat_shared',
+    'connected_website',
+    'write_access_allowed',
+    'passport_data',
+    'proximity_alert_triggered',
+    'boost_added',
+    'chat_background_set',
+    'forum_topic_created',
+    'forum_topic_edited',
+    'forum_topic_closed',
+    'forum_topic_reopened',
+    'general_forum_topic_hidden',
+    'general_forum_topic_unhidden',
+    'giveaway_created',
+    'giveaway',
+    'giveaway_winners',
+    'giveaway_completed',
+    'video_chat_scheduled',
+    'video_chat_started',
+    'video_chat_ended',
+    'video_chat_participants_invited',
+    'web_app_data',
+];
+
+interface JSONInputMessage {
+    user?: { name: string; username?: string };
+    reply_to?: string; // username
+    forward_origin?: unknown;
+    text: string;
+}
+
+interface ConstructMsgOptions {
+    symbolLimit: number;
+    attachments: boolean;
+}
+
+async function constructMsg(
+    api: Api<RawApi>,
+    botInfo: { token: string; id: number },
+    msg: ChatMessage,
+    options: ConstructMsgOptions,
+): Promise<CoreMessage> {
+    const { symbolLimit } = options;
+    const attachAttachments = options.attachments;
+
+    const role = msg.isMyself ? 'assistant' : 'user';
+    const firstName = msg.info.from?.first_name ?? 'User';
+    let text = msg.text ? sliceMessage(msg.text, symbolLimit) : '';
+
+    // Label message types if it's not just text
+    let isSupported = false;
+
+    for (const [type, printType] of supportedTypesMap) {
+        if (msg.info[type] !== undefined) {
+            text += `\n${printType(type, msg.info)}`;
+            isSupported = true;
+        }
+    }
+
+    // Pass unsupported messages as json
+    // TODO: Remove unnecessary fields to reduce size and improve prompt
+    if (!isSupported) {
+        for (const type of jsonTypes) {
+            if (msg.info[type] !== undefined) {
+                text += `\n"${type}": ${JSON.stringify(msg.info[type])}`;
+            }
+        }
+    }
+
+    if (!text) {
+        throw new Error('Message is not supported');
+    }
+
+    const parts: MessageContent = [];
+
+    const user: JSONInputMessage['user'] = {
+        name: firstName,
+        username: msg.info.from?.username,
+    };
+
+    const inputMessage: JSONInputMessage[] = [{
+        user: msg.isMyself ? undefined : user,
+        reply_to: msg.replyTo?.info.from?.username,
+        forward_origin: msg.info.forward_origin, // TODO: Maybe make it prettier
+        text: text.trim(),
+    }];
+
+    const prettyInputMessage = JSON.stringify(inputMessage, null, 2);
+
+    parts.push({
+        type: 'text',
+        text: prettyInputMessage,
+    });
+
+    if (attachAttachments) {
+        let attachments: MessageContent = [];
+        try {
+            attachments = await getAttachments(api, botInfo.token, msg);
+        } catch (error) {
+            logger.error(
+                'Could not download message attachments: ',
+                error,
+            );
+        }
+
+        if (attachments.length > 0) {
+            parts.push(...attachments);
+        }
+    }
+
+    // FIXME: Types are broken
+    return {
+        role,
+        content: parts,
+    } as CoreMessage;
+}
+
+export async function makeHistoryV2(
+    botInfo: { token: string; id: number },
+    api: Api<RawApi>,
+    logger: Logger,
+    history: ChatMessage[],
+    options: HistoryOptions,
+): Promise<CoreMessage[]> {
+    const { messagesLimit, bytesLimit, symbolLimit } = options;
+
+    let totalBytes = 0;
+    const prompt: CoreMessage[] = [];
+    const addedMessages: number[] = [];
+
+    // Go through history in reverse order
+    // to easily add reply threads and attachments
+    // prioritizing latest messages
+    for (let i = history.length - 1; i >= 0; i--) {
+        const msg = history[i];
+        let attachAttachments = options.attachments ?? true;
+
+        // If message is too old, don't attach attachments
+        if (i < history.length - 10) {
+            attachAttachments = false;
+        }
+
+        // Skip if message is added by reply thread
+        if (addedMessages.includes(msg.id)) {
+            continue;
+        }
+
+        // Add reply thread
+        const thread = resolveReplyThread(history, msg);
+        for (const msg of thread) {
+            let msgRes;
+
+            try {
+                msgRes = await constructMsg(
+                    api,
+                    botInfo,
+                    msg,
+                    {
+                        symbolLimit,
+                        attachments: attachAttachments,
+                    },
+                );
+            } catch (error) {
+                logger.error(
+                    'Could not construct replied message: ',
+                    error,
+                );
+                continue;
+            }
+
+            const size = JSON.stringify(msgRes).length;
+
+            if (
+                totalBytes + size >= bytesLimit * 0.95
+            ) {
+                logger.info('Skipping old messages because prompt is too big');
+                break;
+            }
+
+            prompt.push(msgRes);
+            addedMessages.push(msg.id);
+            totalBytes += size;
+        }
+    }
+
+    // Reverse messages to make them in chronological order
+    prompt.reverse();
+
+    // Remove old messages to fit the limit
+    prompt.splice(0, prompt.length - messagesLimit);
+
+    return prompt;
 }
 
 export async function makeHistory(
@@ -121,7 +400,6 @@ export async function makeHistory(
                         parts = await getAttachments(
                             api,
                             botInfo.token,
-                            logger,
                             reply,
                         );
                     } catch (error) {
@@ -138,8 +416,6 @@ export async function makeHistory(
                     prompt.push(
                         {
                             role: 'user',
-                            // FIXME: when npm:ai fixes types
-                            // @ts-expect-error npm:ai types don't work
                             content: replyContent,
                         },
                     );
@@ -170,9 +446,11 @@ export async function makeHistory(
         // If message is in the last 5 messages in history (or if attachment is voice)
         // download image attachments
         if (
-            msg.info.voice || (attachAttachments && history.slice(-5).some((m) => m.id === msg.id))
+            msg.info.voice ||
+            (attachAttachments &&
+                history.slice(-5).some((m) => m.id === msg.id))
         ) {
-            const parts = await getAttachments(api, botInfo.token, logger, msg);
+            const parts = await getAttachments(api, botInfo.token, msg);
 
             if (parts.length > 0) {
                 content = content.concat(parts);
@@ -181,8 +459,6 @@ export async function makeHistory(
 
         prompt.push({
             role: 'user',
-            // FIXME: when npm:ai fixes types
-            // @ts-expect-error npm:ai types don't work
             content,
         });
     }
@@ -193,7 +469,6 @@ export async function makeHistory(
 async function getAttachments(
     api: Api<RawApi>,
     token: string,
-    logger: Logger,
     msg: ChatMessage | ReplyTo,
 ): Promise<MessageContent> {
     const parts: MessageContent = [];
