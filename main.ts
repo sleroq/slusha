@@ -406,7 +406,12 @@ bot.on('message', async (ctx) => {
         }
 
         const typingSpeed = 1200; // symbol per minute
-        const msToWait = output[i + 1].text.length / typingSpeed * 60 * 1000;
+        let msToWait = output[i + 1].text.length / typingSpeed * 60 * 1000;
+
+        if (msToWait > 5000) {
+            msToWait = 5000;
+        }
+
         await new Promise((resolve) => setTimeout(resolve, msToWait));
     }
 
