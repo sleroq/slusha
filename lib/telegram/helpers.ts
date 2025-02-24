@@ -71,7 +71,6 @@ async function replyGeneric<Other>(
             } catch (_) { // Retry without markdown
                 res = await ctx.reply(text, {
                     reply_to_message_id: ctx.msg?.message_id,
-                    // reply_to_message_id: ctx.msg?.message_id,
                 });
             }
         } else {
@@ -119,7 +118,6 @@ async function replyGenericId<Other>(
             } catch (_) { // Retry without markdown
                 res = await ctx.reply(text, {
                     reply_to_message_id: id,
-                    // reply_to_message_id: ctx.msg?.message_id,
                 });
             }
         } else {
@@ -132,7 +130,6 @@ async function replyGenericId<Other>(
             } catch (_) { // Retry without markdown
                 res = await ctx.reply(text, {
                     reply_to_message_id: ctx.msg?.message_id,
-                    // reply_to_message_id: ctx.msg?.message_id,
                 });
             }
         }

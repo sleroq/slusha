@@ -375,7 +375,7 @@ bot.on('message', async (ctx) => {
         }
 
         let replyTo: ReplyTo | undefined;
-        if (replyInfo.reply_to_message && replyInfo.reply_to_message.from) {
+        if (replyInfo.reply_to_message) {
             replyTo = {
                 id: replyInfo.reply_to_message.message_id,
                 text: replyInfo.reply_to_message.text ??

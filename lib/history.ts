@@ -55,6 +55,15 @@ function resolveReplyThread(
     const replyToMsg = history.find((m) => m.id === replyTo.id);
     if (replyToMsg) {
         return resolveReplyThread(history, replyToMsg, thread);
+    } else {
+        // For bot relies and stuff not saved in history
+        thread.push({
+            id: replyTo.id,
+            text: replyTo.text ?? replyTo.info.caption ?? '',
+            replyTo: replyTo,
+            isMyself: false,
+            info: replyTo.info,
+        });
     }
 
     return thread;

@@ -43,7 +43,7 @@ export default async function setupBot(config: Config, memory: Memory) {
 
         // Save all messages to memory
         let replyTo: ReplyTo | undefined;
-        if (ctx.msg.reply_to_message && ctx.msg.reply_to_message.from) {
+        if (ctx.msg.reply_to_message) {
             replyTo = {
                 id: ctx.msg.reply_to_message.message_id,
                 text: ctx.msg.reply_to_message.text ??
