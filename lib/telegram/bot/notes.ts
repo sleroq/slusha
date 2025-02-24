@@ -29,10 +29,11 @@ export default function notes(config: Config, botId: number) {
             return next();
         }
 
-        // Check if 50 messages from last notes
+        // Check if 90 messages from last notes
+        // TODO: Make it configurable
         if (
             ctx.m.getChat().lastNotes &&
-            ctx.msg.message_id - ctx.m.getChat().lastNotes < 50
+            ctx.msg.message_id - ctx.m.getChat().lastNotes < 90
         ) {
             return next();
         }
@@ -45,16 +46,17 @@ export default function notes(config: Config, botId: number) {
         // TODO: Make different function for notes history
         let context: CoreMessage[] = [];
         try {
+            // TODO: Create separate function for this
             context = await makeHistory(
                 { token: config.botToken, id: botId },
                 ctx.api,
                 logger,
                 ctx.m.getHistory(),
                 {
-                    messagesLimit: 50,
+                    messagesLimit: 90,
                     symbolLimit: config.ai.messageMaxLength / 3,
                     attachments: false,
-                    bytesLimit: config.ai.bytesLimit / 3,
+                    bytesLimit: config.ai.bytesLimit,
                 },
             );
         } catch (error) {
