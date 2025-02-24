@@ -1,9 +1,5 @@
 {
   "compilerOptions": {
-    "lib": [
-      "deno.window",
-      "deno.unstable"
-    ],
     "strict": true
   },
   "lint": {
@@ -15,9 +11,6 @@
       "tags": [
         "recommended"
       ],
-      "exclude": [
-        "no-unused-vars"
-      ]
     }
   },
   "fmt": {
