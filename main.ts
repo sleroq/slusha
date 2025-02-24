@@ -333,6 +333,7 @@ bot.on('message', async (ctx) => {
         output,
     );
 
+    let lastMsgId = null;
     for (let i = 0; i < output.length; i++) {
         const res = output[i];
         const replyText = res.text;
@@ -354,7 +355,11 @@ bot.on('message', async (ctx) => {
             // Find latest message with this username
             msgToReply = savedHistory.findLast((m) =>
                 m.info.from?.username === res.reply_to
-            );
+            )?.id;
+        }
+
+        if (!msgToReply && lastMsgId) {
+            msgToReply = lastMsgId;
         }
 
         let replyInfo;
@@ -362,7 +367,7 @@ bot.on('message', async (ctx) => {
             replyInfo = await replyWithMarkdownId(
                 ctx,
                 replyText,
-                msgToReply?.id,
+                msgToReply,
             );
         } catch (error) {
             logger.error('Could not reply to user: ', error);
@@ -373,6 +378,8 @@ bot.on('message', async (ctx) => {
 
             return;
         }
+
+        lastMsgId = replyInfo.message_id;
 
         let replyTo: ReplyTo | undefined;
         if (replyInfo.reply_to_message) {
@@ -398,7 +405,7 @@ bot.on('message', async (ctx) => {
             break;
         }
 
-        const typingSpeed = 520; // symbol per minute
+        const typingSpeed = 1200; // symbol per minute
         const msToWait = output[i + 1].text.length / typingSpeed * 60 * 1000;
         await new Promise((resolve) => setTimeout(resolve, msToWait));
     }
