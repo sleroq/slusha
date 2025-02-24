@@ -30,13 +30,13 @@ export default {
         // prompt is default character, can be replaced with chub.ai prompts
         prompt,
         notesPrompt: 'Напиши краткое обзор важных событий в трех-пяти пунктах без нумирации. Ответ должен содержать только пункты.',
-        finalPrompt: 'Answer must only contain have your reply. Answer must be short. Reply may contain multiple messages. Never use emoji.',
+        finalPrompt: 'Answer must only contain have your reply. Answer must be short but relevant. Reply may contain multiple messages. Never use emoji. Use telegram markdown (no headings).',
         temperature: 0.9,
         topK: 5,
         topP: 0.8,
-        messagesToPass: 10,
+        messagesToPass: 16,
         messageMaxLength: 4096,
-        bytesLimit: 20 * 1024 * 1024, // 20 MB
+        bytesLimit: 20971520,
     },
 
     names: [
@@ -117,7 +117,7 @@ export default {
 
     // Chats which don't use AI for more than chatLastUseNotes days
     // will not get updated summary every 50 messages
-    chatLastUseNotes: 3,
+    chatLastUseNotes: 2,
 
     // Time in seconds after which bot will start typing
     // to prevent from replying on every message in media group
