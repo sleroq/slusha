@@ -276,10 +276,7 @@ bot.on('message', async (ctx) => {
 
     let finalPrompt = config.ai.finalPrompt;
     if (ctx.info.userToReply) {
-        finalPrompt +=
-            ` Ответь только на последнее сообщение от ${ctx.info.userToReply}.`;
-    } else {
-        finalPrompt += ` Ответь только на последнее сообщение.`;
+        finalPrompt += ` Ответь на сообщение от ${ctx.info.userToReply}.`;
     }
 
     messages.push({
@@ -291,7 +288,7 @@ bot.on('message', async (ctx) => {
 
     const time = new Date().getTime();
 
-    console.log(messages);
+    console.log(JSON.stringify(messages, null, 2));
 
     // TODO: Fix repeating replies
     let result;
@@ -316,6 +313,7 @@ bot.on('message', async (ctx) => {
         if (!ctx.info.isRandom) {
             await ctx.reply(getRandomNepon(config));
         }
+
         return;
     }
 
