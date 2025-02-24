@@ -350,6 +350,12 @@ bot.on('message', async (ctx) => {
             return;
         }
 
+        // Replace lists with bullets
+        if (replyText.startsWith('* ')) {
+            replyText = replyText.slice(1);
+            replyText = '-' + replyText;
+        }
+
         let msgToReply;
         if (res.reply_to) {
             // Find latest message with this username
