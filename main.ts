@@ -336,16 +336,14 @@ bot.on('message', async (ctx) => {
     let lastMsgId = null;
     for (let i = 0; i < output.length; i++) {
         const res = output[i];
-        const replyText = res.text;
+        let replyText = res.text.trim();
 
         if (replyText.length === 0) {
-            logger.warn(
-                `Empty response from AI: "${replyText}"`,
+            logger.info(
+                `Empty response from AI`,
             );
 
-            if (!ctx.info.isRandom) {
-                await ctx.reply(getRandomNepon(config));
-            }
+            typing.abort();
 
             return;
         }
