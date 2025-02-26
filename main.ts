@@ -330,26 +330,18 @@ bot.on('message', async (ctx) => {
 
     // If we have nots, add them to messages
     if (ctx.m.getChat().notes.length > 0) {
-        messages.push({
-            role: 'assistant',
-            content: `Chat notes:\n${ctx.m.getChat().notes.join('\n')}`,
-        });
+        chatInfoMsg += `\n\nChat notes:\n${ctx.m.getChat().notes.join('\n')}`;
     }
 
-    const activeMembers = ctx.m.getActiveMembers();
-    if (
-        ctx.chat.type !== 'private' &&
-        activeMembers.length > 0
-    ) {
-        const prettyMembersList = activeMembers.map((m) => `- ${m.first_name} (@${m.username})`).join('\n');
-
-        messages.push({
-            role: 'user',
-            content: `Chat: ${ctx.chat.title}, Active members:\n ${prettyMembersList}`,
-        });
-    }
+    messages.push({
+        role: 'assistant',
+        content: chatInfoMsg,
+    });
 
     const savedHistory = ctx.m.getHistory();
+
+    const messagesToPass = ctx.m.getChat().messagesToPass ??
+        config.ai.messagesToPass;
 
     let history = [];
     try {
@@ -359,7 +351,7 @@ bot.on('message', async (ctx) => {
             logger,
             savedHistory,
             {
-                messagesLimit: config.ai.messagesToPass,
+                messagesLimit: messagesToPass,
                 bytesLimit: config.ai.bytesLimit,
                 symbolLimit: config.ai.messageMaxLength,
             },
@@ -389,7 +381,7 @@ bot.on('message', async (ctx) => {
 
     const time = new Date().getTime();
 
-    console.log(JSON.stringify(messages, null, 2));
+    console.log(messages.filter((_, i) => i < 4 && i > messages.length - 6));
 
     // TODO: Fix repeating replies
     let result;
@@ -457,7 +449,7 @@ bot.on('message', async (ctx) => {
         if (res.reply_to) {
             // Find latest message with this username
             msgToReply = savedHistory.findLast((m) =>
-                m.info.from?.username === res.reply_to
+                '@' + m.info.from?.username === res.reply_to
             )?.id;
         }
 
@@ -466,12 +458,22 @@ bot.on('message', async (ctx) => {
         }
 
         let replyInfo;
+
         try {
-            replyInfo = await replyWithMarkdownId(
-                ctx,
-                replyText,
-                msgToReply,
-            );
+            if (ctx.chat.type === 'private') {
+                replyInfo = await replyGeneric(
+                    ctx,
+                    replyText,
+                    false,
+                    'Markdown',
+                );
+            } else {
+                replyInfo = await replyWithMarkdownId(
+                    ctx,
+                    replyText,
+                    msgToReply,
+                );
+            }
         } catch (error) {
             logger.error('Could not reply to user: ', error);
 
