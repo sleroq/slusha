@@ -85,8 +85,6 @@ export default function notes(config: Config, botId: number) {
             },
         ];
 
-        console.log(`Generating summary for ${ctx.chat.title}\n`, messages);
-
         const start = Date.now();
 
         let response;
