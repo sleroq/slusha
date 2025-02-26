@@ -173,20 +173,17 @@ bot.on('message', (ctx, next) => {
 
     // Direct message
     if (ctx.msg.chat.type === 'private') {
-        logger.info('Direct message');
         return next();
     }
 
     // Direct reply to bot
     if (ctx.msg.reply_to_message?.from?.id === bot.botInfo.id) {
-        logger.info('Direct reply to bot');
         ctx.m.getChat().lastUse = Date.now();
         return next();
     }
 
     // Mentined bot's name
     if (msg.text.includes(bot.botInfo.username)) {
-        logger.info("Replying because of mentioned bot's username");
         return next();
     }
 
@@ -524,6 +521,8 @@ bot.on('message', async (ctx) => {
 });
 
 void bot.start({ drop_pending_updates: config.dropPendingUpdates });
+
+// TODO: Remind users about bot existence
 
 // Save memory every minute
 setInterval(async () => {
