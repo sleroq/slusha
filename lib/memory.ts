@@ -33,6 +33,10 @@ export interface Member {
     lastUse: number;
 }
 
+export interface BotCharacter extends Character {
+    names: string[];
+}
+
 export interface Chat {
     notes: string[];
     lastNotes: number;
@@ -40,9 +44,11 @@ export interface Chat {
     lastUse: number;
     info: TgChat;
     chatModel?: string;
-    character?: Character;
+    character?: BotCharacter;
     optOutUsers: OptOutUser[];
     members: Member[];
+    messagesToPass?: number;
+    randomReplyProbability?: number;
 }
 
 export class Memory {
