@@ -56,6 +56,13 @@ bot.command('lobotomy', async (ctx) => {
     await ctx.reply('История очищена');
 });
 
+bot.command('changelog', async (ctx) => {
+    await replyWithMarkdown(
+        ctx,
+        '```js\n// TODO: написать что нового```\n\nМожешь пока чекнуть комиты что-ли - https://github.com/sleroq/slusha/commits/master',
+    );
+});
+
 bot.use(optOut);
 bot.use(character);
 
