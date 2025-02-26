@@ -162,7 +162,8 @@ bot.on('message', (ctx, next) => {
     // Ignore if text is empty
     if (
         !msg.text &&
-        !msgTypeSupported(msg.info)
+        !msgTypeSupported(msg.info) &&
+        !msg.info.new_chat_members // React to new members joining TODO: add to supported types
     ) {
         return;
     }
