@@ -180,3 +180,20 @@ export function msgTypeSupported(msg: Message) {
     }
 }
 
+
+// Helper function to escape special regex characters
+function escapeRegExp(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Create a more robust name matching function
+export function createNameMatcher(names: string[]) {
+  // Process each name to handle special characters and create proper boundaries
+  const patterns = names.map(name => {
+    const escapedName = escapeRegExp(name);
+    // Match names that are surrounded by spaces, punctuation, or at start/end of text
+    return `(?:^|[\\s.,!?;:'"\\[\\](){}])${escapedName}(?:[\\s.,!?;:'"\\[\\](){}]|$)`;
+  });
+  
+  return new RegExp(patterns.join('|'), 'gmi');
+}

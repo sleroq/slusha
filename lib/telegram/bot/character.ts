@@ -10,6 +10,11 @@ import { escapeHtml } from '../../helpers.ts';
 import { ChatMemory } from '../../memory.ts';
 import logger from '../../logger.ts';
 import { InlineQueryResultArticle } from 'grammy_types';
+import { generateText, Output } from 'ai';
+import { google } from '@ai-sdk/google';
+import { safetySettings } from '../../config.ts';
+import z from 'zod';
+import { limit } from 'grammy_ratelimiter';
 
 const bot = new Composer<SlushaContext>();
 
@@ -20,21 +25,28 @@ bot.command('character', async (ctx) => {
 
     if (textParts.length > 1) {
         replyText +=
-            'Тыкни на кнопку поиска чтобы найти персонажа, не нужно вводить в команду';
+            'Тыкни на кнопку поиска чтобы найти персонажа, не нужно вводить в команду\n\n';
     }
 
     let keyboard = new InlineKeyboard()
         .switchInlineCurrent('Поиск', `@${ctx.chat.id} `);
 
-    if (ctx.m.getChat().character) {
+    const character = ctx.m.getChat().character;
+
+    const name = character?.name ?? 'Слюша';
+
+    replyText = `${replyText}\n\nТекущий персонаж: ${name}.\n`;
+
+    if (character) {
         keyboard = keyboard.text('Вернуть Слюшу', `set ${ctx.chat.id} default`);
+        replyText += `Имена в чате: ${character.names.join(', ')}\n`;
     }
 
-    const character = ctx.m.getChat().character?.name ?? 'Слюша';
+    replyText += `\nНайдите персонажа из Chub.ai чтобы установить его в чат`;
 
     // Reply with search button
     await ctx.reply(
-        `${replyText}\n\nТекущий персонаж: ${character}.\n\nНайдите персонажа из Chub.ai чтобы установить его в чат`,
+        replyText,
         { reply_markup: keyboard },
     );
 });
@@ -113,7 +125,7 @@ bot.inlineQuery(/.*/, async (ctx) => {
 
     // from 2nd arg to the end
     const query = args.join(' ');
-    logger.info(`Query: ${query}`, `Page: ${page}`);
+    // logger.info(`Query: ${query}`, `Page: ${page}`);
 
     let characters;
     try {
@@ -196,6 +208,33 @@ bot.inlineQuery(/.*/, async (ctx) => {
     return ctx.answerInlineQuery(results);
 });
 
+// Rate limit callback queries
+bot.use(limit(
+    {
+        timeFrame: 10000,
+        limit: 1,
+
+        onLimitExceeded: async (ctx) => {
+            await ctx.answerCallbackQuery('Слишком часто');
+        },
+
+        keyGenerator: (ctx) => {
+            if (
+                !(ctx.callbackQuery?.data?.startsWith('set') &&
+                    !ctx.callbackQuery.data.endsWith('default'))
+            ) {
+                return;
+            }
+
+            if (ctx.hasChatType(['group', 'supergroup'])) {
+                return ctx.chat.id.toString();
+            }
+
+            return ctx.from?.id.toString();
+        },
+    },
+));
+
 bot.callbackQuery(/set.*/, async (ctx) => {
     const args = ctx.callbackQuery.data.split(' ').map((arg) => arg.trim());
     if (args.length !== 3) {
@@ -260,6 +299,26 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         return ctx.answerCallbackQuery('Этот персонаж уже установлен');
     }
 
+    const keyboardProgress = new InlineKeyboard()
+        .switchInlineCurrent('Поиск', `@${chatId} `)
+        .text('Скачиваю...', `progress set ${chatId} ${characterId}`);
+
+    try {
+        await ctx.editMessageReplyMarkup(
+            {
+                reply_markup: keyboardProgress,
+            },
+        );
+    } catch (error) {
+        // Ignore if message is not modified errors
+        if (
+            !(error instanceof GrammyError &&
+                error.description.includes('message is not modified'))
+        ) {
+            logger.error('Could not edit message: ', error);
+        }
+    }
+
     let character;
     try {
         character = await getCharacter(characterId);
@@ -268,7 +327,35 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         return ctx.answerCallbackQuery('Could not get character');
     }
 
-    chat.character = character;
+    const config = ctx.info.config;
+    const model = chat.chatModel ?? config.model;
+
+    let namesResult;
+    try {
+        namesResult = await generateText({
+            model: google(model, { safetySettings }),
+            experimental_output: Output.object({
+                // @ts-expect-error TODO: Fix types
+                schema: z.array(z.string()),
+            }),
+            temperature: config.temperature,
+            topK: config.topK,
+            topP: config.topP,
+            prompt:
+                `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
+                'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.\n' +
+                'Пример: имя "Cute Slusha". Варианты: ["Cute Slusha", "Slusha", "Слюша", "слюшаня", "слюшка", "шлюша", "слюш"]\n' +
+                'Пример: имя "Георгий". Варианты: ["Георгий", "Georgie", "George", "Geordie", "Geo", "Егор", "Герасим", "Жора", "Жорка", "Жорочка", "Гоша", "Гошенька", "Гера", "Герочка", "Гога"]',
+        });
+    } catch (error) {
+        logger.error(error, 'Error getting names for character');
+        return await ctx.reply(
+            'Ошибка при получении имен для персонажа. Попробуйте снова',
+        );
+    }
+
+    const names = namesResult.experimental_output as Array<string>;
+    chat.character = { ...character, names };
 
     const keyboard = new InlineKeyboard()
         .text('Вернуть Слюшу', `set ${chatId} default`)
@@ -298,7 +385,8 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     try {
         await ctx.api.sendMessage(
             chatId,
-            `${ctx.from.first_name} установил персонажа ${character.name}`,
+            `${ctx.from.first_name} установил персонажа ${character.name}.\n` +
+                `Имена в чате: ${chat.character.names.join(', ')}`,
             {
                 reply_markup: keyboard2,
             },

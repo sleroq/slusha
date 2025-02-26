@@ -44,8 +44,8 @@ bot.command('forget', async (ctx) => {
     await ctx.reply('История очищена');
 });
 
-bot.use(character);
 bot.use(optOut);
+bot.use(character);
 
 bot.command('model', (ctx) => {
     // Check if user is admin
@@ -136,8 +136,13 @@ bot.on('message', (ctx, next) => {
         return next();
     }
 
+    const characterNames = ctx.m.getChat().character?.names;
+    const names = config.names.concat(characterNames ?? []);
+    const nameRegex = createNameMatcher(names);
+
+    // Mentioned any of bot's aliases
     if (
-        new RegExp(`(${config.names.join('|')})`, 'gmi').test(msg.text) &&
+        nameRegex.test(msg.text) &&
         // Ignore forwarded messages with bot's name
         !(msg.info.forward_origin?.type === 'user' &&
             msg.info.forward_origin.sender_user.id === bot.botInfo.id)
