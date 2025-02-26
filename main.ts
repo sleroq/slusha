@@ -64,6 +64,7 @@ bot.command('changelog', async (ctx) => {
 });
 
 bot.use(optOut);
+bot.use(contextCommand);
 bot.use(character);
 
 bot.command('model', (ctx) => {
