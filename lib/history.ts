@@ -4,6 +4,7 @@ import {
     chooseSize,
     downloadFile,
     getImageContent,
+    removeFieldsWithSuffixes,
     sliceMessage,
 } from './helpers.ts';
 import { ChatMessage, ReplyTo } from './memory.ts';
@@ -36,8 +37,8 @@ interface HistoryOptions {
     symbolLimit: number;
     messagesLimit: number;
     bytesLimit: number;
-    usernames?: boolean;
     attachments?: boolean;
+    resolveReplyThread?: boolean;
 }
 
 function resolveReplyThread(
@@ -150,6 +151,14 @@ interface JSONInputMessage {
 interface ConstructMsgOptions {
     symbolLimit: number;
     attachments: boolean;
+    characterName?: string;
+}
+
+function getTimeString(date: Date): string {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+
+    return `${hours}:${minutes}`;
 }
 
 async function constructMsg(
@@ -158,7 +167,7 @@ async function constructMsg(
     msg: ChatMessage,
     options: ConstructMsgOptions,
 ): Promise<CoreMessage> {
-    const { symbolLimit } = options;
+    const { symbolLimit, characterName } = options;
     const attachAttachments = options.attachments;
 
     const role = msg.isMyself ? 'assistant' : 'user';
@@ -180,7 +189,10 @@ async function constructMsg(
     if (!isSupported) {
         for (const type of jsonTypes) {
             if (msg.info[type] !== undefined) {
-                text += `\n"${type}": ${JSON.stringify(msg.info[type])}`;
+                const prettyJsonObject = removeFieldsWithSuffixes(
+                    msg.info[type],
+                );
+                text += `\n"${type}": ${JSON.stringify(prettyJsonObject)}`;
             }
         }
     }
@@ -191,19 +203,75 @@ async function constructMsg(
 
     const parts: MessageContent = [];
 
+    let username = msg.info.from?.username;
+    if (username) {
+        username = '@' + msg.info.from?.username;
+    }
+
     const user: JSONInputMessage['user'] = {
         name: firstName,
-        username: msg.info.from?.username,
+        username,
     };
 
-    const inputMessage: JSONInputMessage[] = [{
-        user: msg.isMyself ? undefined : user,
-        reply_to: msg.replyTo?.info.from?.username,
-        forward_origin: msg.info.forward_origin, // TODO: Maybe make it prettier
-        text: text.trim(),
-    }];
+    let replyTo = msg.replyTo?.info.from?.username;
+    if (replyTo) {
+        replyTo = '@' + replyTo;
+    }
 
-    const prettyInputMessage = JSON.stringify(inputMessage, null, 2);
+    // JSON message format example. More extensible but less human-readable and seems to be performing worse
+    // const inputMessage: JSONInputMessage[] = [{
+    //     user: msg.isMyself ? undefined : user,
+    //     reply_to: replyTo,
+    //     forward_origin: msg.info.forward_origin, // TODO: Maybe make it prettier
+    //     text: text.trim(),
+    // }];
+
+    // const prettyInputMessage = JSON.stringify(inputMessage, null, 2);
+    // const prettyInputMessage = JSON.stringify(inputMessage);
+
+    let prettyInputMessage = '';
+
+    if (characterName) {
+        prettyInputMessage += `${characterName}`;
+        if (user.username) {
+            prettyInputMessage += ` (${user.username})`;
+        }
+
+        prettyInputMessage += ` [${
+            getTimeString(new Date(msg.info.date * 1000))
+        }]`;
+
+        prettyInputMessage += `:\n\n`;
+    }
+
+    if (!msg.isMyself) {
+        prettyInputMessage += `${user.name}`;
+        if (user.username) {
+            prettyInputMessage += ` (${user.username})`;
+        }
+
+        if (replyTo) {
+            prettyInputMessage += ` <reply to ${replyTo}>`;
+        }
+
+        if (msg.info.forward_origin) {
+            prettyInputMessage += ` <forward from "${
+                JSON.stringify(msg.info.forward_origin)
+            }">`;
+        }
+
+        if (msg.info.quote?.text) {
+            prettyInputMessage += `\n <quoting "${msg.info.quote.text}">`;
+        }
+
+        prettyInputMessage += ` [${
+            getTimeString(new Date(msg.info.date * 1000))
+        }]`;
+
+        prettyInputMessage += `:\n\n`;
+    }
+
+    prettyInputMessage += `${text.trim()}`;
 
     parts.push({
         type: 'text',
@@ -484,7 +552,9 @@ async function getAttachments(
     if (msg.info.photo) {
         const size = chooseSize(msg.info.photo);
         try {
-            parts.push(await getImageContent(api, token, size.file_id, 'image/jpeg'));
+            parts.push(
+                await getImageContent(api, token, size.file_id, 'image/jpeg'),
+            );
         } catch (error) {
             logger.error(
                 'Could not download photo: ',
@@ -497,7 +567,12 @@ async function getAttachments(
         const { sticker } = msg.info;
 
         if (sticker.is_video) {
-            const file = await downloadFile(api, token, sticker.file_id, 'video/webm');
+            const file = await downloadFile(
+                api,
+                token,
+                sticker.file_id,
+                'video/webm',
+            );
 
             parts.push({
                 type: 'file',
@@ -521,7 +596,9 @@ async function getAttachments(
         }
 
         try {
-            parts.push(await getImageContent(api, token, stickerImageId, 'image/webp'));
+            parts.push(
+                await getImageContent(api, token, stickerImageId, 'image/webp'),
+            );
         } catch (error) {
             logger.error(
                 'Could not download sticker: ',
@@ -541,7 +618,12 @@ async function getAttachments(
             video.file_size <= 1024 * 1024 * 20
         ) {
             const mimeType = video.mime_type;
-            const file = await downloadFile(api, token, video.file_id, mimeType);
+            const file = await downloadFile(
+                api,
+                token,
+                video.file_id,
+                mimeType,
+            );
 
             parts.push({
                 type: 'file',
@@ -556,7 +638,14 @@ async function getAttachments(
             }
 
             try {
-                parts.push(await getImageContent(api, token, thumbnailId, 'image/jpeg'));
+                parts.push(
+                    await getImageContent(
+                        api,
+                        token,
+                        thumbnailId,
+                        'image/jpeg',
+                    ),
+                );
             } catch (error) {
                 logger.error(
                     'Could not download video thumbnail: ',
@@ -576,7 +665,12 @@ async function getAttachments(
         }
 
         const mimeType = animation.mime_type;
-        const file = await downloadFile(api, token, animation.file_id, mimeType);
+        const file = await downloadFile(
+            api,
+            token,
+            animation.file_id,
+            mimeType,
+        );
 
         parts.push({
             type: 'file',
@@ -588,7 +682,12 @@ async function getAttachments(
     if (msg.info.video_note) {
         const { video_note: viNote } = msg.info;
 
-        const file = await downloadFile(api, token, viNote.file_id, 'video/mp4');
+        const file = await downloadFile(
+            api,
+            token,
+            viNote.file_id,
+            'video/mp4',
+        );
 
         parts.push({
             type: 'file',

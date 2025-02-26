@@ -180,6 +180,48 @@ export function msgTypeSupported(msg: Message) {
     }
 }
 
+/**
+ * Recursively removes object fields with key names ending with specified suffixes
+ * @param obj - The object to process
+ * @param suffixes - Array of suffixes to match against key names
+ * @returns A new object with matching fields removed
+ */
+export function removeFieldsWithSuffixes<T>(
+    obj: T,
+    suffixes: string[] = ['id', 'size', 'thumbnail'],
+    // deno-lint-ignore no-explicit-any
+): any {
+    // Handle null or undefined
+    if (obj === null || obj === undefined) {
+        return obj;
+    }
+
+    // Handle primitive types
+    if (typeof obj !== 'object') {
+        return obj;
+    }
+
+    // Handle arrays
+    if (Array.isArray(obj)) {
+        return obj.map((item) => removeFieldsWithSuffixes(item, suffixes));
+    }
+
+    // Handle objects
+    // deno-lint-ignore no-explicit-any
+    const result: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(obj)) {
+        // Skip keys ending with any of the specified suffixes
+        if (suffixes.some((suffix) => key.endsWith(suffix))) {
+            continue;
+        }
+
+        // Recursively process nested objects
+        result[key] = removeFieldsWithSuffixes(value, suffixes);
+    }
+
+    return result;
+}
 
 // Helper function to escape special regex characters
 function escapeRegExp(s: string) {
