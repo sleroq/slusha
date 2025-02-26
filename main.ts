@@ -311,6 +311,23 @@ bot.on('message', async (ctx) => {
         content: prompt,
     });
 
+    let chatInfoMsg = `Date and time right now: ${new Date().toLocaleString()}`;
+
+    if (ctx.chat.type === 'private') {
+        chatInfoMsg +=
+            `\nЛичный чат с ${ctx.from.first_name} (@${ctx.from.username})`;
+    } else {
+        const activeMembers = ctx.m.getActiveMembers();
+        if (activeMembers.length > 0) {
+            const prettyMembersList = activeMembers.map((m) =>
+                `- ${m.first_name} (@${m.username})`
+            ).join('\n');
+
+            chatInfoMsg +=
+                `\nChat: ${ctx.chat.title}, Active members:\n ${prettyMembersList}`;
+        }
+    }
+
     // If we have nots, add them to messages
     if (ctx.m.getChat().notes.length > 0) {
         messages.push({
