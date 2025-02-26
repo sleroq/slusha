@@ -99,6 +99,41 @@ bot.command('model', (ctx) => {
     return ctx.reply(`Model set to ${newModel}`);
 });
 
+bot.command('random', (ctx) => {
+    const args = ctx.msg.text
+        .split(' ')
+        .map((arg) => arg.trim())
+        .filter((arg) => arg !== '');
+
+    const currentValue = ctx.m.getChat().randomReplyProbability ??
+        config.randomReplyProbability;
+
+    if (args.length === 1) {
+        return replyWithMarkdown(
+            ctx,
+            'Укажи число от 0 до 50 вторым аргументом, чтобы настроить частоту случайных ответов: `/random <number>`\n' +
+                `Сейчас стоит \`${currentValue}\`%\n` +
+                '`/random default` - поставить значение по умолчанию',
+        );
+    }
+
+    const newValue = args[1];
+    if (newValue === 'default') {
+        ctx.m.getChat().randomReplyProbability = undefined;
+        return ctx.reply('Шанс случайных ответов обновлен');
+    }
+
+    const probability = parseFloat(newValue);
+    if (isNaN(probability) || probability < 0 || probability > 50) {
+        return ctx.reply(
+            'Нераспарсилось число. Попробуй снова',
+        );
+    }
+
+    ctx.m.getChat().randomReplyProbability = probability;
+    return ctx.reply(`Новая вероятность ответа: ${probability}%`);
+});
+
 bot.command('summary', (ctx) => {
     // Skip for private chats
     if (ctx.msg.chat.type === 'private') {
@@ -195,7 +230,10 @@ bot.on('message', (ctx, next) => {
         return next();
     }
 
-    if (probability(config.randomReplyProbability)) {
+    const randomReplyProbability = ctx.m.getChat().randomReplyProbability ??
+        config.randomReplyProbability;
+
+    if (probability(randomReplyProbability)) {
         logger.info('Replying because of random reply probability');
         ctx.info.isRandom = true;
         return next();
