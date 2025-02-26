@@ -28,8 +28,8 @@
   "imports": {
     "@google/generative-ai": "npm:@google/generative-ai@^0.22.0",
     "@std/encoding": "jsr:@std/encoding@^1.0.7",
-    "ai": "npm:ai@^4.1.45",
-    "@ai-sdk/google": "npm:@ai-sdk/google@^1.1.16",
+    "ai": "npm:ai@^4.1.46",
+    "@ai-sdk/google": "npm:@ai-sdk/google@^1.1.17",
     "@deno-library/logger": "jsr:@deno-library/logger@^1.1.9",
     "grammy": "https://deno.land/x/grammy@v1.34.0/mod.ts",
     "grammy_types": "https://deno.land/x/grammy_types@v3.19.0/mod.ts",
