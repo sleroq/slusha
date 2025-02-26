@@ -241,8 +241,10 @@ export async function makeHistoryV2(
     options: HistoryOptions,
 ): Promise<CoreMessage[]> {
     const { messagesLimit, bytesLimit, symbolLimit } = options;
+    const resolveReplies = options.resolveReplyThread ?? true;
 
     let totalBytes = 0;
+    let totalAttachments = 0;
     const prompt: CoreMessage[] = [];
     const addedMessages: number[] = [];
 
@@ -254,7 +256,7 @@ export async function makeHistoryV2(
         let attachAttachments = options.attachments ?? true;
 
         // If message is too old, don't attach attachments
-        if (i < history.length - 5) {
+        if (i < history.length - 10 || totalAttachments > 3) {
             attachAttachments = false;
         }
 
@@ -286,18 +288,32 @@ export async function makeHistoryV2(
                 continue;
             }
 
+            if (Array.isArray(msgRes.content)) {
+                const attachmentsParts = msgRes.content.find((m) =>
+                    m.type === 'file' || m.type === 'image'
+                );
+
+                totalAttachments += attachmentsParts ? 1 : 0;
+            }
+
             const size = JSON.stringify(msgRes).length;
 
-            if (
-                totalBytes + size >= bytesLimit
-            ) {
-                logger.info(`Skipping old messages because prompt is too big ${size} (${totalBytes + size} > ${bytesLimit})`);
+            if (totalBytes + size >= bytesLimit) {
+                logger.info(
+                    `Skipping old messages because prompt is too big ${size} (${
+                        totalBytes + size
+                    } > ${bytesLimit})`,
+                );
                 break;
             }
 
             prompt.push(msgRes);
             addedMessages.push(msg.id);
             totalBytes += size;
+
+            if (!resolveReplies) {
+                break;
+            }
         }
     }
 
