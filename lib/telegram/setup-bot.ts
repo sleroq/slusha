@@ -6,6 +6,7 @@ import { ChatMemory, Memory, ReplyTo } from '../memory.ts';
 interface RequestInfo {
     isRandom: boolean;
     userToReply?: string;
+    config: Config['ai'];
 }
 
 export type SlushaContext = Context & {
@@ -27,7 +28,7 @@ export default async function setupBot(config: Config, memory: Memory) {
         if (ctx.chat) {
             ctx.m = new ChatMemory(memory, ctx.chat);
         }
-        ctx.info = { isRandom: false };
+        ctx.info = { isRandom: false, config: config.ai };
 
         return next();
     });
@@ -63,7 +64,7 @@ export default async function setupBot(config: Config, memory: Memory) {
         });
 
         if (ctx.from) {
-            ctx.m.updateUser(ctx.from)
+            ctx.m.updateUser(ctx.from);
         }
 
         ctx.m.removeOldMessages(config.maxMessagesToStore);
