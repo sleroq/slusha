@@ -16,6 +16,8 @@ const configSchema = z.object({
         topP: z.number(),
         prePrompt: z.string(),
         prompt: z.string(),
+        privateChatPromptAddition: z.string().optional(),
+        groupChatPromptAddition: z.string().optional(),
         finalPrompt: z.string(),
         notesPrompt: z.string(),
         messagesToPass: z.number().default(5),

@@ -228,6 +228,15 @@ bot.on('message', async (ctx) => {
     const messages: CoreMessage[] = [];
 
     let prompt = config.ai.prePrompt;
+
+    if (ctx.chat.type === 'private') {
+        if (config.ai.privateChatPromptAddition) {
+            prompt += config.ai.privateChatPromptAddition;
+        }
+    } else if (config.ai.groupChatPromptAddition) {
+        prompt += config.ai.groupChatPromptAddition;
+    }
+
     const character = ctx.m.getChat().character;
     if (character) {
         prompt += character.description;
