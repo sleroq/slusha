@@ -15,6 +15,17 @@ export type SlushaContext = Context & {
     m: ChatMemory;
 };
 
+// TODO: Maybe derive from bot info somehow?
+const commands = [
+    '/optout',
+    '/optin',
+    '/context',
+    '/model',
+    '/lobotomy',
+    '/random',
+    '/summary',
+];
+
 export default async function setupBot(config: Config, memory: Memory) {
     Deno.mkdir('./tmp', { recursive: true });
 
@@ -37,7 +48,7 @@ export default async function setupBot(config: Config, memory: Memory) {
     bot.on('message', (ctx, next) => {
         if (
             ctx.m.getChat().optOutUsers.find((u) => u.id === ctx.from?.id) &&
-            (!ctx.msg.text || !['/optin', '/optout'].includes(ctx.msg.text))
+            (!ctx.msg.text || !commands.includes(ctx.msg.text))
         ) {
             return;
         }
