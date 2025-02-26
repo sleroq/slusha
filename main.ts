@@ -8,6 +8,7 @@ import { CoreMessage, generateText, Output } from 'ai';
 import { google } from '@ai-sdk/google';
 
 import {
+    createNameMatcher,
     deleteOldFiles,
     getRandomNepon,
     msgTypeSupported,
@@ -15,7 +16,12 @@ import {
     sliceMessage,
     testMessage,
 } from './lib/helpers.ts';
-import { doTyping, replyWithMarkdownId } from './lib/telegram/helpers.ts';
+import {
+    doTyping,
+    replyGeneric,
+    replyWithMarkdown,
+    replyWithMarkdownId,
+} from './lib/telegram/helpers.ts';
 import { limit } from 'grammy_ratelimiter';
 import character from './lib/telegram/bot/character.ts';
 import optOut from './lib/telegram/bot/opt-out.ts';
@@ -23,6 +29,7 @@ import msgDelay from './lib/telegram/bot/msg-delay.ts';
 import notes from './lib/telegram/bot/notes.ts';
 import { makeHistoryV2 } from './lib/history.ts';
 import z from 'zod';
+import contextCommand from './lib/telegram/bot/context.ts';
 
 let config: Config;
 try {
@@ -39,6 +46,11 @@ const bot = await setupBot(config, memory);
 bot.command('start', (ctx) => ctx.reply(config.startMessage));
 
 bot.command('forget', async (ctx) => {
+    ctx.m.clear();
+    await ctx.reply('История очищена');
+});
+
+bot.command('lobotomy', async (ctx) => {
     ctx.m.clear();
     ctx.m.getChat().notes = [];
     await ctx.reply('История очищена');

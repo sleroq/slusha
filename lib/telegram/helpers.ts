@@ -45,7 +45,7 @@ function splitMessage(message: string, maxLength = 3000) {
     return parts;
 }
 
-async function replyGeneric<Other>(
+export async function replyGeneric<Other>(
     ctx: SlushaContext,
     text: string,
     reply: boolean,
