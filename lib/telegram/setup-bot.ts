@@ -46,9 +46,10 @@ export default async function setupBot(config: Config, memory: Memory) {
 
     // TODO: Save other message types, like special events
     bot.on('message', (ctx, next) => {
+        // Ignore opted out users and commands
         if (
-            ctx.m.getChat().optOutUsers.find((u) => u.id === ctx.from?.id) &&
-            (!ctx.msg.text || !commands.includes(ctx.msg.text))
+            ctx.m.getChat().optOutUsers.find((u) => u.id === ctx.from?.id) ||
+            commands.some((c) => ctx.msg.text?.startsWith(c))
         ) {
             return;
         }
