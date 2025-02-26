@@ -231,7 +231,7 @@ async function constructMsg(
 
     let prettyInputMessage = '';
 
-    if (characterName) {
+    if (characterName && msg.isMyself) {
         prettyInputMessage += `${characterName}`;
         if (user.username) {
             prettyInputMessage += ` (${user.username})`;
@@ -241,7 +241,7 @@ async function constructMsg(
             getTimeString(new Date(msg.info.date * 1000))
         }]`;
 
-        prettyInputMessage += `:\n\n`;
+        prettyInputMessage += `:\n`;
     }
 
     if (!msg.isMyself) {
@@ -268,7 +268,7 @@ async function constructMsg(
             getTimeString(new Date(msg.info.date * 1000))
         }]`;
 
-        prettyInputMessage += `:\n\n`;
+        prettyInputMessage += `:\n`;
     }
 
     prettyInputMessage += `${text.trim()}`;
