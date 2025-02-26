@@ -14,7 +14,7 @@ Smartest girl in telegram.
   </details>
 - <details>
     <summary>
-      Characters from [Chub.ai](https://chubai.com/)
+      Characters from Chub.ai
     </summary>
     <img src="https://i.ibb.co/yFKJDxYG/photo-2025-02-26-20-11-40.jpg" alt="Character selection">
   </details>
