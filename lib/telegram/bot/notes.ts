@@ -4,7 +4,7 @@ import { CoreMessage, generateText } from 'npm:ai';
 import { Config, safetySettings } from '../../config.ts';
 import logger from '../../logger.ts';
 import { SlushaContext } from '../setup-bot.ts';
-import { makeHistory } from '../../history.ts';
+import { makeNotesHistory } from '../../history.ts';
 
 export default function notes(config: Config, botId: number) {
     const bot = new Composer<SlushaContext>();
@@ -43,11 +43,11 @@ export default function notes(config: Config, botId: number) {
 
         const model = config.ai.notesModel ?? config.ai.model;
 
-        // TODO: Make different function for notes history
+        const characterName = ctx.m.getChat().character?.name;
+
         let context: CoreMessage[] = [];
         try {
-            // TODO: Create separate function for this
-            context = await makeHistory(
+            context = await makeNotesHistory(
                 { token: config.botToken, id: botId },
                 ctx.api,
                 logger,
@@ -55,8 +55,8 @@ export default function notes(config: Config, botId: number) {
                 {
                     messagesLimit: 90,
                     symbolLimit: config.ai.messageMaxLength / 3,
-                    attachments: false,
                     bytesLimit: config.ai.bytesLimit,
+                    characterName,
                 },
             );
         } catch (error) {
@@ -84,6 +84,8 @@ export default function notes(config: Config, botId: number) {
                 content: config.ai.notesPrompt,
             },
         ];
+
+        console.log(`Generating summary for ${ctx.chat.title}\n`, messages);
 
         const start = Date.now();
 

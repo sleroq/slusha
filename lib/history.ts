@@ -394,152 +394,85 @@ export async function makeHistoryV2(
     return prompt;
 }
 
-export async function makeHistory(
+interface NotesHistoryOptions {
+    symbolLimit: number;
+    messagesLimit: number;
+    bytesLimit: number;
+    characterName?: string;
+}
+
+export async function makeNotesHistory(
     botInfo: { token: string; id: number },
     api: Api<RawApi>,
     logger: Logger,
     history: ChatMessage[],
-    options: HistoryOptions,
+    options: NotesHistoryOptions,
 ): Promise<CoreMessage[]> {
-    const { symbolLimit, messagesLimit } = options;
-    const usernames = options?.usernames ?? true;
-    const attachAttachments = options?.attachments ?? true;
+    const { messagesLimit, bytesLimit, symbolLimit, characterName } = options;
 
-    if (history.length > messagesLimit) {
-        history.splice(0, history.length - messagesLimit);
-    }
+    let totalBytes = 0;
+    let textPart = '';
 
-    const prompt: CoreMessage[] = [];
-    for (let i = 0; i < history.length; i++) {
+    // Go through history in reverse order
+    for (let i = history.length - 1; i >= 0; i--) {
         const msg = history[i];
-        const sender = msg.info.from;
 
-        const username = sender?.username ? ` (@${sender.username})` : '';
-        const name = sender?.first_name ?? 'User';
-
-        // This is a message passed to ai
-        let context = `${name}`;
-
-        if (usernames && username) {
-            context += username;
+        if (i < history.length - messagesLimit) {
+            break;
         }
 
-        // If message is a reply add info about it
-        if (msg.replyTo) {
-            if (msg.replyTo.info.from?.id !== botInfo.id) {
-                const replyName = msg.replyTo.info.from?.first_name ?? 'User';
-                context += ` (in reply to: ${replyName})`;
-            }
-
-            if (msg.replyTo.info.quote?.is_manual) {
-                context += ` (quoted) > ${msg.replyTo.info.quote.text}`;
-            }
-        }
-
-        // If message is reply but not from bot
-        // and replied message is not in 5 messages before current one
-        // add context about original message so ai can follow conversation
-        if (msg.replyTo) {
-            const reply = msg.replyTo;
-            const prevIndex = i - 5 < 0 ? 0 : i - 5;
-            if (
-                !history.slice(prevIndex, i).some((msg) => msg.id === reply.id)
-            ) {
-                const replyName = reply.info.from?.first_name ?? 'User';
-                let replyText = `(quoted message from ${replyName}):\n`;
-                replyText += sliceMessage(reply.text, symbolLimit);
-
-                const isItFromMe = reply.info.from?.id === botInfo.id;
-                if (isItFromMe) {
-                    prompt.push(
-                        {
-                            role: 'assistant',
-                            content: replyText,
-                        },
-                    );
-                    // Add attachments only if it's replied by last 3 messages
-                    // TODO: Track reply thread
-                } else if (
-                    history.slice(-3).some((m) => m.id === msg.id) &&
-                    !msg.isMyself &&
-                    attachAttachments
-                ) {
-                    let replyContent: MessageContent = [
-                        {
-                            type: 'text',
-                            text: replyText,
-                        },
-                    ];
-
-                    let parts: MessageContent = [];
-                    try {
-                        parts = await getAttachments(
-                            api,
-                            botInfo.token,
-                            reply,
-                        );
-                    } catch (error) {
-                        logger.error(
-                            'Could not download reply attachments: ',
-                            error,
-                        );
-                    }
-
-                    if (parts.length > 0) {
-                        replyContent = replyContent.concat(parts);
-                    }
-
-                    prompt.push(
-                        {
-                            role: 'user',
-                            content: replyContent,
-                        },
-                    );
-                }
-            }
-        }
-
-        context += ':\n' + sliceMessage(msg.text, symbolLimit);
-
-        if (msg.isMyself) {
-            prompt.push({
-                role: 'assistant',
-                content: [{
-                    type: 'text',
-                    text: context,
-                }],
-            });
+        let msgRes;
+        try {
+            msgRes = await constructMsg(
+                api,
+                botInfo,
+                msg,
+                {
+                    symbolLimit,
+                    attachments: false,
+                    characterName,
+                },
+            );
+        } catch (error) {
+            logger.error('Could not construct message: ', error);
             continue;
         }
 
-        let content: MessageContent = [
-            {
-                type: 'text',
-                text: context,
-            },
-        ];
+        const size = JSON.stringify(msgRes).length;
 
-        // If message is in the last 5 messages in history (or if attachment is voice)
-        // download image attachments
-        if (
-            msg.info.voice ||
-            (attachAttachments &&
-                history.slice(-5).some((m) => m.id === msg.id))
-        ) {
-            const parts = await getAttachments(api, botInfo.token, msg);
+        if (totalBytes + size >= bytesLimit) {
+            logger.info(
+                `Skipping old messages because prompt is too big ${size} (${
+                    totalBytes + size
+                } > ${bytesLimit})`,
+            );
 
-            if (parts.length > 0) {
-                content = content.concat(parts);
-            }
+            break;
         }
 
-        prompt.push({
-            role: 'user',
-            content,
-        });
+        let content = msgRes.content;
+        if (Array.isArray(content) && 'text' in content[0]) {
+            content = content[0].text;
+        }
+
+        if (!content) {
+            logger.warn('Message content is empty: ', msgRes);
+            continue;
+        }
+
+        textPart += content;
+
+        if (i >= history.length - messagesLimit) {
+            textPart += '\n\n---\n\n';
+        }
+
+        totalBytes += size;
     }
 
-    return prompt;
+    return [{
+        role: 'user',
+        content: textPart,
+    }];
 }
 
 async function getAttachments(
