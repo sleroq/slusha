@@ -2,7 +2,7 @@ import { SlushaContext } from '../setup-bot.ts';
 import { OptOutUser } from '../../memory.ts';
 import { replyWithHTML } from '../helpers.ts';
 import logger from '../../logger.ts';
-import { InlineKeyboard, Composer } from 'grammy';
+import { Composer, InlineKeyboard } from 'grammy';
 
 const bot = new Composer<SlushaContext>();
 
@@ -92,11 +92,7 @@ async function optIn(ctx: SlushaContext, id: number, reply: boolean) {
             },
         });
     } catch (error) {
-        try {
-            await ctx.editMessageText(message);
-        } catch (error) {
-            logger.error('Could not edit message: ', error);
-        }
+        logger.error('Could not edit message: ', error);
     }
 }
 
