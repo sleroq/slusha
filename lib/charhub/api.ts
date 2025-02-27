@@ -53,9 +53,11 @@ export interface SearchResult {
 
 export const pageSize = 20;
 
-export async function getCharacters(query = '', page = 1) {
+export async function getCharacters(query = '', page = 1, excludeNsfw = true) {
     const url = new URL('https://api.chub.ai/api/characters/search');
-    url.searchParams.set('excludetopics', 'nsfw');
+    if (excludeNsfw) {
+        url.searchParams.set('excludetopics', 'nsfw');
+    }
     url.searchParams.set('first', String(pageSize));
     url.searchParams.set('page', String(page));
     url.searchParams.set('namespace', 'characters');

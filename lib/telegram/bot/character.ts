@@ -72,7 +72,7 @@ function errorResult(chatId: number) {
 function headerResult(chatId: number, query: string) {
     return InlineQueryResultBuilder
         .article('696969', 'Поиск по имени персонажа в Chub.ai', {
-            description: 'Результаты:',
+            description: 'Подсказка: добавь /nsfw в запрос, чтобы включить nsfw результаты',
             thumbnail_url: 'https://chub.ai/logo_cataract.png',
             reply_markup: new InlineKeyboard()
                 .switchInlineCurrent('Поиск', `@${chatId} ${query}`),
@@ -124,12 +124,20 @@ bot.inlineQuery(/.*/, async (ctx) => {
     }
 
     // from 2nd arg to the end
-    const query = args.join(' ');
-    // logger.info(`Query: ${query}`, `Page: ${page}`);
+    let query = args.join(' ');
+
+    const findNsfwArg = query.match(/\s?\/nsfw\s?/i);
+    let excludeNsfw = true;
+    if (findNsfwArg) {
+        query = query.replace(/\s?\/nsfw\s?/i, ' ').trim();
+        excludeNsfw = false;
+    }
+
+    logger.info(`Query: ${query}`, `Page: ${page}, excludeNsfw: ${excludeNsfw}`);
 
     let characters;
     try {
-        characters = await getCharacters(query, page);
+        characters = await getCharacters(query, page, excludeNsfw);
     } catch (error) {
         logger.error('Could not get characters: ', error);
         return ctx.answerInlineQuery([errorResult(chatId)], { cache_time: 0 });
