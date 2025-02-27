@@ -318,12 +318,16 @@ bot.on('message', async (ctx) => {
     } else {
         const activeMembers = ctx.m.getActiveMembers();
         if (activeMembers.length > 0) {
-            const prettyMembersList = activeMembers.map((m) =>
-                `- ${m.first_name} (@${m.username})`
-            ).join('\n');
+            const prettyMembersList = activeMembers.map((m) => {
+                let text = `- ${m.first_name}`;
+                if (m.username) {
+                    text += ` (@${m.username})`;
+                }
+                return text;
+            }).join('\n');
 
             chatInfoMsg +=
-                `\nChat: ${ctx.chat.title}, Active members:\n ${prettyMembersList}`;
+                `\nChat: ${ctx.chat.title}, Active members:\n${prettyMembersList}`;
         }
     }
 
