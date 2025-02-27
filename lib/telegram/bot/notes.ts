@@ -64,14 +64,14 @@ export default function notes(config: Config, botId: number) {
             return next();
         }
 
-        let prompt = config.ai.prePrompt;
-        const character = ctx.m.getChat().character;
-        if (character) {
-            prompt += character.description;
-        } else {
-            prompt += config.ai.prompt;
-        }
-        prompt += '\n' + config.ai.notesPrompt;
+        // let prompt = config.ai.prePrompt;
+        // const character = ctx.m.getChat().character;
+        // if (character) {
+        //     prompt += character.description;
+        // } else {
+        //     prompt += config.ai.prompt;
+        // }
+        const prompt = config.ai.notesPrompt;
 
         const messages: CoreMessage[] = [
             {
@@ -110,7 +110,21 @@ export default function notes(config: Config, botId: number) {
             (Date.now() - start) / 1000,
         );
 
-        const summaryText = response.text;
+        let summaryText = response.text;
+
+        const summarySplit = summaryText.split('\n');
+
+        summaryText = summarySplit.map((s) => {
+            let t = s.trim();
+
+            // Replace lists with bullets
+            if (t.startsWith('* ')) {
+                t = t.slice(1);
+                t = '- ' + t.trim();
+            }
+
+            return t;
+        }).join('\n');
 
         ctx.m.getChat().notes.push(summaryText);
 
