@@ -155,8 +155,8 @@ interface ConstructMsgOptions {
 }
 
 function getTimeString(date: Date): string {
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
 
     return `${hours}:${minutes}`;
 }
@@ -324,7 +324,7 @@ export async function makeHistoryV2(
         let attachAttachments = options.attachments ?? true;
 
         // If message is too old, don't attach attachments
-        if (i < history.length - 10 || totalAttachments > 3) {
+        if (i < history.length - 10 || totalAttachments > 2) {
             attachAttachments = false;
         }
 
@@ -357,11 +357,11 @@ export async function makeHistoryV2(
             }
 
             if (Array.isArray(msgRes.content)) {
-                const attachmentsParts = msgRes.content.find((m) =>
+                const attachmentsPart = msgRes.content.find((m) =>
                     m.type === 'file' || m.type === 'image'
                 );
 
-                totalAttachments += attachmentsParts ? 1 : 0;
+                totalAttachments += attachmentsPart ? 1 : 0;
             }
 
             const size = JSON.stringify(msgRes).length;
