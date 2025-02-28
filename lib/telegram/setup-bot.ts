@@ -91,6 +91,20 @@ export default async function setupBot(config: Config, memory: Memory) {
 
     // TODO: Add support for group to supergroup migration
 
+    bot.on(':migrate_from_chat_id', (ctx, next) => {
+        const from = ctx.msg.migrate_from_chat_id;
+        const to = ctx.chat.id;
+
+        ctx.memory.chats[to] = ctx.memory.chats[from];
+        delete ctx.memory.chats[from];
+
+        logger.debug(
+            `Successfully migrated "${ctx.chat.title}" from ${from} to ${to}`,
+        );
+
+        return next();
+    });
+
     await bot.init();
 
     return bot;
