@@ -306,15 +306,19 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     }
 
     const chatId = parseInt(args[1]);
-    if (isNaN(chatId)) {
+    const chat = ctx.memory.chats[chatId];
+    if (isNaN(chatId) || chat === undefined) {
         return ctx.answerCallbackQuery('Invalid chat id');
     }
 
-    // Manually set chat by query id cause it's not available in ctx
-    const chatInfo = ctx.memory.chats[chatId].info;
-    ctx.m = new ChatMemory(ctx.memory, chatInfo);
+    const userInChat = chat.members.find((member) => member.id === ctx.from.id);
+    if (!userInChat) {
+        return ctx.answerCallbackQuery('You are not a member of this chat');
+    }
 
-    const chat = ctx.memory.chats[chatId];
+    // Manually set chat by query id cause it's not available in ctx
+    ctx.m = new ChatMemory(ctx.memory, chat.info);
+
     if (!chat) {
         return ctx.answerCallbackQuery('Chat not found');
     }
