@@ -89,7 +89,25 @@ export default async function setupBot(config: Config, memory: Memory) {
         return next();
     });
 
-    // TODO: Add support for group to supergroup migration
+    bot.on(':left_chat_member', (ctx, next) => {
+        ctx.m.getChat().members = ctx.m.getChat().members.filter((m) =>
+            m.id !== ctx.from?.id
+        );
+
+        return next();
+    });
+
+    bot.on('edit:text', (ctx, next) => {
+        const history = ctx.m.getChat().history;
+
+        for (const msg of history) {
+            if (msg.id === ctx.msg.message_id) {
+                msg.text = ctx.msg.text ?? ctx.msg.caption ?? '';
+            }
+        }
+
+        return next();
+    });
 
     bot.on(':migrate_from_chat_id', (ctx, next) => {
         const from = ctx.msg.migrate_from_chat_id;
