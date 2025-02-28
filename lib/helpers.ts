@@ -163,15 +163,6 @@ export function testMessage(regexs: Array<string | RegExp>, text: string) {
     });
 }
 
-export function escapeHtml(unsafe: string): string {
-    return unsafe
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
 export function msgTypeSupported(msg: Message) {
     for (const [type] of supportedTypesMap) {
         if (msg[type] !== undefined) {
@@ -225,17 +216,17 @@ export function removeFieldsWithSuffixes<T>(
 
 // Helper function to escape special regex characters
 function escapeRegExp(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // Create a more robust name matching function
 export function createNameMatcher(names: string[]) {
-  // Process each name to handle special characters and create proper boundaries
-  const patterns = names.map(name => {
-    const escapedName = escapeRegExp(name);
-    // Match names that are surrounded by spaces, punctuation, or at start/end of text
-    return `(?:^|[\\s.,!?;:'"\\[\\](){}])${escapedName}(?:[\\s.,!?;:'"\\[\\](){}]|$)`;
-  });
-  
-  return new RegExp(patterns.join('|'), 'gmi');
+    // Process each name to handle special characters and create proper boundaries
+    const patterns = names.map((name) => {
+        const escapedName = escapeRegExp(name);
+        // Match names that are surrounded by spaces, punctuation, or at start/end of text
+        return `(?:^|[\\s.,!?;:'"\\[\\](){}])${escapedName}(?:[\\s.,!?;:'"\\[\\](){}]|$)`;
+    });
+
+    return new RegExp(patterns.join('|'), 'gmi');
 }

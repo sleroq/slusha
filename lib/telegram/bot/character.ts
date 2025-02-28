@@ -6,7 +6,7 @@ import {
 } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
 import { getCharacter, getCharacters, pageSize } from '../../charhub/api.ts';
-import { escapeHtml } from '../../helpers.ts';
+import { sliceMessage } from '../../helpers.ts';
 import { ChatMemory } from '../../memory.ts';
 import logger from '../../logger.ts';
 import { InlineQueryResultArticle } from 'grammy_types';
@@ -15,6 +15,10 @@ import { google } from '@ai-sdk/google';
 import { safetySettings } from '../../config.ts';
 import z from 'zod';
 import { limit } from 'grammy_ratelimiter';
+import DOMPurify from 'isomorphic-dompurify';
+import remarkHtml from 'remark-html';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
 
 const bot = new Composer<SlushaContext>();
 
@@ -72,7 +76,8 @@ function errorResult(chatId: number) {
 function headerResult(chatId: number, query: string) {
     return InlineQueryResultBuilder
         .article('696969', 'Поиск по имени персонажа в Chub.ai', {
-            description: 'Подсказка: добавь /nsfw в запрос, чтобы включить nsfw результаты',
+            description:
+                'Подсказка: добавь /nsfw в запрос, чтобы включить nsfw результаты',
             thumbnail_url: 'https://chub.ai/logo_cataract.png',
             reply_markup: new InlineKeyboard()
                 .switchInlineCurrent('Поиск', `@${chatId} ${query}`),
@@ -133,7 +138,10 @@ bot.inlineQuery(/.*/, async (ctx) => {
         excludeNsfw = false;
     }
 
-    logger.info(`Query: ${query}`, `Page: ${page}, excludeNsfw: ${excludeNsfw}`);
+    logger.info(
+        `Query: ${query}`,
+        `Page: ${page}, excludeNsfw: ${excludeNsfw}`,
+    );
 
     let characters;
     try {
@@ -152,19 +160,67 @@ bot.inlineQuery(/.*/, async (ctx) => {
         return ctx.answerInlineQuery(results);
     }
 
+    const tagsWhitelist = [
+        'b',
+        'i',
+        'u',
+        's',
+        'del',
+        'strike',
+        'span',
+        'a',
+        'code',
+    ];
+
     for (const character of characters) {
         const url = `https://venus.chub.ai/characters/${character.fullPath}`;
 
-        const name = escapeHtml(character.name);
-        const description = escapeHtml(character.description);
-        const topics = escapeHtml(character.topics.join(', '));
+        const baseHTMLName = await unified()
+            .use(remarkParse)
+            .use(remarkHtml)
+            .process(character.name);
+
+        const noHTMLName = DOMPurify.sanitize(character.name, {
+            ALLOWED_TAGS: [],
+        });
+        const HTMLName = DOMPurify.sanitize(
+            baseHTMLName,
+            {
+                ALLOWED_TAGS: tagsWhitelist,
+            },
+        );
+
+        const descriptionCut = sliceMessage(
+            character.description,
+            3500,
+        );
+        const baseDescription = await unified()
+            .use(remarkParse)
+            .use(remarkHtml)
+            .process(descriptionCut);
+
+        const noHTMLDescription = DOMPurify.sanitize(baseDescription, {
+            ALLOWED_TAGS: [],
+        });
+
+        const HTMLdescription = DOMPurify.sanitize(
+            baseDescription,
+            {
+                ALLOWED_TAGS: tagsWhitelist,
+            },
+        );
+
+        const topics = DOMPurify.sanitize(character.topics.join(', '), {
+            ALLOWED_TAGS: [],
+        });
         const starCount = character.starCount;
 
-        let text =
-            `${name}<a href="${character.avatar_url}"> </a> <a href="${url}">(source)</a>\n`;
-        text += description + '\n\n';
+        let text = `${HTMLName}\n`;
+        text += `<blockquote expandable>${HTMLdescription}</blockquote>` +
+            `<a href="${character.avatar_url}"> </a>` +
+            '\n';
         text += topics + '\n\n';
-        text += starCount + ' ⭐';
+        text += ` <a href="${url}">${starCount}</a> ⭐`;
 
         const keyboard = new InlineKeyboard()
             .switchInlineCurrent('Поиск', `@${chatId} `)
@@ -172,10 +228,10 @@ bot.inlineQuery(/.*/, async (ctx) => {
 
         const result = InlineQueryResultBuilder
             .article(
-                character.id.toString(),
-                character.name,
+                String(character.id),
+                noHTMLName,
                 {
-                    description: character.description,
+                    description: noHTMLDescription,
                     thumbnail_url: character.avatar_url,
                     reply_markup: keyboard,
                 },
