@@ -384,7 +384,7 @@ bot.on('message', async (ctx) => {
 
     const time = new Date().getTime();
 
-    console.log(messages.filter((_, i) => i < 4 || i > messages.length - 6));
+    // console.log(messages.filter((_, i) => i < 5 || i > messages.length - 6));
 
     // TODO: Fix repeating replies
     let result;

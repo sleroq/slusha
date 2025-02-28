@@ -31,7 +31,12 @@ export default async function setupBot(config: Config, memory: Memory) {
 
     const bot = new Bot<SlushaContext>(config.botToken);
 
-    bot.catch((error) => logger.error(error));
+    bot.catch((error) =>
+        logger.error({
+            ...error,
+            ctx: { ...error.ctx, m: undefined, memory: undefined },
+        })
+    );
 
     bot.use((ctx, next) => {
         // Init custom context
