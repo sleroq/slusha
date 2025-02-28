@@ -148,7 +148,7 @@ bot.command('summary', (ctx) => {
         return ctx.reply('Пока маловато сообщений прошло, сам прочитай');
     }
 
-    return ctx.reply(notes.join('\n'));
+    return ctx.reply(notes.join('\n').replaceAll('\n\n', '\n'));
 });
 
 bot.use(msgDelay(config));
