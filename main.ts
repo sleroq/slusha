@@ -292,10 +292,10 @@ bot.on('message', async (ctx) => {
 
     if (ctx.chat.type === 'private') {
         if (config.ai.privateChatPromptAddition) {
-            prompt += config.ai.privateChatPromptAddition;
+            prompt += '\n' +config.ai.privateChatPromptAddition;
         }
     } else if (config.ai.groupChatPromptAddition) {
-        prompt += config.ai.groupChatPromptAddition;
+        prompt += '\n' + config.ai.groupChatPromptAddition;
     }
 
     const character = ctx.m.getChat().character;
