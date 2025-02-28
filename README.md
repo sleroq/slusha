@@ -2,7 +2,7 @@
 
 Smartest girl in telegram.
 
-> Try it out - [@sl_chatbot](https://t.me/sl_chatbot)
+> Try it out - [@sl_chatbot](https://t.me/sl_chatbot) yourself or check out quotes - [@sl_quotes](https://t.me/s/slushaquotes)
 
 ## Features
 
