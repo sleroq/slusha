@@ -260,6 +260,10 @@ async function constructMsg(
             }">`;
         }
 
+        if (msg.info.via_bot) {
+            prettyInputMessage += ` <this message content generated via bot @${msg.info.via_bot.username}>`;
+        }
+
         if (msg.info.quote?.text) {
             prettyInputMessage += `\n <quoting "${msg.info.quote.text}">`;
         }
