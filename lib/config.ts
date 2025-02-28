@@ -21,6 +21,7 @@ const configSchema = z.object({
         finalPrompt: z.string(),
         notesPrompt: z.string(),
         messagesToPass: z.number().default(5),
+        notesFrequency: z.number().default(150),
         messageMaxLength: z.number().default(4096),
         bytesLimit: z.number().default(20 * 1024 * 1024),
     }),

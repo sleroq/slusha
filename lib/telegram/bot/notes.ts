@@ -12,10 +12,7 @@ export default function notes(config: Config, botId: number) {
     // Generate summary about chat every 50 messages
     // if bot was used in last 3 days
     bot.on('message', async (ctx, next) => {
-        // Skip for private chats
-        if (ctx.msg.chat.type === 'private') {
-            return next();
-        }
+        const frequency = config.ai.notesFrequency;
 
         if (
             ctx.m.getChat().lastUse <
@@ -29,11 +26,9 @@ export default function notes(config: Config, botId: number) {
             return next();
         }
 
-        // Check if 90 messages from last notes
-        // TODO: Make it configurable
         if (
             ctx.m.getChat().lastNotes &&
-            ctx.msg.message_id - ctx.m.getChat().lastNotes < 90
+            ctx.msg.message_id - ctx.m.getChat().lastNotes < frequency
         ) {
             return next();
         }
@@ -53,7 +48,7 @@ export default function notes(config: Config, botId: number) {
                 logger,
                 ctx.m.getHistory(),
                 {
-                    messagesLimit: 90,
+                    messagesLimit: frequency,
                     symbolLimit: config.ai.messageMaxLength / 3,
                     bytesLimit: config.ai.bytesLimit,
                     characterName,
