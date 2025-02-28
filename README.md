@@ -32,7 +32,7 @@ Smartest girl in telegram.
     <img src="https://i.ibb.co/dJtvhfDj/photo-2025-02-26-20-11-49.jpg" alt="Smart reply">
   </details>
 - Extensive per-chat configuration
-- Undertanding of Telegram-specific features, like reply threads, message quotes and forwards
+- Undertanding of Telegram-specific features, like reply threads, via bot messages, quotes and forwards
 
 ## Requirements
 
