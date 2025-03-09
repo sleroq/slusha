@@ -161,6 +161,25 @@ bot.command('summary', (ctx) => {
     return ctx.reply(notes.join('\n').replaceAll('\n\n', '\n'));
 });
 
+bot.command('hatemode', async (ctx) => {
+    if (ctx.chat.type !== 'private') {
+        const admins = await ctx.getChatAdministrators();
+        if (!admins.some((a) => a.user.id === ctx.from?.id)) {
+            const msg = 'Эта команда только для администраторов чата' + '\n' +
+                `Но если что, хейт сейчас ${
+                    ctx.m.getChat().hateMode ? 'включен' : 'выключен'
+                }`;
+            return ctx.reply(msg);
+        }
+    }
+
+    ctx.m.getChat().hateMode = !ctx.m.getChat().hateMode;
+
+    return ctx.reply(
+        `хейт теперь ${ctx.m.getChat().hateMode ? 'включен' : 'выключен'}`,
+    );
+});
+
 bot.use(msgDelay(config));
 
 bot.use(notes(config, bot.botInfo.id));
