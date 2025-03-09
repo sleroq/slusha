@@ -4,14 +4,16 @@ import resolveConfig, { Config, safetySettings } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
 import { loadMemory, ReplyTo } from './lib/memory.ts';
 
-import { CoreMessage, generateText, Output } from 'ai';
+import { APICallError, CoreMessage, generateText, Output } from 'ai';
 import { google } from '@ai-sdk/google';
 
 import {
     createNameMatcher,
     deleteOldFiles,
+    formatReply,
     getRandomNepon,
     msgTypeSupported,
+    prettyDate,
     probability,
     sliceMessage,
     testMessage,
@@ -40,6 +42,7 @@ try {
 }
 
 const memory = await loadMemory();
+logger.info('Memory loaded');
 
 const bot = await setupBot(config, memory);
 
@@ -51,8 +54,16 @@ bot.command('forget', async (ctx) => {
 });
 
 bot.command('lobotomy', async (ctx) => {
+    if (ctx.chat.type !== 'private') {
+        const admins = await ctx.getChatAdministrators();
+        if (!admins.some((a) => a.user.id === ctx.from?.id)) {
+            return ctx.reply('Эта команда только для администраторов чата');
+        }
+    }
+
     ctx.m.clear();
     ctx.m.getChat().notes = [];
+    ctx.m.getChat().memory = undefined;
     await ctx.reply('История очищена');
 });
 
@@ -73,10 +84,7 @@ bot.command('model', (ctx) => {
         !config.adminIds || !ctx.msg.from ||
         !config.adminIds.includes(ctx.msg.from.id)
     ) {
-        return ctx.reply(
-            'Not admin ' + ctx.msg.from?.id + ' ' +
-                JSON.stringify(config.adminIds),
-        );
+        return ctx.reply('Not bot admin ' + ctx.msg.from?.id);
     }
 
     const args = ctx.msg.text
@@ -100,7 +108,7 @@ bot.command('model', (ctx) => {
     return ctx.reply(`Model set to ${newModel}`);
 });
 
-bot.command('random', (ctx) => {
+bot.command('random', async (ctx) => {
     const args = ctx.msg.text
         .split(' ')
         .map((arg) => arg.trim())
@@ -116,6 +124,13 @@ bot.command('random', (ctx) => {
                 `Сейчас стоит \`${currentValue}\`%\n` +
                 '`/random default` - поставить значение по умолчанию',
         );
+    }
+
+    if (ctx.chat.type !== 'private') {
+        const admins = await ctx.getChatAdministrators();
+        if (!admins.some((a) => a.user.id === ctx.from?.id)) {
+            return ctx.reply('Эта команда только для администраторов чата');
+        }
     }
 
     const newValue = args[1];
@@ -136,13 +151,8 @@ bot.command('random', (ctx) => {
 });
 
 bot.command('summary', (ctx) => {
-    // Skip for private chats
-    if (ctx.msg.chat.type === 'private') {
-        return ctx.reply('Это только для групповых чатов');
-    }
-
     ctx.m.getChat().lastUse = Date.now();
-    const notes = ctx.m.getChat().notes;
+    const notes = ctx.m.getChat().notes.slice(-config.maxNotesToStore - 2);
 
     if (notes.length === 0) {
         return ctx.reply('Пока маловато сообщений прошло, сам прочитай');
@@ -158,6 +168,10 @@ bot.use(notes(config, bot.botInfo.id));
 // Decide if we should reply to user
 bot.on('message', (ctx, next) => {
     const msg = ctx.m.getLastMessage();
+
+    if (!msg) {
+        return;
+    }
 
     // Ignore if text is empty
     if (
@@ -175,6 +189,7 @@ bot.on('message', (ctx, next) => {
 
     // Direct message
     if (ctx.msg.chat.type === 'private') {
+        ctx.m.getChat().lastUse = Date.now();
         return next();
     }
 
@@ -200,6 +215,7 @@ bot.on('message', (ctx, next) => {
         !(msg.info.forward_origin?.type === 'user' &&
             msg.info.forward_origin.sender_user.id === bot.botInfo.id)
     ) {
+        ctx.m.getChat().lastUse = Date.now();
         logger.info("Replying because of mentioned bot's name");
         return next();
     }
@@ -288,19 +304,34 @@ bot.on('message', async (ctx) => {
 
     const messages: CoreMessage[] = [];
 
-    let prompt = config.ai.prePrompt;
+    let prompt = config.ai.prePrompt + '\n\n';
+    const savedHistory = ctx.m.getHistory();
+
+    // TODO: Improve this check
+    const isComments = savedHistory.some((m) =>
+        m.info.forward_origin?.type === 'channel' &&
+        m.info.from?.first_name === 'Telegram'
+    );
 
     if (ctx.chat.type === 'private') {
         if (config.ai.privateChatPromptAddition) {
-            prompt += '\n' +config.ai.privateChatPromptAddition;
+            prompt += config.ai.privateChatPromptAddition;
         }
+    } else if (isComments && config.ai.commentsPromptAddition) {
+        prompt += config.ai.commentsPromptAddition;
     } else if (config.ai.groupChatPromptAddition) {
-        prompt += '\n' + config.ai.groupChatPromptAddition;
+        prompt += config.ai.groupChatPromptAddition;
     }
+
+    if (ctx.m.getChat().hateMode && config.ai.hateModePrompt) {
+        prompt += '\n' + config.ai.hateModePrompt;
+    }
+
+    prompt += '\n\n';
 
     const character = ctx.m.getChat().character;
     if (character) {
-        prompt += character.description;
+        prompt += '### Character ###\n' + character.description;
     } else {
         prompt += config.ai.prompt;
     }
@@ -310,7 +341,7 @@ bot.on('message', async (ctx) => {
         content: prompt,
     });
 
-    let chatInfoMsg = `Date and time right now: ${new Date().toLocaleString()}`;
+    let chatInfoMsg = `Date and time right now: ${prettyDate()}`;
 
     if (ctx.chat.type === 'private') {
         chatInfoMsg +=
@@ -336,12 +367,15 @@ bot.on('message', async (ctx) => {
         chatInfoMsg += `\n\nChat notes:\n${ctx.m.getChat().notes.join('\n')}`;
     }
 
+    if (ctx.m.getChat().memory) {
+        chatInfoMsg +=
+            `\n\nMY OWN PERSONAL NOTES AND MEMORY:\n${ctx.m.getChat().memory}`;
+    }
+
     messages.push({
         role: 'assistant',
         content: chatInfoMsg,
     });
-
-    const savedHistory = ctx.m.getHistory();
 
     const messagesToPass = ctx.m.getChat().messagesToPass ??
         config.ai.messagesToPass;
@@ -384,8 +418,6 @@ bot.on('message', async (ctx) => {
 
     const time = new Date().getTime();
 
-    // console.log(messages.filter((_, i) => i < 5 || i > messages.length - 6));
-
     // TODO: Fix repeating replies
     let result;
     try {
@@ -406,6 +438,25 @@ bot.on('message', async (ctx) => {
     } catch (error) {
         logger.error('Could not get response: ', error);
 
+        if (error instanceof APICallError) {
+            if (error.responseBody) {
+                let err;
+
+                try {
+                    err = JSON.parse(error.responseBody);
+                } catch (error) {
+                    logger.error('Could not parse error response: ', error);
+                }
+
+                if (err?.promptFeedback?.blockReason) {
+                    return ctx.reply(
+                        'API провайдер запрещает тебе отвечать. Возможно это из-за персонажа: ' +
+                            err.promptFeedback.blockReason,
+                    );
+                }
+            }
+        }
+
         if (!ctx.info.isRandom) {
             await ctx.reply(getRandomNepon(config));
         }
@@ -420,11 +471,18 @@ bot.on('message', async (ctx) => {
 
     const name = ctx.chat.first_name ?? ctx.chat.title;
     const username = ctx.chat?.username ? `(@${ctx.chat.username})` : '';
+
+    // console.log(
+    //     messages
+    //         .filter((_, i) => (i < 3) || i > messages.length - 3)
+    //         .map((m) => formatReply(m, character))
+    //         .join('\n\n'),
+    // );
     logger.info(
         'Time to get response:',
         (new Date().getTime() - time) / 1000,
-        `for "${name}" ${username}. Response:`,
-        output,
+        `for "${name}" ${username}. Response:\n`,
+        formatReply(output, character),
     );
 
     let lastMsgId = null;
