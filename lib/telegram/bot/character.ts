@@ -454,7 +454,8 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         await ctx.api.sendMessage(
             chatId,
             `${ctx.from.first_name} установил персонажа ${character.name}.\n` +
-                `Имена в чате: ${chat.character.names.join(', ')}`,
+                `Имена в чате: ${chat.character.names.join(', ')}` +
+                '\n\nМожет иметь смысл стереть память (/lobotomy), если это мешает новому персонажу.',
             {
                 reply_markup: keyboard2,
             },

@@ -53,7 +53,7 @@ export default async function setupBot(config: Config, memory: Memory) {
     bot.on('message', (ctx, next) => {
         // Ignore opted out users and commands
         if (
-            ctx.m.getChat().optOutUsers.find((u) => u.id === ctx.from?.id)
+            ctx.m.getChat().optOutUsers.some((u) => u.id === ctx.from?.id)
         ) {
             return;
         }

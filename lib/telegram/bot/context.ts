@@ -4,7 +4,7 @@ import { Composer } from 'grammy';
 
 const bot = new Composer<SlushaContext>();
 
-bot.command('context', (ctx) => {
+bot.command('context', async (ctx) => {
     const textParts = ctx.msg.text.split(' ').map((arg) => arg.trim());
     const config = ctx.info.config;
 
@@ -18,6 +18,13 @@ bot.command('context', (ctx) => {
                 'Маленькие значения дают более точные ответы, большие значения улучшают память. Максимум 200.\n' +
                 `Текущее значение - ${currentValue}. Передай \`default\` чтобы вернуть количество сообщений по умолчанию (сейчас ${config.messagesToPass}, но может меняться с обновлениями)`,
         );
+    }
+
+    if (ctx.chat.type !== 'private') {
+        const admins = await ctx.getChatAdministrators();
+        if (!admins.some((a) => a.user.id === ctx.from?.id)) {
+            return ctx.reply('Эта команда только для администраторов чата');
+        }
     }
 
     if (textParts[1] === 'default') {
@@ -39,7 +46,12 @@ bot.command('context', (ctx) => {
 
     ctx.m.getChat().messagesToPass = count;
 
-    return ctx.reply(`Количество сообщений установлено на ${count}`);
+    let msg = `Количество сообщений должно быть от ${count}`;
+    if (count > 60) {
+        msg += '\n\n`TODO: запейволить большой контекст`';
+    }
+
+    return replyWithMarkdown(ctx, msg);
 });
 
 export default bot;

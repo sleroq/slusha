@@ -40,7 +40,9 @@ export interface BotCharacter extends Character {
 export interface Chat {
     notes: string[];
     lastNotes: number;
+    lastMemory: number;
     history: ChatMessage[];
+    memory?: string;
     lastUse: number;
     info: TgChat;
     chatModel?: string;
@@ -49,6 +51,7 @@ export interface Chat {
     members: Member[];
     messagesToPass?: number;
     randomReplyProbability?: number;
+    hateMode?: boolean;
 }
 
 export class Memory {
@@ -68,6 +71,7 @@ export class Memory {
             chat = {
                 notes: [],
                 lastNotes: 0,
+                lastMemory: 0,
                 history: [],
                 lastUse: Date.now(),
                 info: tgChat,
@@ -83,11 +87,6 @@ export class Memory {
 
     save() {
         const jsonData = JSON.stringify(this);
-
-        for (const chat of Object.values(this.chats)) {
-            this.chats[chat.info.id].optOutUsers = [];
-        }
-
         return Deno.writeTextFile('memory.json', jsonData);
     }
 }
@@ -173,7 +172,7 @@ export class ChatMemory {
         if (!chat.members) {
             return [];
         }
-        
+
         const activeMembers = chat.members.filter((m) =>
             m.lastUse > Date.now() - 1000 * 60 * 60 * 24 * days
         );

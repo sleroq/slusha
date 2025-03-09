@@ -255,13 +255,21 @@ async function constructMsg(
         }
 
         if (msg.info.forward_origin) {
-            prettyInputMessage += ` <forward from "${
-                JSON.stringify(msg.info.forward_origin)
-            }">`;
+            const prettyJsonObject = JSON.stringify(removeFieldsWithSuffixes(
+                msg.info.forward_origin,
+            ));
+
+            if (user.name === 'Telegram') {
+                prettyInputMessage +=
+                    ` <new post in the channel ${prettyJsonObject}>`;
+            } else {
+                prettyInputMessage += ` <forward from "${prettyJsonObject}">`;
+            }
         }
 
         if (msg.info.via_bot) {
-            prettyInputMessage += ` <this message content generated via bot @${msg.info.via_bot.username}>`;
+            prettyInputMessage +=
+                ` <this message content generated via bot @${msg.info.via_bot.username}>`;
         }
 
         if (msg.info.quote?.text) {
@@ -442,7 +450,17 @@ export async function makeNotesHistory(
             continue;
         }
 
-        const size = JSON.stringify(msgRes).length;
+        let content = msgRes.content;
+        if (Array.isArray(content) && 'text' in content[0]) {
+            content = content[0].text;
+        }
+
+        if (!content) {
+            logger.warn('Message content is empty: ', msgRes);
+            continue;
+        }
+
+        const size = JSON.stringify(content).length;
 
         if (totalBytes + size >= bytesLimit) {
             logger.info(
@@ -454,20 +472,10 @@ export async function makeNotesHistory(
             break;
         }
 
-        let content = msgRes.content;
-        if (Array.isArray(content) && 'text' in content[0]) {
-            content = content[0].text;
-        }
-
-        if (!content) {
-            logger.warn('Message content is empty: ', msgRes);
-            continue;
-        }
-
         textPart += content;
 
         if (i >= history.length - messagesLimit) {
-            textPart += '\n\n---\n\n';
+            textPart += '\n--- ---\n';
         }
 
         totalBytes += size;

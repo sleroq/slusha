@@ -6,6 +6,8 @@ import { ImagePart, supportedTypesMap } from './history.ts';
 import { exists } from '@std/fs';
 import { Message, PhotoSize, Sticker } from 'grammy_types';
 import { FileState, GoogleAIFileManager } from '@google/generative-ai/server';
+import { CoreMessage } from 'ai';
+import { BotCharacter } from './memory.ts';
 // import { encodeBase64 } from "@std/encoding/base64";
 
 export function getRandomInt(min: number, max: number) {
@@ -22,6 +24,55 @@ export function sliceMessage(message: string, maxLength: number): string {
     return message.length > maxLength
         ? message.slice(0, maxLength) + '...'
         : message;
+}
+
+export function splitMessage(message: string, maxLength = 3000) {
+    if (maxLength <= 0) {
+        throw new Error('Max length must be positive');
+    }
+
+    const parts: string[] = [];
+    let currentIndex = 0;
+
+    while (currentIndex < message.length) {
+        let endIndex = Math.min(currentIndex + maxLength, message.length);
+
+        // If we're not at the end of the message
+        if (endIndex < message.length) {
+            // First try to break at a newline for more natural splits
+            const lastNewline = message.lastIndexOf('\n', endIndex);
+
+            if (lastNewline > currentIndex) {
+                endIndex = lastNewline;
+            } else {
+                // If no newline found, look for the last space
+                const lastSpace = message.lastIndexOf(' ', endIndex);
+                if (lastSpace > currentIndex) {
+                    endIndex = lastSpace;
+                }
+                // If no space found, we'll force break at maxLength (default behavior)
+            }
+        }
+
+        // Extract the part and trim whitespace
+        const part = message.slice(currentIndex, endIndex).trim();
+
+        // Only add non-empty parts
+        if (part) {
+            parts.push(part);
+        }
+
+        // Move to next chunk
+        currentIndex = endIndex;
+        if (
+            currentIndex < message.length &&
+            (message[currentIndex] === ' ' || message[currentIndex] === '\n')
+        ) {
+            currentIndex++;
+        }
+    }
+
+    return parts;
 }
 
 const AI_TOKEN = Deno.env.get('AI_TOKEN');
@@ -118,6 +169,7 @@ export function chooseSize(photos: PhotoSize[]): PhotoSize {
 export async function deleteOldFiles(logger: Logger, maxAge: number) {
     const files = Deno.readDir('./tmp');
 
+    let deletedCount = 0;
     for await (const file of files) {
         const filePath = `./tmp/${file.name}`;
 
@@ -127,10 +179,17 @@ export async function deleteOldFiles(logger: Logger, maxAge: number) {
         const age = (Date.now() - mtime) / (1000 * 60 * 60);
 
         if (age > maxAge || stat.mtime === null) {
-            logger.info(`Deleting old file: ${file.name}`);
-            await Deno.remove(filePath);
+            try {
+                await Deno.remove(filePath);
+            } catch (error) {
+                logger.warn(`Failed to delete file: ${filePath}`, error);
+            }
+
+            deletedCount++;
         }
     }
+
+    logger.info(`Deleted ${deletedCount} files`);
 }
 
 export function getRandomNepon(config: Config) {
@@ -179,7 +238,7 @@ export function msgTypeSupported(msg: Message) {
  */
 export function removeFieldsWithSuffixes<T>(
     obj: T,
-    suffixes: string[] = ['id', 'size', 'thumbnail'],
+    suffixes: string[] = ['id', 'size', 'thumbnail', 'date'],
     // deno-lint-ignore no-explicit-any
 ): any {
     // Handle null or undefined
@@ -219,6 +278,23 @@ function escapeRegExp(s: string) {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+export function prettyDate() {
+    const options: Intl.DateTimeFormatOptions = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZone: 'Europe/Moscow',
+    };
+
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString('ru-RU', options);
+    return formattedDate;
+}
+
 // Create a more robust name matching function
 export function createNameMatcher(names: string[]) {
     // Process each name to handle special characters and create proper boundaries
@@ -229,4 +305,66 @@ export function createNameMatcher(names: string[]) {
     });
 
     return new RegExp(patterns.join('|'), 'gmi');
+}
+
+export function formatReply(
+    m: CoreMessage | { text: string; reply_to?: string }[],
+    char?: BotCharacter,
+) {
+    const charName = char?.name ?? 'Slusha';
+    let text = '';
+
+    let content;
+    if (!Array.isArray(m)) {
+        content = m.content;
+    } else {
+        content = m;
+    }
+
+    if (!('content' in m) || m.role === 'assistant') {
+        text += `${charName}:`;
+
+        if (Array.isArray(content)) {
+            content = content.map((c) => {
+                if ('text' in c) {
+                    return {
+                        ...c,
+                        text: '\n' + c.text,
+                    };
+                } else {
+                    return c;
+                }
+            });
+        }
+    }
+
+    if (!Array.isArray(content)) {
+        return '\n    ' + content.trim().replace(/\n/g, '\n    ');
+    }
+
+    text += content.map((c) => {
+        let res = '';
+
+        if (!('type' in c)) {
+            res = `    ${c.text}`;
+        } else {
+            switch (c.type) {
+                case 'text':
+                    res = c.text;
+                    break;
+                case 'image':
+                    res = `    image: ${c.image} (${c.mimeType})`;
+                    break;
+                case 'file':
+                    res = `    file: ${c.data} (${c.mimeType})`;
+                    break;
+                default:
+                    res = '';
+            }
+        }
+
+        return res.replace(/\n/g, '\n    ');
+    }).join('\n');
+
+    return text;
 }

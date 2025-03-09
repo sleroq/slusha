@@ -11,7 +11,7 @@ function formatOptOutUsers(users: OptOutUser[]) {
 
     message += users.map((u) => {
         if (u.username) {
-            return `<a href="https://t.me/${u.username}">${u.first_name}</a>`;
+            return `- <a href="https://t.me/${u.username}">${u.first_name}</a>`;
         } else {
             return u.first_name;
         }
@@ -44,13 +44,21 @@ bot.command('optout', (ctx) => {
     }
 
     return replyWithHTML(ctx, message, {
-        reply_markup: new InlineKeyboard().text('Вернуться', 'opt-in'),
+        reply_markup: new InlineKeyboard().text(
+            'Вернуться',
+            `opt-in ${ctx.from.id}`,
+        ),
         link_preview_options: {
             is_disabled: true,
         },
     });
 });
-bot.callbackQuery('opt-in', (ctx) => {
+
+bot.callbackQuery(/opt-in.*/, (ctx) => {
+    if (Number(ctx.callbackQuery.data.split(' ')[1]) !== ctx.from?.id) {
+        return ctx.answerCallbackQuery('Не твоя кнопка');
+    }
+
     return optIn(ctx, ctx.callbackQuery.from.id, false);
 });
 
