@@ -33,6 +33,7 @@
     "@ai-sdk/google": "npm:@ai-sdk/google@^1.1.17",
     "@deno-library/logger": "jsr:@deno-library/logger@^1.1.9",
     "grammy": "https://deno.land/x/grammy@v1.34.0/mod.ts",
+    "@grammyjs/runner": "https://deno.land/x/grammy_runner@v2.0.3/mod.ts",
     "grammy_types": "https://deno.land/x/grammy_types@v3.19.0/mod.ts",
     "isomorphic-dompurify": "npm:isomorphic-dompurify@^2.22.0",
     "ky": "https://esm.sh/ky@1.7.5",

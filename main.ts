@@ -2,6 +2,7 @@ import Werror from './lib/werror.ts';
 import logger from './lib/logger.ts';
 import resolveConfig, { Config, safetySettings } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
+import { run } from '@grammyjs/runner';
 import { loadMemory, ReplyTo } from './lib/memory.ts';
 
 import { APICallError, CoreMessage, generateText, Output } from 'ai';
@@ -603,7 +604,8 @@ bot.on('message', async (ctx) => {
     typing.abort();
 });
 
-void bot.start({ drop_pending_updates: config.dropPendingUpdates });
+run(bot);
+logger.info('Bot started');
 
 // TODO: Remind users about bot existence
 

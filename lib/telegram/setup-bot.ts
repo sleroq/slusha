@@ -2,6 +2,7 @@ import { Bot, Context } from 'grammy';
 import logger from '../logger.ts';
 import { Config } from '../config.ts';
 import { ChatMemory, Memory, ReplyTo } from '../memory.ts';
+import { sequentialize } from '@grammyjs/runner';
 
 interface RequestInfo {
     isRandom: boolean;
@@ -37,6 +38,13 @@ export default async function setupBot(config: Config, memory: Memory) {
             ctx: { ...error.ctx, m: undefined, memory: undefined },
         })
     );
+
+    // Make sure messages are handled sequentially
+    bot.use(sequentialize((ctx) => {
+        const chat = ctx.chat?.id.toString();
+        const user = ctx.from?.id.toString();
+        return [chat, user].filter((con) => con !== undefined);
+    }));
 
     bot.use((ctx, next) => {
         // Init custom context
