@@ -1,49 +1,7 @@
 import { Logger } from '@deno-library/logger';
 import { SlushaContext } from './setup-bot.ts';
 import { Message, ParseMode } from 'grammy_types';
-
-// Thanks cloud sonnet for this function hopefully it works
-function splitMessage(message: string, maxLength = 3000) {
-    // Input validation
-    if (!message || typeof message !== 'string') {
-        throw new Error('Message must be a non-empty string');
-    }
-    if (maxLength <= 0) {
-        throw new Error('Max length must be positive');
-    }
-
-    const parts = [];
-    let currentIndex = 0;
-
-    while (currentIndex < message.length) {
-        let endIndex = currentIndex + maxLength;
-
-        // If we're not at the end of the message
-        if (endIndex < message.length) {
-            // Look for the last space within the limit
-            const lastSpace = message.lastIndexOf(' ', endIndex);
-
-            // If we found a space within the limit, break at the space
-            if (lastSpace > currentIndex) {
-                endIndex = lastSpace;
-            }
-            // If no space found, force break at maxLength
-        }
-
-        // Extract the part and trim whitespace
-        const part = message.slice(currentIndex, endIndex).trim();
-
-        // Only add non-empty parts
-        if (part) {
-            parts.push(part);
-        }
-
-        // Move to next chunk
-        currentIndex = endIndex + 1;
-    }
-
-    return parts;
-}
+import { splitMessage } from '../helpers.ts';
 
 export async function replyGeneric<Other>(
     ctx: SlushaContext,
