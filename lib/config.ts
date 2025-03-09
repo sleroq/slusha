@@ -11,6 +11,7 @@ const configSchema = z.object({
     ai: z.object({
         model: z.string(),
         notesModel: z.string().optional(),
+        memoryModel: z.string().optional(),
         temperature: z.number(),
         topK: z.number(),
         topP: z.number(),
@@ -18,10 +19,15 @@ const configSchema = z.object({
         prompt: z.string(),
         privateChatPromptAddition: z.string().optional(),
         groupChatPromptAddition: z.string().optional(),
+        commentsPromptAddition: z.string().optional(),
+        hateModePrompt: z.string().optional(),
         finalPrompt: z.string(),
         notesPrompt: z.string(),
+        memoryPrompt: z.string(),
+        memoryPromptRepeat: z.string(),
         messagesToPass: z.number().default(5),
         notesFrequency: z.number().default(150),
+        memoryFrequency: z.number().default(50),
         messageMaxLength: z.number().default(4096),
         bytesLimit: z.number().default(20 * 1024 * 1024),
     }),
@@ -38,8 +44,8 @@ const configSchema = z.object({
     maxNotesToStore: z.number().default(5),
     maxMessagesToStore: z.number().default(100),
     chatLastUseNotes: z.number().default(3),
-    responseDelay: z.number().default(2),
-    dropPendingUpdates: z.boolean().default(true),
+    chatLastUseMemory: z.number().default(2),
+    responseDelay: z.number().default(1),
 });
 
 type SafetySettings = Exclude<

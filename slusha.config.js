@@ -44,6 +44,10 @@ export default {
 
     ai: {
         model: 'gemini-2.0-flash',
+        // notesModel is used for /summary command
+        notesModel: 'gemini-2.0-flash-lite',
+        // memoryModel: 'gemini-2.0-flash',
+        memoryModel: 'gemini-2.0-flash-thinking-exp-01-21',
         // prePromt is used with chub.ai prompts and with default prompt
         prePrompt,
         // prompt is default character, can be replaced with chub.ai prompts
@@ -51,13 +55,23 @@ export default {
         // privateChatPromptAddition is used after prePrompt with any character, but in private chats only
         privateChatPromptAddition,
         groupChatPromptAddition,
+        commentsPromptAddition,
+        hateModePrompt,
         notesPrompt,
+        memoryPrompt,
+        memoryPromptRepeat,
         finalPrompt,
-        temperature: 0.8,
-        topK: 60,
-        topP: 0.9,
-        messagesToPass: 20,
+
+        temperature: 0.9,
+        topK: 80,
+        topP: 0.95,
+
+        messagesToPass: 12,
+        notesFrequency: 190,
+        memoryFrequency: 150,
         messageMaxLength: 4096,
+
+        // Prompt limit in bytes (forced by api provider)
         bytesLimit: 20971520,
     },
 
@@ -66,6 +80,7 @@ export default {
         'шлюша',
         'слюща',
         'союша',
+        'слюш',
         'slusha',
         'слбша',
         'слюшенция',
@@ -81,7 +96,6 @@ export default {
     tendToReply: [
         'лучшая девочка',
         'лучший бот',
-        /\b(AI)\b/i,
     ],
 
     tendToReplyProbability: 50,
@@ -94,34 +108,34 @@ export default {
         'откисаю, попробуй позже',
     ],
 
-    randomReplyProbability: 1,
+    randomReplyProbability: 2,
 
     tendToIgnore: [
-        /^ор+/,
-        /^ору+/,
-        /(ха)+/,
-        /а(пх)+/,
-        /сука+/,
-        /^сук+/,
-        /ло+л/,
-        /еба+ть/,
-        /бля+ть/,
-        /^(не)?пон+/,
-        'хорошо',
-        /^гуд\b/,
-        /норм.*/,
-        /^ok$/gm,
-        /^ok$/gm,
-        'кек',
-        /ок.*/,
+        /^ор+/i,
+        /^ору+/i,
+        /(ха)+/i,
+        /а(пх)+/i,
+        /сука+/i,
+        /^сук+/i,
+        /ло+л/i,
+        /еба+ть/i,
+        /бля+ть/i,
+        /^(не)?пон+/i,
+        /хорошо/i,
+        /^гуд\b/i,
+        /норм.*/i,
+        /^ok$/igm,
+        /^ok$/igm,
+        /кек/i,
+        /ок/i,
         /^лан$/gm,
-        'ладно',
-        'спс',
-        /^да$/gm,
+        /ладно/i,
+        /спс/i,
+        /^да$/igm,
         /согласен$/gm,
-        /согласна$/gm,
-        /^баз/,
-        /реально$/gm,
+        /согласна$/gmi,
+        /^баз/i,
+        /реально$/gmi,
         /\/q.*/,
     ],
 
@@ -132,21 +146,21 @@ export default {
     adminIds: [
         308552322,
         855109381,
+        783255786,	
+        585847096,
     ],
 
-    maxNotesToStore: 5,
-    maxMessagesToStore: 100,
+    maxNotesToStore: 3,
+    maxMessagesToStore: 200,
 
     // Chats which don't use AI for more than chatLastUseNotes days
     // will not get updated summary every 50 messages
     chatLastUseNotes: 2,
 
+    chatLastUseMemory: 2,
+
     // Time in seconds after which bot will start typing
     // to prevent from replying on every message in media group
     // or give user time to finish prompt consisting of multiple messages
     responseDelay: 2,
-
-    // Drops pending messages if any when bot was down
-    // When false, bot will try respond to all of them at once so may hit AI proveder rate limit
-    dropPendingUpdates: false,
 }
