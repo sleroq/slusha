@@ -46,7 +46,7 @@ bot.command('context', async (ctx) => {
 
     ctx.m.getChat().messagesToPass = count;
 
-    let msg = `Количество сообщений должно быть от ${count}`;
+    let msg = `Количество сообщений установлено на ${count}`;
     if (count > 60) {
         msg += '\n\n`TODO: запейволить большой контекст`';
     }
