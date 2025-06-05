@@ -5,7 +5,7 @@ import { Logger } from '@deno-library/logger';
 import { ImagePart, supportedTypesMap } from './history.ts';
 import { exists } from '@std/fs';
 import { Message, PhotoSize, Sticker } from 'grammy_types';
-import { FileState, GoogleAIFileManager } from '@google/generative-ai/server';
+import { GoogleGenAI } from '@google/genai';
 import { CoreMessage } from 'ai';
 import { BotCharacter } from './memory.ts';
 // import { encodeBase64 } from "@std/encoding/base64";
@@ -81,25 +81,29 @@ if (!AI_TOKEN) {
     throw new Error('AI_TOKEN is required');
 }
 
-const fileManager = new GoogleAIFileManager(AI_TOKEN);
+const ai = new GoogleGenAI({ apiKey: AI_TOKEN });
 
 async function uploadToGoogle(path: string, name: string, mimeType: string) {
-    const uploadResult = await fileManager.uploadFile(path, {
-        mimeType,
-        displayName: name,
+    const fileData = await Deno.readFile(path);
+    const blob = new Blob([fileData], { type: mimeType });
+
+    const uploadResult = await ai.files.upload({
+        file: blob,
     });
 
-    let file = await fileManager.getFile(uploadResult.file.name);
-    while (file.state === FileState.PROCESSING) {
+    let file = uploadResult;
+    while (file.state === 'PROCESSING') {
         await new Promise((resolve) => setTimeout(resolve, 100));
-        file = await fileManager.getFile(uploadResult.file.name);
+        if (uploadResult.name) {
+            file = await ai.files.get({ name: uploadResult.name });
+        }
     }
 
-    if (file.state === FileState.FAILED) {
+    if (file.state === 'FAILED') {
         throw new Error('Audio processing failed.');
     }
 
-    return file.uri;
+    return file.uri || '';
 }
 
 export async function downloadFile(
