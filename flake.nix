@@ -7,60 +7,174 @@
   };
 
   outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
-      in
-      {
-        packages.default = pkgs.stdenv.mkDerivation rec {
-          pname = "slusha";
-          version = "0.1.0";
-          src = ./.;
+    let
+      buildSlusha = pkgs: pkgs.stdenv.mkDerivation rec {
+        pname = "slusha";
+        version = "0.1.0";
 
-          nativeBuildInputs = with pkgs; [
-            deno
-          ];
+        src = ./.;
 
-          buildPhase = ''
-            runHook preBuild
-            
-            # Cache dependencies first
-            deno cache main.ts
-            
-            # Compile to binary
-            deno compile --allow-all --output slusha main.ts
-            
-            runHook postBuild
-          '';
+        nativeBuildInputs = with pkgs; [
+          deno
+        ];
 
-          installPhase = ''
-            runHook preInstall
-            
-            mkdir -p $out/bin
-            cp slusha $out/bin/
-            
-            runHook postInstall
-          '';
+        buildPhase = ''
+          runHook preBuild
+          
+          # Cache dependencies first
+          deno cache main.ts
+          
+          # Compile to binary
+          deno compile --allow-all --output slusha main.ts
+          
+          runHook postBuild
+        '';
 
-          meta = with pkgs.lib; {
-            description = "A Telegram bot built with Deno and TypeScript";
-            homepage = "https://github.com/sleroq/slusha";
-            license = licenses.mit; # Adjust based on your actual license
-            maintainers = [ maintainers.sleroq or "sleroq" ];
-            platforms = platforms.linux ++ platforms.darwin;
+        installPhase = ''
+          runHook preInstall
+          
+          mkdir -p $out/bin
+          cp slusha $out/bin/
+          
+          runHook postInstall
+        '';
+
+        meta = with pkgs.lib; {
+          description = "A Telegram bot built with Deno and TypeScript";
+          homepage = "https://github.com/sleroq/slusha";
+          license = licenses.mit;
+          maintainers = [ ];
+          platforms = platforms.unix;
+        };
+      };
+    in
+    {
+      nixosModules.slusha = { config, lib, pkgs, ... }:
+        with lib;
+        let
+          cfg = config.services.slusha;
+        in {
+          options.services.slusha = {
+            enable = mkEnableOption "Slusha Telegram bot";
+
+            package = mkOption {
+              type = types.package;
+              default = buildSlusha pkgs;
+              description = "The slusha package to use";
+            };
+
+            user = mkOption {
+              type = types.str;
+              default = "slusha";
+              description = "User to run slusha as";
+            };
+
+            group = mkOption {
+              type = types.str;
+              default = "slusha";
+              description = "Group to run slusha as";
+            };
+
+            dataDir = mkOption {
+              type = types.str;
+              default = "/var/lib/slusha";
+              description = "Directory to store slusha data";
+            };
+
+            environmentFile = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description = "File containing environment variables";
+            };
+
+            configFile = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description = "Path to slusha configuration file";
+            };
+
+            configText = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description = "Slusha configuration as a string";
+            };
+
+            settings = mkOption {
+              type = types.attrs;
+              default = { };
+              description = "Environment variables for slusha";
+            };
           };
+
+          config = mkIf cfg.enable (
+            let
+              configFile = if cfg.configText != null then
+                pkgs.writeText "slusha.config.js" cfg.configText
+              else if cfg.configFile != null then
+                cfg.configFile
+              else
+                null;
+            in {
+              users.users.${cfg.user} = {
+                isSystemUser = true;
+                group = cfg.group;
+                home = cfg.dataDir;
+                createHome = true;
+              };
+
+              users.groups.${cfg.group} = { };
+
+              systemd.services.slusha = {
+                description = "Slusha Telegram bot";
+                wantedBy = [ "multi-user.target" ];
+                after = [ "network.target" ];
+
+                serviceConfig = {
+                  Type = "simple";
+                  User = cfg.user;
+                  Group = cfg.group;
+                  WorkingDirectory = cfg.dataDir;
+                  ExecStart = "${cfg.package}/bin/slusha";
+                  Restart = "always";
+                  RestartSec = "5s";
+
+                  NoNewPrivileges = true;
+                  PrivateTmp = true;
+                  ProtectSystem = "strict";
+                  ProtectHome = true;
+                  ReadWritePaths = [ cfg.dataDir ];
+                  ProtectKernelTunables = true;
+                  ProtectKernelModules = true;
+                  ProtectControlGroups = true;
+                } // lib.optionalAttrs (cfg.environmentFile != null) {
+                  EnvironmentFile = cfg.environmentFile;
+                };
+
+                environment = cfg.settings // {
+                  SLUSHA_DATA_DIR = cfg.dataDir;
+                } // lib.optionalAttrs (configFile != null) {
+                  SLUSHA_CONFIG_PATH = configFile;
+                };
+              };
+            }
+          );
         };
 
+      nixosModules.default = self.nixosModules.slusha;
+    } // flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+        slusha = buildSlusha pkgs;
+      in
+      {
+        packages.default = slusha;
+        packages.slusha = slusha;
+
         devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            deno
-            # Additional development tools
-            nodePackages.typescript-language-server
-            nodePackages.prettier
-          ];
+          buildInputs = with pkgs; [ deno ];
           
           shellHook = ''
-            echo "Slusha development environment"
+            echo "Welcome to Slusha development environment"
             echo "Deno version: $(deno --version | head -n1)"
             echo ""
             echo "Available commands:"
@@ -80,7 +194,9 @@
 
         apps.default = {
           type = "app";
-          program = "${self.packages.${system}.default}/bin/slusha";
+          program = "${slusha}/bin/slusha";
         };
+
+        formatter = pkgs.nixpkgs-fmt;
       });
 } 
