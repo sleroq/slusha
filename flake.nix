@@ -11,7 +11,10 @@
     let
       src = ./.;
 
-      # TODO: figure out how to do it properly, this is nonsense
+      # Cache all dependencies
+      # - deno install --entrypoint caches all deps including JSR metadata  
+      # - Pre-compile dummy script to cache denort runtime binary
+      # - dontStrip = true preserves embedded JS section in final binary
       cacheDeps = pkgs: pkgs.stdenv.mkDerivation {
         name = "deno-deps-cache";
         inherit src;
@@ -21,7 +24,6 @@
           export HOME=$(mktemp -d)
           export DENO_DIR=$HOME/.cache/deno
           
-          # Install all dependencies - this will cache npm packages and JSR packages
           deno install --allow-import --entrypoint main.ts
           
           # Pre-download the denort runtime binary by compiling a dummy script
@@ -32,9 +34,7 @@
 
         installPhase = ''
           mkdir -p $out
-          # Copy deno cache directory which contains all dependencies
           cp -r $HOME/.cache/deno $out/deno_cache
-          # Also copy vendor directory (created by vendor: true in deno.json)
           cp -r vendor $out/vendor
         '';
 
@@ -49,9 +49,10 @@
 
         inherit src;
 
+        dontStrip = true;
+
         nativeBuildInputs = with pkgs; [
           deno
-          autoPatchelfHook
           patchelf
         ];
 
@@ -63,16 +64,40 @@
           openssl
         ];
 
-        fixupPhase = ''
-          runHook preFixup
+        postFixup = ''
+          # Don't patch the binary at all - any ELF modification corrupts the embedded JS
+          # Instead, create a wrapper script that sets LD_LIBRARY_PATH
           
-          patchelf --replace-needed libdl.so.2 ${pkgs.glibc}/lib/libdl.so.2 $out/bin/slusha
-          patchelf --replace-needed librt.so.1 ${pkgs.glibc}/lib/librt.so.1 $out/bin/slusha
-          patchelf --replace-needed libpthread.so.0 ${pkgs.glibc}/lib/libpthread.so.0 $out/bin/slusha
-          patchelf --replace-needed libm.so.6 ${pkgs.glibc}/lib/libm.so.6 $out/bin/slusha
-          patchelf --replace-needed libc.so.6 ${pkgs.glibc}/lib/libc.so.6 $out/bin/slusha
+          echo "Original binary library dependencies:"
+          ldd $out/bin/slusha || true
           
-          runHook postFixup
+          mv $out/bin/slusha $out/bin/.slusha-wrapped
+          
+          # Create wrapper script that sets library path
+          cat > $out/bin/slusha << EOF
+#!/bin/bash
+# Set LD_LIBRARY_PATH to include nix store libraries
+export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ 
+  pkgs.stdenv.cc.cc.lib 
+  pkgs.glibc 
+  pkgs.libgcc 
+  pkgs.zlib 
+  pkgs.openssl 
+]}:\$LD_LIBRARY_PATH"
+
+# Execute the original binary
+exec "\$(dirname "\$0")/.slusha-wrapped" "\$@"
+EOF
+          
+          chmod +x $out/bin/slusha
+          
+          echo "Created wrapper script, testing..."
+          if $out/bin/slusha --version 2>&1 | grep -q "Could not find standalone binary section"; then
+            echo "ERROR: Binary still corrupted"
+            exit 1
+          else
+            echo "Wrapper script works correctly"
+          fi
         '';
 
         buildPhase = ''
@@ -84,6 +109,8 @@
           # Create cache directory and copy cached dependencies from cacheDeps
           mkdir -p $HOME/.cache
           cp -r ${cacheDeps pkgs}/deno_cache $DENO_DIR
+          
+          # Copy vendor directory from cacheDeps
           cp -r ${cacheDeps pkgs}/vendor ./vendor
           
           # TODO: remove --no-check
