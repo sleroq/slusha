@@ -7,12 +7,46 @@
   };
 
   outputs = { self, nixpkgs, flake-utils }:
+  
     let
+      src = ./.;
+
+      cacheDeps = pkgs: pkgs.stdenv.mkDerivation {
+        name = "deno-deps-cache";
+        inherit src;
+        buildInputs = [ pkgs.deno ];
+
+        buildPhase = ''
+          export HOME=$(mktemp -d)
+          export DENO_DIR=$HOME/.cache/deno
+          
+          # Install all dependencies
+          deno install --allow-import --entrypoint main.ts
+          
+          # Pre-download the denort runtime binary by compiling a dummy script
+          echo 'console.log("test");' > dummy.ts
+          deno compile --allow-all --output dummy dummy.ts || true
+          rm -f dummy dummy.ts
+        '';
+
+        installPhase = ''
+          mkdir -p $out
+          # Copy deno cache directory which contains all dependencies
+          cp -r $HOME/.cache/deno $out/deno_cache
+          cp -r vendor $out/vendor
+        '';
+
+        outputHashMode = "recursive";
+        outputHashAlgo = "sha256";
+        # This will need to be updated after first build
+        outputHash = "sha256-0VI5yfcIN1IPmlyCqpn9hO5D7KSkCmfb4t56TKDHN3k=";
+      };
+
       buildSlusha = pkgs: pkgs.stdenv.mkDerivation rec {
         pname = "slusha";
         version = "0.1.0";
 
-        src = ./.;
+        inherit src;
 
         nativeBuildInputs = with pkgs; [
           deno
@@ -21,11 +55,15 @@
         buildPhase = ''
           runHook preBuild
           
-          # Cache dependencies first
-          deno cache main.ts
+          export HOME=$(mktemp -d)
+          export DENO_DIR=$HOME/.cache/deno
           
-          # Compile to binary
-          deno compile --allow-all --output slusha main.ts
+          # Create cache directory and copy cached dependencies from cacheDeps
+          mkdir -p $HOME/.cache
+          cp -r ${cacheDeps pkgs}/deno_cache $DENO_DIR
+          cp -r ${cacheDeps pkgs}/vendor ./vendor
+          
+          deno compile --allow-all --no-check --cached-only --output slusha main.ts
           
           runHook postBuild
         '';
@@ -168,6 +206,7 @@
       in
       {
         packages.default = slusha;
+        packages.vendor = cacheDeps pkgs;
         packages.slusha = slusha;
 
         devShells.default = pkgs.mkShell {
