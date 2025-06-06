@@ -75,7 +75,8 @@
           
           # Create wrapper script that sets library path
           cat > $out/bin/slusha << EOF
-#!/bin/bash
+#!${pkgs.bash}/bin/bash
+set -e
 # Set LD_LIBRARY_PATH to include nix store libraries
 export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ 
   pkgs.stdenv.cc.cc.lib 
@@ -224,7 +225,7 @@ EOF
                   User = cfg.user;
                   Group = cfg.group;
                   WorkingDirectory = cfg.dataDir;
-                  ExecStart = "${cfg.package}/bin/slusha";
+                  ExecStart = "${pkgs.bash}/bin/bash ${cfg.package}/bin/slusha";
                   Restart = "always";
                   RestartSec = "5s";
 
@@ -258,7 +259,6 @@ EOF
       in
       {
         packages.default = slusha;
-        packages.vendor = cacheDeps pkgs;
         packages.slusha = slusha;
 
         devShells.default = pkgs.mkShell {
