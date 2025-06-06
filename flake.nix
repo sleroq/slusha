@@ -21,7 +21,7 @@
           export HOME=$(mktemp -d)
           export DENO_DIR=$HOME/.cache/deno
           
-          # Install all dependencies
+          # Install all dependencies - this will cache npm packages and JSR packages
           deno install --allow-import --entrypoint main.ts
           
           # Pre-download the denort runtime binary by compiling a dummy script
@@ -34,6 +34,7 @@
           mkdir -p $out
           # Copy deno cache directory which contains all dependencies
           cp -r $HOME/.cache/deno $out/deno_cache
+          # Also copy vendor directory (created by vendor: true in deno.json)
           cp -r vendor $out/vendor
         '';
 
@@ -50,7 +51,29 @@
 
         nativeBuildInputs = with pkgs; [
           deno
+          autoPatchelfHook
+          patchelf
         ];
+
+        buildInputs = with pkgs; [
+          stdenv.cc.cc.lib
+          glibc
+          libgcc
+          zlib
+          openssl
+        ];
+
+        fixupPhase = ''
+          runHook preFixup
+          
+          patchelf --replace-needed libdl.so.2 ${pkgs.glibc}/lib/libdl.so.2 $out/bin/slusha
+          patchelf --replace-needed librt.so.1 ${pkgs.glibc}/lib/librt.so.1 $out/bin/slusha
+          patchelf --replace-needed libpthread.so.0 ${pkgs.glibc}/lib/libpthread.so.0 $out/bin/slusha
+          patchelf --replace-needed libm.so.6 ${pkgs.glibc}/lib/libm.so.6 $out/bin/slusha
+          patchelf --replace-needed libc.so.6 ${pkgs.glibc}/lib/libc.so.6 $out/bin/slusha
+          
+          runHook postFixup
+        '';
 
         buildPhase = ''
           runHook preBuild
