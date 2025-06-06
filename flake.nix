@@ -11,6 +11,7 @@
     let
       src = ./.;
 
+      # TODO: figure out how to do it properly, this is nonsense
       cacheDeps = pkgs: pkgs.stdenv.mkDerivation {
         name = "deno-deps-cache";
         inherit src;
@@ -38,7 +39,6 @@
 
         outputHashMode = "recursive";
         outputHashAlgo = "sha256";
-        # This will need to be updated after first build
         outputHash = "sha256-0VI5yfcIN1IPmlyCqpn9hO5D7KSkCmfb4t56TKDHN3k=";
       };
 
@@ -63,6 +63,8 @@
           cp -r ${cacheDeps pkgs}/deno_cache $DENO_DIR
           cp -r ${cacheDeps pkgs}/vendor ./vendor
           
+          # TODO: remove --no-check
+          # TODO: remove --allow-all
           deno compile --allow-all --no-check --cached-only --output slusha main.ts
           
           runHook postBuild
