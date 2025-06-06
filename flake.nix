@@ -11,10 +11,7 @@
     let
       src = ./.;
 
-      # Cache all dependencies
-      # - deno install --entrypoint caches all deps including JSR metadata  
-      # - Pre-compile dummy script to cache denort runtime binary
-      # - dontStrip = true preserves embedded JS section in final binary
+      # Cache all dependencies for faster builds
       cacheDeps = pkgs: pkgs.stdenv.mkDerivation {
         name = "deno-deps-cache";
         inherit src;
@@ -24,12 +21,8 @@
           export HOME=$(mktemp -d)
           export DENO_DIR=$HOME/.cache/deno
           
+          # Cache all dependencies
           deno install --allow-import --entrypoint main.ts
-          
-          # Pre-download the denort runtime binary by compiling a dummy script
-          echo 'console.log("test");' > dummy.ts
-          deno compile --allow-all --output dummy dummy.ts || true
-          rm -f dummy dummy.ts
         '';
 
         installPhase = ''
@@ -40,7 +33,7 @@
 
         outputHashMode = "recursive";
         outputHashAlgo = "sha256";
-        outputHash = "sha256-0VI5yfcIN1IPmlyCqpn9hO5D7KSkCmfb4t56TKDHN3k=";
+        outputHash = "sha256-fgudcMR6PEQkSm9qfnWxpxevyhULxTI3iFuFqzQ0IX4=";
       };
 
       buildSlusha = pkgs: pkgs.stdenv.mkDerivation rec {
@@ -49,57 +42,7 @@
 
         inherit src;
 
-        dontStrip = true;
-
-        nativeBuildInputs = with pkgs; [
-          deno
-          patchelf
-        ];
-
-        buildInputs = with pkgs; [
-          stdenv.cc.cc.lib
-          glibc
-          libgcc
-          zlib
-          openssl
-        ];
-
-        postFixup = ''
-          # Don't patch the binary at all - any ELF modification corrupts the embedded JS
-          # Instead, create a wrapper script that sets LD_LIBRARY_PATH
-          
-          echo "Original binary library dependencies:"
-          ldd $out/bin/slusha || true
-          
-          mv $out/bin/slusha $out/bin/.slusha-wrapped
-          
-          # Create wrapper script that sets library path
-          cat > $out/bin/slusha << EOF
-#!${pkgs.bash}/bin/bash
-set -e
-# Set LD_LIBRARY_PATH to include nix store libraries
-export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ 
-  pkgs.stdenv.cc.cc.lib 
-  pkgs.glibc 
-  pkgs.libgcc 
-  pkgs.zlib 
-  pkgs.openssl 
-]}:\$LD_LIBRARY_PATH"
-
-# Execute the original binary
-exec "\$(dirname "\$0")/.slusha-wrapped" "\$@"
-EOF
-          
-          chmod +x $out/bin/slusha
-          
-          echo "Created wrapper script, testing..."
-          if $out/bin/slusha --version 2>&1 | grep -q "Could not find standalone binary section"; then
-            echo "ERROR: Binary still corrupted"
-            exit 1
-          else
-            echo "Wrapper script works correctly"
-          fi
-        '';
+        nativeBuildInputs = with pkgs; [ deno ];
 
         buildPhase = ''
           runHook preBuild
@@ -107,16 +50,10 @@ EOF
           export HOME=$(mktemp -d)
           export DENO_DIR=$HOME/.cache/deno
           
-          # Create cache directory and copy cached dependencies from cacheDeps
+          # Copy cached dependencies
           mkdir -p $HOME/.cache
           cp -r ${cacheDeps pkgs}/deno_cache $DENO_DIR
-          
-          # Copy vendor directory from cacheDeps
           cp -r ${cacheDeps pkgs}/vendor ./vendor
-          
-          # TODO: remove --no-check
-          # TODO: remove --allow-all
-          deno compile --allow-all --no-check --cached-only --output slusha main.ts
           
           runHook postBuild
         '';
@@ -125,7 +62,38 @@ EOF
           runHook preInstall
           
           mkdir -p $out/bin
-          cp slusha $out/bin/
+          mkdir -p $out/share/slusha
+          
+          # Copy source code and dependencies
+          cp -r . $out/share/slusha/
+          cp -r $DENO_DIR $out/share/slusha/.deno_cache
+          
+          # Create wrapper script
+          cat > $out/bin/slusha << EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Set up Deno cache directory
+export DENO_DIR="\$HOME/.cache/deno"
+mkdir -p "\$DENO_DIR"
+
+# Copy cached dependencies if cache is empty
+if [ ! -d "\$DENO_DIR/deps" ]; then
+  cp -r "$out/share/slusha/.deno_cache"/* "\$DENO_DIR/" 2>/dev/null || true
+fi
+
+# Create a temporary working directory
+WORK_DIR="\$(mktemp -d)"
+cd "\$WORK_DIR"
+
+# Copy necessary files to working directory
+cp -r "$out/share/slusha"/* .
+
+# Run the application
+exec ${pkgs.deno}/bin/deno run --allow-all --cached-only main.ts "\$@"
+EOF
+          
+          chmod +x $out/bin/slusha
           
           runHook postInstall
         '';
@@ -225,10 +193,11 @@ EOF
                   User = cfg.user;
                   Group = cfg.group;
                   WorkingDirectory = cfg.dataDir;
-                  ExecStart = "${pkgs.bash}/bin/bash ${cfg.package}/bin/slusha";
+                  ExecStart = "${cfg.package}/bin/slusha";
                   Restart = "always";
                   RestartSec = "5s";
 
+                  # Security settings
                   NoNewPrivileges = true;
                   PrivateTmp = true;
                   ProtectSystem = "strict";
