@@ -13,6 +13,7 @@
       ]
     }
   },
+  "vendor": true,
   "fmt": {
     "include": [
       "*.ts",
@@ -29,19 +30,19 @@
     "@google/genai": "npm:@google/genai@^1.4.0",
     "@std/assert": "jsr:@std/assert@^1.0.13",
     "@std/encoding": "jsr:@std/encoding@^1.0.10",
+    "@std/fs": "jsr:@std/fs@^1.0.18",
     "ai": "npm:ai@^4.1.46",
     "@ai-sdk/google": "npm:@ai-sdk/google@^1.1.17",
-    "@deno-library/logger": "jsr:@deno-library/logger@^1.1.9",
+    "@deno-library/logger": "jsr:@deno-library/logger@^1.2.0",
     "grammy": "https://deno.land/x/grammy@v1.36.3/mod.ts",
     "@grammyjs/runner": "https://deno.land/x/grammy_runner@v2.0.3/mod.ts",
-    "grammy_types": "https://deno.land/x/grammy_types@v3.19.0/mod.ts",
+    "grammy_types": "https://deno.land/x/grammy_types@v3.20.0/mod.ts",
     "isomorphic-dompurify": "npm:isomorphic-dompurify@^2.22.0",
-    "ky": "https://esm.sh/ky@1.7.5",
+    "ky": "npm:ky@^1.7.2",
     "grammy_ratelimiter": "https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts",
     "remark-html": "npm:remark-html@^16.0.1",
     "remark-parse": "npm:remark-parse@^11.0.0",
     "unified": "npm:unified@^11.0.5",
-    "zod": "https://deno.land/x/zod@v3.23.8/mod.ts",
-    "@std/fs": "jsr:@std/fs@^1.0.18"
+    "zod": "npm:zod@^3.23.8"
   }
 }
