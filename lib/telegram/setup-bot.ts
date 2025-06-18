@@ -19,13 +19,14 @@ export type SlushaContext = Context & {
 // TODO: Maybe derive from bot info somehow?
 const commands = [
     '/optout',
-    '/optin',
     '/context',
     '/model',
     '/lobotomy',
     '/random',
     '/summary',
 ];
+
+const startDate = new Date();
 
 export default async function setupBot(config: Config, memory: Memory) {
     Deno.mkdir('./tmp', { recursive: true });
@@ -59,9 +60,26 @@ export default async function setupBot(config: Config, memory: Memory) {
 
     // TODO: Save other message types, like special events
     bot.on('message', (ctx, next) => {
+        // Filter out old messages (1 minute)
+        if (ctx.msg.date - startDate.getTime() / 1000 < 1) {
+            console.log(
+                'Skipping old message',
+                ctx.msg.date,
+                startDate.getTime() / 1000,
+            );
+            return;
+        } else {
+            console.log(
+                'Processing message',
+                ctx.msg.date,
+                startDate.getTime() / 1000,
+            );
+        }
+
         // Ignore opted out users and commands
         if (
-            ctx.m.getChat().optOutUsers.some((u) => u.id === ctx.from?.id)
+            ctx.m.getChat().optOutUsers.some((u) => u.id === ctx.from?.id) &&
+            !ctx.msg.text?.startsWith('/optin')
         ) {
             return;
         }

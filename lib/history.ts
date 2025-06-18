@@ -9,7 +9,7 @@ import {
 } from './helpers.ts';
 import { ChatMessage, ReplyTo } from './memory.ts';
 import { Message } from 'grammy_types';
-import { Logger } from 'jsr:@deno-library/logger';
+import { Logger } from '@deno-library/logger';
 import logger from './logger.ts';
 
 export interface FileContent {
@@ -73,11 +73,11 @@ function resolveReplyThread(
 type PrintType = (name: keyof Message, msg: Message) => string;
 
 function getAttachmentDefault(name: keyof Message) {
-    return `"${name}": true`;
+    return `"${String(name)}": true`;
 }
 
 function getStickerAttachment(name: keyof Message, msg: Message) {
-    return `"${name}": { "emoji": "${msg.sticker?.emoji}" }`;
+    return `"${String(name)}": { "emoji": "${msg.sticker?.emoji}" }`;
 }
 
 export const supportedTypesMap = new Map<keyof Message, PrintType>([
@@ -192,7 +192,7 @@ async function constructMsg(
                 const prettyJsonObject = removeFieldsWithSuffixes(
                     msg.info[type],
                 );
-                text += `\n"${type}": ${JSON.stringify(prettyJsonObject)}`;
+                text += `\n"${String(type)}": ${JSON.stringify(prettyJsonObject)}`;
             }
         }
     }

@@ -1,4 +1,4 @@
-import { Logger } from 'jsr:@deno-library/logger';
+import { Logger } from '@deno-library/logger';
 
 const logger = new Logger();
 await logger.initFileLogger('log', { rotate: true });

@@ -604,7 +604,12 @@ bot.on('message', async (ctx) => {
     typing.abort();
 });
 
-run(bot);
+run(bot, {
+    runner: {
+        // @ts-expect-error TODO: Seems to work
+        drop_pending_updates: true,
+    },
+});
 logger.info('Bot started');
 
 // TODO: Remind users about bot existence
