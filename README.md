@@ -33,6 +33,12 @@ Smartest girl in telegram.
   </details>
 - Extensive per-chat configuration
 - Undertanding of Telegram-specific features, like reply threads, via bot messages, quotes and forwards
+- <details>
+    <summary>
+      Optional AI telemetry for debugging and cost/prompt review
+    </summary>
+    <img src="https://share.cum.army/u/YQEHu9.png" alt="Langfuse screenshot">
+  </details>
 
 ## Requirements
 
@@ -49,4 +55,20 @@ Smartest girl in telegram.
 
 ```bash
 scripts/run.bash
+```
+
+## Docker Production
+
+```bash
+# Build and run
+docker build -t slusha-bot .
+docker run -d \
+  --name slusha-bot \
+  --restart unless-stopped \
+  -e BOT_TOKEN=your_bot_token \
+  -e AI_TOKEN=your_ai_token \
+  slusha-bot
+
+# Using Docker Compose
+docker-compose --profile production up -d slusha-prod
 ```
