@@ -9,5 +9,5 @@ source ./scripts/env.bash
 trap 'break' SIGINT
 
 while true; do
-    deno run --allow-net --allow-env --allow-write --allow-read --allow-import main.ts
+    deno run --allow-net --allow-env --allow-write --allow-read --allow-import --allow-sys main.ts
 done

@@ -33,6 +33,16 @@ import notes from './lib/telegram/bot/notes.ts';
 import { makeHistoryV2 } from './lib/history.ts';
 import z from 'zod';
 import contextCommand from './lib/telegram/bot/context.ts';
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+import { LangfuseExporter } from 'langfuse-vercel';
+
+const sdk = new NodeSDK({
+  traceExporter: new LangfuseExporter(),
+  instrumentations: [getNodeAutoInstrumentations()],
+});
+
+sdk.start();
 
 let config: Config;
 try {
@@ -438,13 +448,21 @@ bot.on('message', async (ctx) => {
 
     const time = new Date().getTime();
 
+    const tags = ['user-message'];
+    if (ctx.chat.type === 'private') {
+        tags.push('private');
+    }
+
+    if (ctx.info.isRandom) {
+        tags.push('random');
+    }
+
     // TODO: Fix repeating replies
     let result;
     try {
         result = await generateText({
             model: google(model, { safetySettings }),
             experimental_output: Output.object({
-                // @ts-expect-error TODO: Fix types
                 schema: z.array(z.object({
                     text: z.string(),
                     reply_to: z.string().optional(),
@@ -454,6 +472,15 @@ bot.on('message', async (ctx) => {
             topK: config.ai.topK,
             topP: config.ai.topP,
             messages,
+            experimental_telemetry: {
+                isEnabled: true,
+                functionId: 'user-message',
+                metadata: {
+                    sessionId: ctx.chat.id.toString(),
+                    userId: ctx.chat.type === 'private' ? ctx.from?.id.toString() : '',
+                    tags,
+                },
+            },
         });
     } catch (error) {
         logger.error('Could not get response: ', error);
@@ -633,6 +660,12 @@ setInterval(async () => {
 }, 60 * 60 * 1000);
 
 async function gracefulShutdown() {
+    try {
+        await sdk.shutdown();
+    } catch (error) {
+        logger.error('Could not shutdown SDK: ', error);
+    }
+
     try {
         await memory.save();
         logger.info('Memory saved on exit');

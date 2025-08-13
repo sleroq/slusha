@@ -403,7 +403,6 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         namesResult = await generateText({
             model: google(model, { safetySettings }),
             experimental_output: Output.object({
-                // @ts-expect-error TODO: Fix types
                 schema: z.array(z.string()),
             }),
             temperature: config.temperature,
@@ -414,6 +413,14 @@ bot.callbackQuery(/set.*/, async (ctx) => {
                 'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.\n' +
                 'Пример: имя "Cute Slusha". Варианты: ["Cute Slusha", "Slusha", "Слюша", "слюшаня", "слюшка", "шлюша", "слюш"]\n' +
                 'Пример: имя "Георгий". Варианты: ["Георгий", "Georgie", "George", "Geordie", "Geo", "Егор", "Герасим", "Жора", "Жорка", "Жорочка", "Гоша", "Гошенька", "Гера", "Герочка", "Гога"]',
+            experimental_telemetry: {
+                isEnabled: true,
+                functionId: 'character-names',
+                metadata: {
+                    sessionId: chatId,
+                    tags: ['character'],
+                },
+            },
         });
     } catch (error) {
         logger.error(error, 'Error getting names for character');

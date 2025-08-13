@@ -13,7 +13,6 @@
       ]
     }
   },
-  "vendor": true,
   "fmt": {
     "include": [
       "*.ts",
@@ -26,8 +25,11 @@
     "singleQuote": true,
     "proseWrap": "preserve"
   },
+  "nodeModulesDir": "auto",
   "imports": {
     "@google/genai": "npm:@google/genai@^1.4.0",
+    "@opentelemetry/auto-instrumentations-node": "npm:@opentelemetry/auto-instrumentations-node@^0.62.0",
+    "@opentelemetry/sdk-node": "npm:@opentelemetry/sdk-node@^0.203.0",
     "@std/assert": "jsr:@std/assert@^1.0.13",
     "@std/encoding": "jsr:@std/encoding@^1.0.10",
     "@std/fs": "jsr:@std/fs@^1.0.18",
@@ -40,6 +42,7 @@
     "isomorphic-dompurify": "npm:isomorphic-dompurify@^2.22.0",
     "ky": "npm:ky@^1.7.2",
     "grammy_ratelimiter": "https://deno.land/x/grammy_ratelimiter@v1.2.0/mod.ts",
+    "langfuse-vercel": "npm:langfuse-vercel@^3.38.4",
     "remark-html": "npm:remark-html@^16.0.1",
     "remark-parse": "npm:remark-parse@^11.0.0",
     "unified": "npm:unified@^11.0.5",
