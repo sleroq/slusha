@@ -1,0 +1,14 @@
+services:
+  slusha:
+    image: slusha:latest
+    container_name: slusha
+    environment:
+      - DENO_ENV=production
+      - BOT_TOKEN=${BOT_TOKEN}
+      - AI_TOKEN=${AI_TOKEN}
+    volumes:
+      - ./memory.json:/app/memory.json:Z
+      - ./slusha.config.js:/app/slusha.config.js:ro,Z
+      - ./tmp:/app/tmp:Z
+      - ./log:/app/log:Z
+    restart: unless-stopped

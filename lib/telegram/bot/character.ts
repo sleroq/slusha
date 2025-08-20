@@ -401,7 +401,8 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     let namesResult;
     try {
         namesResult = await generateText({
-            model: google(model, { safetySettings }),
+            model: google(model),
+            providerOptions: { google: { safetySettings } },
             experimental_output: Output.object({
                 schema: z.array(z.string()),
             }),

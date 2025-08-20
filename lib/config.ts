@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { GoogleGenerativeAIProvider } from '@ai-sdk/google';
 
 function isValidRegex(val: unknown): val is RegExp {
     if (val instanceof RegExp) return true;
@@ -48,12 +47,7 @@ const configSchema = z.object({
     responseDelay: z.number().default(1),
 });
 
-type SafetySettings = Exclude<
-    Parameters<GoogleGenerativeAIProvider>[1],
-    undefined
->['safetySettings'];
-
-export const safetySettings: SafetySettings = [
+export const safetySettings: Array<{ category: string; threshold: string }> = [
     {
         category: 'HARM_CATEGORY_HARASSMENT',
         threshold: 'BLOCK_NONE',
@@ -74,10 +68,10 @@ export const safetySettings: SafetySettings = [
 
 export type UserConfig = z.infer<typeof configSchema>;
 
-const config = configSchema.merge(z.object({
+const config = configSchema.extend({
     botToken: z.string(),
     aiToken: z.string(),
-}));
+});
 
 export type Config = z.infer<typeof config>;
 

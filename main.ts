@@ -5,7 +5,7 @@ import setupBot from './lib/telegram/setup-bot.ts';
 import { run } from '@grammyjs/runner';
 import { loadMemory, ReplyTo } from './lib/memory.ts';
 
-import { APICallError, CoreMessage, generateText, Output } from 'ai';
+import { APICallError, generateText, Output } from 'ai';
 import { google } from '@ai-sdk/google';
 
 import {
@@ -461,7 +461,8 @@ bot.on('message', async (ctx) => {
     let result;
     try {
         result = await generateText({
-            model: google(model, { safetySettings }),
+            model: google(model),
+            providerOptions: { google: { safetySettings } },
             experimental_output: Output.object({
                 schema: z.array(z.object({
                     text: z.string(),

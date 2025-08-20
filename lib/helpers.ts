@@ -6,7 +6,7 @@ import { ImagePart, supportedTypesMap } from './history.ts';
 import { exists } from '@std/fs';
 import { Message, PhotoSize, Sticker } from 'grammy_types';
 import { GoogleGenAI } from '@google/genai';
-import { CoreMessage } from 'ai';
+import { ModelMessage } from 'ai';
 import { BotCharacter } from './memory.ts';
 // import { encodeBase64 } from "@std/encoding/base64";
 
@@ -312,7 +312,7 @@ export function createNameMatcher(names: string[]) {
 }
 
 export function formatReply(
-    m: CoreMessage | { text: string; reply_to?: string }[],
+    m: ModelMessage | { text: string; reply_to?: string }[],
     char?: BotCharacter,
 ) {
     const charName = char?.name ?? 'Slusha';

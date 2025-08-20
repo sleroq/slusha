@@ -379,11 +379,11 @@ export async function makeHistoryV2(
             const size = JSON.stringify(msgRes).length;
 
             if (totalBytes + size >= bytesLimit) {
-                logger.info(
-                    `Skipping old messages because prompt is too big ${size} (${
-                        totalBytes + size
-                    } > ${bytesLimit})`,
-                );
+                // logger.info(
+                //     `Skipping old messages because prompt is too big ${size} (${
+                //         totalBytes + size
+                //     } > ${bytesLimit})`,
+                // );
                 break;
             }
 

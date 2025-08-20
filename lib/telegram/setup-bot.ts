@@ -69,11 +69,11 @@ export default async function setupBot(config: Config, memory: Memory) {
             );
             return;
         } else {
-            console.log(
-                'Processing message',
-                ctx.msg.date,
-                startDate.getTime() / 1000,
-            );
+            // console.log(
+            //     'Processing message',
+            //     ctx.msg.date,
+            //     startDate.getTime() / 1000,
+            // );
         }
 
         // Ignore opted out users and commands
