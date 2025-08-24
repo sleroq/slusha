@@ -1,6 +1,6 @@
 import ky from 'ky';
 
-export interface CharacterResult {
+interface CharacterResult {
     id: number;
     name: string;
     fullPath: string;
@@ -22,11 +22,10 @@ export interface CharacterResult {
     related_lorebooks: number[];
     related_prompts: number[];
     related_extensions: number[];
-    forks: number[];
     hasGallery: boolean;
     nChats: number;
     nMessages: number;
-    definition: string;
+    definition: number;
     permissions: string;
     is_public: boolean;
     is_favorite: boolean;
@@ -35,11 +34,15 @@ export interface CharacterResult {
     n_favorites: number;
     is_unlisted: boolean;
     avatar_url: string;
-    bound_preset: string;
-    project_uuid: string;
+    max_res_url: string;
+    bound_preset: number;
+    project_uuid: number;
+    voice_id: number;
     verified: boolean;
     recommended: boolean;
     ratings_disabled: boolean;
+    lang_id: number;
+    badges: unknown[];
 }
 
 interface Label {
@@ -48,7 +51,10 @@ interface Label {
 }
 
 export interface SearchResult {
-    nodes: CharacterResult[];
+    data: {
+        count: number;
+        nodes: CharacterResult[];
+    };
 }
 
 export const pageSize = 20;
@@ -101,9 +107,7 @@ export async function getCharacters(query = '', page = 1, excludeNsfw = true) {
         },
     }).json<SearchResult>();
 
-    console.log(results);
-
-    return results.nodes;
+    return results.data.nodes;
 }
 
 interface Extensions {
