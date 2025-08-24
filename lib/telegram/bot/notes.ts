@@ -1,6 +1,6 @@
 import { Composer } from 'grammy';
 import { google } from 'npm:@ai-sdk/google';
-import { CoreMessage, generateText } from 'npm:ai';
+import { generateText, ModelMessage } from 'npm:ai';
 import { Config, safetySettings } from '../../config.ts';
 import logger from '../../logger.ts';
 import { SlushaContext } from '../setup-bot.ts';
@@ -37,7 +37,7 @@ export default function notes(config: Config, botId: number) {
 
             const characterName = ctx.m.getChat().character?.name;
 
-            let context: CoreMessage[] = [];
+            let context: ModelMessage[] = [];
             try {
                 context = await makeNotesHistory(
                     { token: config.botToken, id: botId },
@@ -59,7 +59,7 @@ export default function notes(config: Config, botId: number) {
             const model = config.ai.notesModel ?? config.ai.model;
             const prompt = config.ai.notesPrompt;
 
-            const messages: CoreMessage[] = [
+            const messages: ModelMessage[] = [
                 {
                     role: 'system',
                     content: prompt,
@@ -171,7 +171,7 @@ export default function notes(config: Config, botId: number) {
             const characterName = ctx.m.getChat().character?.name;
             const savedHistory = ctx.m.getHistory();
 
-            let context: CoreMessage[] = [];
+            let context: ModelMessage[] = [];
             try {
                 context = await makeNotesHistory(
                     { token: config.botToken, id: botId },
@@ -257,7 +257,7 @@ export default function notes(config: Config, botId: number) {
 
             const model = config.ai.memoryModel ?? config.ai.model;
 
-            const messages: CoreMessage[] = [
+            const messages: ModelMessage[] = [
                 {
                     role: 'system',
                     content: prompt,

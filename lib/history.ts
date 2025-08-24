@@ -1,5 +1,5 @@
 import { Api, RawApi } from 'grammy';
-import { CoreMessage } from 'npm:ai';
+import { ModelMessage, UserContent } from 'npm:ai';
 import {
     chooseSize,
     downloadFile,
@@ -166,7 +166,7 @@ async function constructMsg(
     botInfo: { token: string; id: number },
     msg: ChatMessage,
     options: ConstructMsgOptions,
-): Promise<CoreMessage> {
+): Promise<ModelMessage> {
     const { symbolLimit, characterName } = options;
     const attachAttachments = options.attachments;
 
@@ -201,7 +201,7 @@ async function constructMsg(
         throw new Error('Message is not supported');
     }
 
-    const parts: MessageContent = [];
+    const parts: UserContent = [];
 
     let username = msg.info.from?.username;
     if (username) {
@@ -291,7 +291,7 @@ async function constructMsg(
     });
 
     if (attachAttachments && role === 'user') {
-        let attachments: MessageContent = [];
+        let attachments: Exclude<UserContent, string> = [];
         try {
             attachments = await getAttachments(api, botInfo.token, msg);
         } catch (error) {
@@ -310,7 +310,7 @@ async function constructMsg(
     return {
         role,
         content: parts,
-    } as CoreMessage;
+    } as ModelMessage;
 }
 
 export async function makeHistoryV2(
@@ -319,13 +319,13 @@ export async function makeHistoryV2(
     logger: Logger,
     history: ChatMessage[],
     options: HistoryOptions,
-): Promise<CoreMessage[]> {
+): Promise<ModelMessage[]> {
     const { messagesLimit, bytesLimit, symbolLimit } = options;
     const resolveReplies = options.resolveReplyThread ?? true;
 
     let totalBytes = 0;
     let totalAttachments = 0;
-    const prompt: CoreMessage[] = [];
+    const prompt: ModelMessage[] = [];
     const addedMessages: number[] = [];
 
     // Go through history in reverse order
@@ -419,7 +419,7 @@ export async function makeNotesHistory(
     logger: Logger,
     history: ChatMessage[],
     options: NotesHistoryOptions,
-): Promise<CoreMessage[]> {
+): Promise<ModelMessage[]> {
     const { messagesLimit, bytesLimit, symbolLimit, characterName } = options;
 
     let totalBytes = 0;
@@ -491,8 +491,8 @@ async function getAttachments(
     api: Api<RawApi>,
     token: string,
     msg: ChatMessage | ReplyTo,
-): Promise<MessageContent> {
-    const parts: MessageContent = [];
+): Promise<Exclude<UserContent, string>> {
+    const parts: UserContent = [];
 
     if (msg.info.photo) {
         const size = chooseSize(msg.info.photo);
@@ -522,7 +522,7 @@ async function getAttachments(
             parts.push({
                 type: 'file',
                 data: file,
-                mimeType: 'video/webm',
+                mediaType: 'video/webm',
             });
 
             return parts;
@@ -573,7 +573,7 @@ async function getAttachments(
             parts.push({
                 type: 'file',
                 data: file,
-                mimeType: mimeType,
+                mediaType: mimeType,
             });
         } else {
             const thumbnailId = msg.info.video.thumbnail?.file_id;
@@ -609,18 +609,18 @@ async function getAttachments(
             return parts;
         }
 
-        const mimeType = animation.mime_type;
+        const mediaType = animation.mime_type;
         const file = await downloadFile(
             api,
             token,
             animation.file_id,
-            mimeType,
+            mediaType,
         );
 
         parts.push({
             type: 'file',
             data: file,
-            mimeType,
+            mediaType,
         });
     }
 
@@ -637,7 +637,7 @@ async function getAttachments(
         parts.push({
             type: 'file',
             data: file,
-            mimeType: 'video/mp4',
+            mediaType: 'video/mp4',
         });
     }
 
@@ -649,13 +649,13 @@ async function getAttachments(
             return parts;
         }
 
-        const mimeType = voice.mime_type;
-        const file = await downloadFile(api, token, voice.file_id, mimeType);
+        const mediaType = voice.mime_type;
+        const file = await downloadFile(api, token, voice.file_id, mediaType);
 
         parts.push({
             type: 'file',
             data: file,
-            mimeType,
+            mediaType,
         });
     }
 

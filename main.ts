@@ -5,7 +5,7 @@ import setupBot from './lib/telegram/setup-bot.ts';
 import { run } from '@grammyjs/runner';
 import { loadMemory, ReplyTo } from './lib/memory.ts';
 
-import { APICallError, generateText, Output } from 'ai';
+import { APICallError, generateText, ModelMessage, Output } from 'ai';
 import { google } from '@ai-sdk/google';
 
 import {
@@ -332,7 +332,7 @@ bot.use(limit(
 bot.on('message', async (ctx) => {
     const typing = doTyping(ctx, logger);
 
-    const messages: CoreMessage[] = [];
+    const messages: ModelMessage[] = [];
 
     let prompt = config.ai.prePrompt + '\n\n';
     const savedHistory = ctx.m.getHistory();
