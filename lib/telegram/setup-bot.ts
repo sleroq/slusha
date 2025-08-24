@@ -62,11 +62,11 @@ export default async function setupBot(config: Config, memory: Memory) {
     bot.on('message', (ctx, next) => {
         // Filter out old messages (1 minute)
         if (ctx.msg.date - startDate.getTime() / 1000 < 1) {
-            console.log(
-                'Skipping old message',
-                ctx.msg.date,
-                startDate.getTime() / 1000,
-            );
+            // console.log(
+            //     'Skipping old message',
+            //     ctx.msg.date,
+            //     startDate.getTime() / 1000,
+            // );
             return;
         } else {
             // console.log(

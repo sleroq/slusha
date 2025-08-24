@@ -12,27 +12,6 @@ import { Message } from 'grammy_types';
 import { Logger } from '@deno-library/logger';
 import logger from './logger.ts';
 
-export interface FileContent {
-    type: 'file';
-    mimeType: string;
-    data: Uint8Array | ArrayBuffer | string;
-}
-
-export interface TextPart {
-    type: 'text';
-    text: string;
-}
-
-export interface ImagePart {
-    type: 'image';
-    image: Uint8Array | ArrayBuffer | URL | string;
-    mimeType?: string;
-}
-
-type ContentPart = TextPart | ImagePart | FileContent;
-
-type MessageContent = ContentPart[];
-
 interface HistoryOptions {
     symbolLimit: number;
     messagesLimit: number;

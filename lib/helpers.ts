@@ -2,11 +2,11 @@ import { Config } from './config.ts';
 import ky from 'ky';
 import { Api, RawApi } from 'grammy';
 import { Logger } from '@deno-library/logger';
-import { ImagePart, supportedTypesMap } from './history.ts';
+import { supportedTypesMap } from './history.ts';
 import { exists } from '@std/fs';
 import { Message, PhotoSize, Sticker } from 'grammy_types';
 import { GoogleGenAI } from '@google/genai';
-import { ModelMessage } from 'ai';
+import { ModelMessage, ImagePart } from 'ai';
 import { BotCharacter } from './memory.ts';
 // import { encodeBase64 } from "@std/encoding/base64";
 
@@ -83,7 +83,7 @@ if (!AI_TOKEN) {
 
 const ai = new GoogleGenAI({ apiKey: AI_TOKEN });
 
-async function uploadToGoogle(path: string, name: string, mimeType: string) {
+async function uploadToGoogle(path: string, _name: string, mimeType: string) {
     const fileData = await Deno.readFile(path);
     const blob = new Blob([fileData], { type: mimeType });
 
@@ -136,14 +136,14 @@ export async function getImageContent(
     api: Api<RawApi>,
     token: string,
     fileId: string,
-    mimeType: string,
+    mediaType: string,
 ): Promise<ImagePart> {
-    const file = await downloadFile(api, token, fileId, mimeType);
+    const file = await downloadFile(api, token, fileId, mediaType);
 
     return {
         type: 'image',
         image: file,
-        mimeType,
+        mediaType,
     };
 }
 
@@ -300,12 +300,17 @@ export function prettyDate() {
 }
 
 // Create a more robust name matching function
-export function createNameMatcher(names: string[]) {
-    // Process each name to handle special characters and create proper boundaries
-    const patterns = names.map((name) => {
-        const escapedName = escapeRegExp(name);
-        // Match names that are surrounded by spaces, punctuation, or at start/end of text
-        return `(?:^|[\\s.,!?;:'"\\[\\](){}])${escapedName}(?:[\\s.,!?;:'"\\[\\](){}]|$)`;
+export function createNameMatcher(names: Array<string | RegExp>) {
+    // Process each name or pattern, handling strings and regular expressions
+    const patterns = names.map((nameOrPattern) => {
+        if (typeof nameOrPattern === 'string') {
+            const escapedName = escapeRegExp(nameOrPattern);
+            // Match names that are surrounded by spaces, punctuation, or at start/end of text
+            return `(?:^|[\\s.,!?;:'"\\[\\](){}])${escapedName}(?:[\\s.,!?;:'"\\[\\](){}]|$)`;
+        }
+
+        // Use the provided RegExp's source directly
+        return nameOrPattern.source;
     });
 
     return new RegExp(patterns.join('|'), 'gmi');
@@ -357,10 +362,10 @@ export function formatReply(
                     res = c.text;
                     break;
                 case 'image':
-                    res = `    image: ${c.image} (${c.mimeType})`;
+                    res = `    image: ${c.image}`;
                     break;
                 case 'file':
-                    res = `    file: ${c.data} (${c.mimeType})`;
+                    res = `    file: ${c.data}`;
                     break;
                 default:
                     res = '';
