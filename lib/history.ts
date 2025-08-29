@@ -18,6 +18,7 @@ interface HistoryOptions {
     bytesLimit: number;
     attachments?: boolean;
     resolveReplyThread?: boolean;
+    includeReactions?: boolean;
 }
 
 function resolveReplyThread(
@@ -131,6 +132,7 @@ interface ConstructMsgOptions {
     symbolLimit: number;
     attachments: boolean;
     characterName?: string;
+    includeReactions?: boolean;
 }
 
 function getTimeString(date: Date): string {
@@ -148,6 +150,7 @@ async function constructMsg(
 ): Promise<ModelMessage> {
     const { symbolLimit, characterName } = options;
     const attachAttachments = options.attachments;
+    const includeReactions = options.includeReactions ?? false;
 
     const role = msg.isMyself ? 'assistant' : 'user';
     const firstName = msg.info.from?.first_name ?? 'User';
@@ -264,6 +267,26 @@ async function constructMsg(
 
     prettyInputMessage += `${text.trim()}`;
 
+    if (includeReactions && msg.reactions && Object.keys(msg.reactions).length > 0) {
+        const parts: string[] = [];
+        for (const rec of Object.values(msg.reactions)) {
+            let label = '';
+            if (rec.type === 'emoji' && rec.emoji) label = rec.emoji;
+            else if (rec.type === 'custom' && rec.customEmojiId) label = `custom:${rec.customEmojiId}`;
+            else continue;
+
+            if (rec.by && rec.by.length > 0) {
+                const users = rec.by.map((u) => u.username ? `@${u.username}` : u.name).join(', ');
+                parts.push(`${label} by ${users}`);
+            } else if (rec.count && rec.count > 0) {
+                parts.push(`${label} x${rec.count}`);
+            }
+        }
+        if (parts.length > 0) {
+            prettyInputMessage += ` <reactions: ${parts.join(', ')}>`;
+        }
+    }
+
     parts.push({
         type: 'text',
         text: prettyInputMessage,
@@ -337,6 +360,7 @@ export async function makeHistoryV2(
                     {
                         symbolLimit,
                         attachments: attachAttachments,
+                        includeReactions: options.includeReactions,
                     },
                 );
             } catch (error) {

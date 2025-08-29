@@ -282,7 +282,12 @@ export default function notes(config: Config, botId: number) {
             try {
                 response = await generateText({
                     model: google(model),
-                    providerOptions: { google: { safetySettings } },
+                    providerOptions: {
+                        google: {
+                            safetySettings,
+                            thinkingConfig: { thinkingBudget: 2048 },
+                        },
+                    },
                     messages,
                     temperature: config.ai.temperature,
                     topK: config.ai.topK,
@@ -309,7 +314,7 @@ export default function notes(config: Config, botId: number) {
                 (Date.now() - start) / 1000,
             );
 
-            logger.info(`Memory generated: \n${response.text}\n`);
+            // logger.info(`Memory generated: \n${response.text}\n`);
 
             if (!response.text.trim()) {
                 logger.warn('Empty response from AI');

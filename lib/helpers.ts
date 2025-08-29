@@ -317,7 +317,7 @@ export function createNameMatcher(names: Array<string | RegExp>) {
 }
 
 export function formatReply(
-    m: ModelMessage | { text: string; reply_to?: string }[],
+    m: ModelMessage | ({ text: string; reply_to?: string; offset?: number } | { react: string; reply_to?: string; offset?: number })[],
     char?: BotCharacter,
 ) {
     const charName = char?.name ?? 'Slusha';
@@ -355,7 +355,13 @@ export function formatReply(
         let res = '';
 
         if (!('type' in c)) {
-            res = `    ${c.text}`;
+            if ('text' in c) {
+                res = `    ${c.text}`;
+            } else if ('react' in c) {
+                res = `    [react ${c.react}${c.reply_to ? ' -> ' + c.reply_to : ''}${typeof c.offset === 'number' ? ' #' + c.offset : ''}]`;
+            } else {
+                res = '';
+            }
         } else {
             switch (c.type) {
                 case 'text':

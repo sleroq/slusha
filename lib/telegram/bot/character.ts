@@ -396,6 +396,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     }
 
     const config = ctx.info.config;
+    // TODO: Allow to set different model for generating character names
     const model = chat.chatModel ?? config.model;
 
     let namesResult;
@@ -403,6 +404,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         namesResult = await generateText({
             model: google(model),
             providerOptions: { google: { safetySettings } },
+            // TODO: Remove experimental stuff and move to new stable API
             experimental_output: Output.object({
                 schema: z.array(z.string()),
             }),
