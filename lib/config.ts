@@ -134,45 +134,6 @@ const config = configSchema.extend({
 
 export type Config = z.infer<typeof config>;
 
-// Built-in minimal defaults to allow running with env-only setup
-const defaultUserConfig: UserConfig = {
-    startMessage: 'Привет! Я Слюша.',
-    ai: {
-        model: 'gemini-2.5-flash-lite',
-        temperature: 0.9,
-        topK: 40,
-        topP: 0.95,
-        prePrompt: '',
-        prompt: '',
-        finalPrompt: '',
-        notesPrompt: '',
-        memoryPrompt: '',
-        memoryPromptRepeat: '',
-        messagesToPass: 5,
-        notesFrequency: 150,
-        memoryFrequency: 50,
-        messageMaxLength: 4096,
-        bytesLimit: 20 * 1024 * 1024,
-    },
-    names: ['slusha'],
-    tendToReply: [],
-    tendToIgnore: [],
-    nepons: ['непон..'],
-    tendToReplyProbability: 50,
-    tendToIgnoreProbability: 90,
-    randomReplyProbability: 1,
-    filesMaxAge: 72,
-    maxNotesToStore: 5,
-    maxMessagesToStore: 100,
-    chatLastUseNotes: 3,
-    chatLastUseMemory: 2,
-    responseDelay: 1,
-    // The following fields use schema defaults if not provided
-    // tendToReplyProbability, tendToIgnoreProbability, randomReplyProbability,
-    // filesMaxAge, maxNotesToStore, maxMessagesToStore, chatLastUseNotes,
-    // chatLastUseMemory, responseDelay
-};
-
 function resolveEnv() {
     const botToken = Deno.env.get('BOT_TOKEN');
     if (!botToken) throw new Error('BOT_TOKEN is required');
@@ -249,13 +210,10 @@ export default async function resolveConfig(): Promise<Config> {
     }
 
     const envOverrides = resolveEnvOverrides();
-    const withDefaults = deepMerge<UserConfig>(defaultUserConfig, fileConfig as Partial<UserConfig>);
-    const merged = deepMerge<UserConfig>(withDefaults, envOverrides as Partial<UserConfig>);
+    const merged = deepMerge<UserConfig>(fileConfig as Partial<UserConfig>, envOverrides as Partial<UserConfig>);
 
     const validated = configSchema.parse(merged);
 
-    console.log(validated);
-    
     return {
         ...validated,
         botToken: env.botToken,
