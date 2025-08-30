@@ -31,4 +31,6 @@ CMD ["deno", "run", \
      "--allow-read=.", \
      "--allow-import", \
      "--allow-write", \
+     "--allow-sys", \
+     "--unstable-detect-cjs", \
      "main.ts"] 
