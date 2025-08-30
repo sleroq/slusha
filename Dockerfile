@@ -30,5 +30,5 @@ CMD ["deno", "run", \
      "--allow-net", \
      "--allow-read=.", \
      "--allow-import", \
-     "--allow-write=memory.json,tmp,log", \
+     "--allow-write", \
      "main.ts"] 
