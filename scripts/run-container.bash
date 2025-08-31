@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-# podman run -d --name slusha-bot --restart unless-stopped \
-#   -e BOT_TOKEN=your_bot_token \
-#   -e AI_TOKEN=your_ai_token \
-#   slusha:latest
-
 set -euo pipefail
 
 # Ensure we run from repo root so relative binds resolve correctly
