@@ -330,7 +330,6 @@ bot.use(limit(
 
 // Get response from AI
 bot.on('message', async (ctx) => {
-    const typing = doTyping(ctx, logger);
 
     const messages: ModelMessage[] = [];
 
@@ -543,8 +542,6 @@ bot.on('message', async (ctx) => {
                 `Empty response from AI`,
             );
 
-            typing.abort();
-
             return;
         }
 
@@ -628,8 +625,6 @@ bot.on('message', async (ctx) => {
 
         await new Promise((resolve) => setTimeout(resolve, msToWait));
     }
-
-    typing.abort();
 });
 
 run(bot, {
