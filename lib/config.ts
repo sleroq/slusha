@@ -16,11 +16,28 @@ const configSchema = z.object({
         topP: z.number(),
         prePrompt: z.string(),
         prompt: z.string(),
+        dumbPrompt: z.string().optional(),
+        /**
+         * When false, bot will not expect JSON array output and will
+         * generate a single plain text message instead. Reactions are disabled.
+         */
+        useJsonResponses: z.boolean().default(true),
+        /**
+         * Optional alternative pre-prompt for dumb models that don't output JSON
+         */
+        dumbPrePrompt: z.string().optional(),
         privateChatPromptAddition: z.string().optional(),
         groupChatPromptAddition: z.string().optional(),
         commentsPromptAddition: z.string().optional(),
         hateModePrompt: z.string().optional(),
+        /**
+         * Smart-mode final prompt (expects JSON array response)
+         */
         finalPrompt: z.string(),
+        /**
+         * Optional alternative final prompt for dumb models (plain text)
+         */
+        dumbFinalPrompt: z.string().optional(),
         notesPrompt: z.string(),
         memoryPrompt: z.string(),
         memoryPromptRepeat: z.string(),

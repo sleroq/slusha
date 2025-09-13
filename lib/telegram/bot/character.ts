@@ -10,7 +10,7 @@ import { sliceMessage } from '../../helpers.ts';
 import { ChatMemory } from '../../memory.ts';
 import logger from '../../logger.ts';
 import { InlineQueryResultArticle } from 'grammy_types';
-import { generateText, Output } from 'ai';
+import { generateObject, generateText } from 'ai';
 import { google } from '@ai-sdk/google';
 import { safetySettings } from '../../config.ts';
 import z from 'zod';
@@ -413,38 +413,82 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     // TODO: Allow to set different model for generating character names
     const model = chat.chatModel ?? config.model;
 
-    let namesResult;
+    const useJsonResponses = config.useJsonResponses;
+    let names: string[] = [];
     try {
-        namesResult = await generateText({
-            model: google(model),
-            providerOptions: { google: { safetySettings } },
-            // TODO: Remove experimental stuff and move to new stable API
-            experimental_output: Output.object({
+        if (useJsonResponses) {
+            const result = await generateObject({
+                model: google(model),
+                providerOptions: { google: { safetySettings } },
                 schema: z.array(z.string()),
-            }),
-            temperature: config.temperature,
-            topK: config.topK,
-            topP: config.topP,
-            prompt:
-                `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
-                'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.\n' +
-                'Пример: имя "Cute Slusha". Варианты: ["Cute Slusha", "Slusha", "Слюша", "слюшаня", "слюшка", "шлюша", "слюш"]\n' +
-                'Пример: имя "Георгий". Варианты: ["Георгий", "Georgie", "George", "Geordie", "Geo", "Егор", "Герасим", "Жора", "Жорка", "Жорочка", "Гоша", "Гошенька", "Гера", "Герочка", "Гога"]',
-            experimental_telemetry: {
-                isEnabled: true,
-                functionId: 'character-names',
-                metadata: {
-                    sessionId: chatId,
-                    tags: ['character'],
+                temperature: config.temperature,
+                topK: config.topK,
+                topP: config.topP,
+                prompt:
+                    `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
+                    'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.',
+                experimental_telemetry: {
+                    isEnabled: true,
+                    functionId: 'character-names',
+                    metadata: {
+                        sessionId: chatId.toString(),
+                        tags: ['character'],
+                    },
                 },
-            },
-        });
+            });
+            names = result.object;
+        } else {
+            const response = await generateText({
+                model: google(model),
+                providerOptions: { google: { safetySettings } },
+                temperature: config.temperature,
+                topK: config.topK,
+                topP: config.topP,
+                prompt:
+                    `Напиши варианты имени "${character.name}" (русские и английские, уменьшительные и очевидные похожие формы). ` +
+                    'Верни только список вариантов через запятую или с новой строки, без пояснений.',
+                experimental_telemetry: {
+                    isEnabled: true,
+                    functionId: 'character-names-dumb',
+                    metadata: {
+                        sessionId: chatId.toString(),
+                        tags: ['character'],
+                    },
+                },
+            });
+
+            const raw = response.text.trim();
+            const split = raw
+                .split(/\n|,|;|•|·|\u2022/g)
+                .map((s) => s.trim())
+                .map((s) => s.replace(/^[-*•·]\s*/, ''))
+                .map((s) => s.replace(/^"|"$/g, ''))
+                .filter((s) => s.length > 0 && s.length < 64);
+
+            const dedup = new Set<string>();
+            for (const s of split) {
+                const k = s.toLowerCase();
+                if (!dedup.has(k)) dedup.add(k);
+            }
+            names = Array.from(dedup).map((k) => {
+                // Recover original casing by finding first occurrence in split
+                const orig = split.find((s) => s.toLowerCase() === k);
+                return orig ?? k;
+            });
+
+            if (names.length === 0) {
+                names = [character.name];
+            }
+            if (names.length > 20) {
+                names = names.slice(0, 20);
+            }
+        }
     } catch (error) {
         logger.error(error, 'Error getting names for character');
         return await ctx.reply(ctx.t('character-names-error'));
     }
 
-    const names = namesResult.experimental_output as Array<string>;
+    
     chat.character = { ...character, names };
 
     const keyboard = new InlineKeyboard()

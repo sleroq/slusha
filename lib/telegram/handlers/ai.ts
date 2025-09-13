@@ -2,7 +2,7 @@ import { Bot } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
 import { Config, safetySettings } from '../../config.ts';
 import logger from '../../logger.ts';
-import { APICallError, generateObject, ModelMessage } from 'ai';
+import { APICallError, generateObject, generateText, ModelMessage } from 'ai';
 import { google } from '@ai-sdk/google';
 import { makeHistoryV2 } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
@@ -20,7 +20,19 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
 
         const messages: ModelMessage[] = [];
 
-        let prompt = config.ai.prePrompt + '\n\n';
+        const useJsonResponses = config.ai.useJsonResponses;
+
+        let prompt = '';
+        if (useJsonResponses) {
+            prompt = (config.ai.prePrompt ?? '') + '\n\n';
+        } else {
+            const fallbackDumbPre = (
+                'Отвечай одним сообщением простым текстом без какого-либо JSON.' +
+                '\nНе используй реакции. Пиши кратко и по делу.' +
+                '\nИспользуй Telegram markdown, но без заголовков.'
+            );
+            prompt = (config.ai.dumbPrePrompt ?? fallbackDumbPre) + '\n\n';
+        }
         const savedHistory = ctx.m.getHistory();
 
         // TODO: Improve this check
@@ -49,7 +61,9 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
         if (character) {
             prompt += '### Character ###\n' + character.description;
         } else {
-            prompt += config.ai.prompt;
+            prompt += useJsonResponses
+                ? config.ai.prompt
+                : (config.ai.dumbPrompt ?? config.ai.prompt);
         }
 
         messages.push({
@@ -123,7 +137,9 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
 
         messages.push(...history);
 
-        let finalPrompt = config.ai.finalPrompt;
+        let finalPrompt = useJsonResponses
+            ? config.ai.finalPrompt
+            : (config.ai.dumbFinalPrompt ?? 'Ответь простым текстом.');
         if (ctx.info.userToReply) {
             finalPrompt += ` Ответь на сообщение от ${ctx.info.userToReply}.`;
         }
@@ -145,33 +161,62 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             tags.push('random');
         }
 
-        let result;
+        let output;
         try {
-            result = await generateObject({
-                model: google(model),
-                providerOptions: {
-                    google: {
-                        safetySettings,
-                        thinkingConfig: { thinkingBudget: 1024 },
+            if (useJsonResponses) {
+                const result = await generateObject({
+                    model: google(model),
+                    providerOptions: {
+                        google: {
+                            safetySettings,
+                            thinkingConfig: { thinkingBudget: 1024 },
+                        },
                     },
-                },
-                schema: chatResponseSchema,
-                temperature: config.ai.temperature,
-                topK: config.ai.topK,
-                topP: config.ai.topP,
-                messages,
-                experimental_telemetry: {
-                    isEnabled: true,
-                    functionId: 'user-message',
-                    metadata: {
-                        sessionId: ctx.chat.id.toString(),
-                        userId: ctx.chat.type === 'private'
-                            ? ctx.from?.id.toString()
-                            : '',
-                        tags,
+                    schema: chatResponseSchema,
+                    temperature: config.ai.temperature,
+                    topK: config.ai.topK,
+                    topP: config.ai.topP,
+                    messages,
+                    experimental_telemetry: {
+                        isEnabled: true,
+                        functionId: 'user-message',
+                        metadata: {
+                            sessionId: ctx.chat.id.toString(),
+                            userId: ctx.chat.type === 'private'
+                                ? ctx.from?.id.toString()
+                                : '',
+                            tags,
+                        },
                     },
-                },
-            });
+                });
+                output = result.object;
+            } else {
+                const response = await generateText({
+                    model: google(model),
+                    providerOptions: {
+                        google: {
+                            safetySettings,
+                            thinkingConfig: { thinkingBudget: 1024 },
+                        },
+                    },
+                    messages,
+                    temperature: config.ai.temperature,
+                    topK: config.ai.topK,
+                    topP: config.ai.topP,
+                    experimental_telemetry: {
+                        isEnabled: true,
+                        functionId: 'user-message-dumb',
+                        metadata: {
+                            sessionId: ctx.chat.id.toString(),
+                            userId: ctx.chat.type === 'private'
+                                ? ctx.from?.id.toString()
+                                : '',
+                            tags,
+                        },
+                    },
+                });
+                output = [{ text: response.text }];
+            }
         } catch (error) {
             logger.error('Could not get response: ', error);
             if (error instanceof APICallError) {
@@ -195,8 +240,6 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             }
             return;
         }
-
-        const output = result.object;
 
         const name = ctx.chat.first_name ?? ctx.chat.title;
         const username = ctx.chat?.username ? `(@${ctx.chat.username})` : '';
@@ -301,6 +344,12 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                 msgToReply = resolveTargetMessageId(
                     res.reply_to,
                     res.offset,
+                    true,
+                );
+            } else if (!useJsonResponses && ctx.info.userToReply) {
+                msgToReply = resolveTargetMessageId(
+                    ctx.info.userToReply,
+                    undefined,
                     true,
                 );
             }
