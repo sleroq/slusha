@@ -6,8 +6,8 @@ import { Composer, InlineKeyboard } from 'grammy';
 
 const bot = new Composer<SlushaContext>();
 
-function formatOptOutUsers(users: OptOutUser[]) {
-    let message = '\n\n Пользователи, которых не видит слюша:\n';
+function formatOptOutUsers(users: OptOutUser[], ctx: SlushaContext) {
+    let message = ctx.t('opt-out-users-list');
 
     message += users.map((u) => {
         if (u.username) {
@@ -25,9 +25,7 @@ bot.command('optout', (ctx) => {
         return;
     }
 
-    let message =
-        '<b>Слюша больше не будет видеть твои сообщения в этом чате.</b>\n' +
-        '<span class="tg-spoiler">за исключением прямого ответа другого пользователя на твое сообщение с упоминанием слюши</span>';
+    let message = ctx.t('opt-out-confirm');
 
     const optOutUsers = ctx.m.getChat().optOutUsers;
 
@@ -40,12 +38,12 @@ bot.command('optout', (ctx) => {
     }
 
     if (optOutUsers.length > 1) {
-        message += formatOptOutUsers(optOutUsers);
+        message += formatOptOutUsers(optOutUsers, ctx);
     }
 
     return replyWithHTML(ctx, message, {
         reply_markup: new InlineKeyboard().text(
-            'Вернуться',
+            ctx.t('opt-out-button-return'),
             `opt-in ${ctx.from.id}`,
         ),
         link_preview_options: {
@@ -56,7 +54,7 @@ bot.command('optout', (ctx) => {
 
 bot.callbackQuery(/opt-in.*/, (ctx) => {
     if (Number(ctx.callbackQuery.data.split(' ')[1]) !== ctx.from?.id) {
-        return ctx.answerCallbackQuery('Не твоя кнопка');
+        return ctx.answerCallbackQuery(ctx.t('opt-out-not-your-button'));
     }
 
     return optIn(ctx, ctx.callbackQuery.from.id, false);
@@ -73,15 +71,16 @@ bot.command('optin', (ctx) => {
 
 async function optIn(ctx: SlushaContext, id: number, reply: boolean) {
     const wasOptedIn = ctx.m.getChat().optOutUsers.some((u) => u.id === id);
-    const verb = wasOptedIn ? 'снова' : 'уже';
-    let message = `Ура, Слюша ${verb} видит твои сообщения`;
+    let message = ctx.t('opt-out-status', {
+        verb: wasOptedIn ? ctx.t('again') : ctx.t('already'),
+    });
 
     ctx.m.getChat().optOutUsers = ctx.m.getChat().optOutUsers.filter((u) =>
         u.id !== id
     );
 
     if (ctx.m.getChat().optOutUsers.length > 1) {
-        message += formatOptOutUsers(ctx.m.getChat().optOutUsers);
+        message += formatOptOutUsers(ctx.m.getChat().optOutUsers, ctx);
     }
 
     if (reply) {

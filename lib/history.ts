@@ -174,7 +174,9 @@ async function constructMsg(
                 const prettyJsonObject = removeFieldsWithSuffixes(
                     msg.info[type],
                 );
-                text += `\n"${String(type)}": ${JSON.stringify(prettyJsonObject)}`;
+                text += `\n"${String(type)}": ${
+                    JSON.stringify(prettyJsonObject)
+                }`;
             }
         }
     }
@@ -267,16 +269,22 @@ async function constructMsg(
 
     prettyInputMessage += `${text.trim()}`;
 
-    if (includeReactions && msg.reactions && Object.keys(msg.reactions).length > 0) {
+    if (
+        includeReactions && msg.reactions &&
+        Object.keys(msg.reactions).length > 0
+    ) {
         const parts: string[] = [];
         for (const rec of Object.values(msg.reactions)) {
             let label = '';
             if (rec.type === 'emoji' && rec.emoji) label = rec.emoji;
-            else if (rec.type === 'custom' && rec.customEmojiId) label = `custom:${rec.customEmojiId}`;
-            else continue;
+            else if (rec.type === 'custom' && rec.customEmojiId) {
+                label = `custom:${rec.customEmojiId}`;
+            } else continue;
 
             if (rec.by && rec.by.length > 0) {
-                const users = rec.by.map((u) => u.username ? `@${u.username}` : u.name).join(', ');
+                const users = rec.by.map((u) =>
+                    u.username ? `@${u.username}` : u.name
+                ).join(', ');
                 parts.push(`${label} by ${users}`);
             } else if (rec.count && rec.count > 0) {
                 parts.push(`${label} x${rec.count}`);

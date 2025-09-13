@@ -1,4 +1,5 @@
 import { Bot, Context } from 'grammy';
+import { I18nFlavor } from '@grammyjs/i18n';
 import logger from '../logger.ts';
 import { Config } from '../config.ts';
 import { ChatMemory, Memory, ReplyTo } from '../memory.ts';
@@ -10,27 +11,36 @@ interface RequestInfo {
     config: Config['ai'];
 }
 
-export type SlushaContext = Context & {
+export type SlushaContext = Context & I18nFlavor & {
     info: RequestInfo;
     memory: Memory;
     m: ChatMemory;
 };
 
-function isEmojiReactionType(obj: unknown): obj is { type: 'emoji'; emoji: string } {
+function isEmojiReactionType(
+    obj: unknown,
+): obj is { type: 'emoji'; emoji: string } {
     return typeof obj === 'object' && obj !== null &&
         (obj as { type?: unknown }).type === 'emoji' &&
         typeof (obj as { emoji?: unknown }).emoji === 'string';
 }
 
-function isCustomReactionType(obj: unknown): obj is { type: 'custom_emoji'; custom_emoji_id: string } {
+function isCustomReactionType(
+    obj: unknown,
+): obj is { type: 'custom_emoji'; custom_emoji_id: string } {
     return typeof obj === 'object' && obj !== null &&
         (obj as { type?: unknown }).type === 'custom_emoji' &&
-        typeof (obj as { custom_emoji_id?: unknown }).custom_emoji_id === 'string';
+        typeof (obj as { custom_emoji_id?: unknown }).custom_emoji_id ===
+            'string';
 }
 
 function pickCount(obj: unknown): number | undefined {
     if (typeof obj !== 'object' || obj === null) return undefined;
-    const o = obj as { total_count?: unknown; count?: unknown; total?: unknown };
+    const o = obj as {
+        total_count?: unknown;
+        count?: unknown;
+        total?: unknown;
+    };
     if (typeof o.total_count === 'number') return o.total_count;
     if (typeof o.count === 'number') return o.count;
     if (typeof o.total === 'number') return o.total;
@@ -45,6 +55,7 @@ const commands = [
     '/lobotomy',
     '/random',
     '/summary',
+    '/language',
 ];
 
 const startDate = new Date();
@@ -112,26 +123,40 @@ export default async function setupBot(config: Config, memory: Memory) {
             if (emojiAdded.length === 0 && mr.new_reaction) {
                 for (const r of mr.new_reaction as unknown[]) {
                     if (isEmojiReactionType(r)) emojiAdded.push(r.emoji);
-                    else if (isCustomReactionType(r)) customAdded.push(r.custom_emoji_id);
+                    else if (isCustomReactionType(r)) {
+                        customAdded.push(r.custom_emoji_id);
+                    }
                 }
             }
             if (emojiRemoved.length === 0 && mr.old_reaction) {
                 for (const r of mr.old_reaction as unknown[]) {
                     if (isEmojiReactionType(r)) emojiRemoved.push(r.emoji);
-                    else if (isCustomReactionType(r)) customRemoved.push(r.custom_emoji_id);
+                    else if (isCustomReactionType(r)) {
+                        customRemoved.push(r.custom_emoji_id);
+                    }
                 }
             }
 
-            const by = ctx.from ? {
-                id: ctx.from.id,
-                username: ctx.from.username,
-                first_name: ctx.from.first_name,
-            } : undefined;
+            const by = ctx.from
+                ? {
+                    id: ctx.from.id,
+                    username: ctx.from.username,
+                    first_name: ctx.from.first_name,
+                }
+                : undefined;
 
-            for (const e of emojiAdded) ctx.m.addEmojiReaction(messageId, e, by);
-            for (const e of emojiRemoved) ctx.m.removeEmojiReaction(messageId, e, by);
-            for (const c of customAdded) ctx.m.addCustomReaction(messageId, c, by);
-            for (const c of customRemoved) ctx.m.removeCustomReaction(messageId, c, by);
+            for (const e of emojiAdded) {
+                ctx.m.addEmojiReaction(messageId, e, by);
+            }
+            for (const e of emojiRemoved) {
+                ctx.m.removeEmojiReaction(messageId, e, by);
+            }
+            for (const c of customAdded) {
+                ctx.m.addCustomReaction(messageId, c, by);
+            }
+            for (const c of customRemoved) {
+                ctx.m.removeCustomReaction(messageId, c, by);
+            }
         } catch (error) {
             logger.warn('Could not process message_reaction: ', error);
         }
@@ -146,22 +171,42 @@ export default async function setupBot(config: Config, memory: Memory) {
             if (!mrc) return next();
             const messageId = mrc.message_id;
 
-            const rawCounts = ((mrc as unknown) as { reactions?: unknown; reaction_counts?: unknown }).reactions
-                ?? ((mrc as unknown) as { reactions?: unknown; reaction_counts?: unknown }).reaction_counts
-                ?? [];
+            const rawCounts = ((mrc as unknown) as {
+                reactions?: unknown;
+                reaction_counts?: unknown;
+            }).reactions ??
+                ((mrc as unknown) as {
+                    reactions?: unknown;
+                    reaction_counts?: unknown;
+                }).reaction_counts ??
+                [];
 
             const arr = Array.isArray(rawCounts) ? rawCounts : [];
             const counts = arr.map((r: unknown) => {
                 const obj = r as { type?: unknown };
                 const t = obj.type ?? obj;
                 if (isEmojiReactionType(t)) {
-                    return { type: 'emoji' as const, emoji: t.emoji, total: pickCount(r) ?? 0 };
+                    return {
+                        type: 'emoji' as const,
+                        emoji: t.emoji,
+                        total: pickCount(r) ?? 0,
+                    };
                 }
                 if (isCustomReactionType(t)) {
-                    return { type: 'custom' as const, customEmojiId: t.custom_emoji_id, total: pickCount(r) ?? 0 };
+                    return {
+                        type: 'custom' as const,
+                        customEmojiId: t.custom_emoji_id,
+                        total: pickCount(r) ?? 0,
+                    };
                 }
                 return undefined;
-            }).filter((x): x is { type: 'emoji'; emoji: string; total: number } | { type: 'custom'; customEmojiId: string; total: number } => x !== undefined);
+            }).filter((
+                x,
+            ): x is { type: 'emoji'; emoji: string; total: number } | {
+                type: 'custom';
+                customEmojiId: string;
+                total: number;
+            } => x !== undefined);
 
             ctx.m.setReactionCounts(messageId, counts);
         } catch (error) {

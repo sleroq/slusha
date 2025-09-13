@@ -93,7 +93,9 @@ export default function notes(config: Config, botId: number) {
                         metadata: {
                             sessionId: ctx.chat.id.toString(),
                             tags,
-                            userId: ctx.chat.type === 'private' ? ctx.from?.id.toString() : '',
+                            userId: ctx.chat.type === 'private'
+                                ? ctx.from?.id.toString()
+                                : '',
                         },
                     },
                 });
@@ -298,7 +300,9 @@ export default function notes(config: Config, botId: number) {
                         metadata: {
                             sessionId: ctx.chat.id.toString(),
                             tags,
-                            userId: ctx.chat.type === 'private' ? ctx.from?.id.toString() : '',
+                            userId: ctx.chat.type === 'private'
+                                ? ctx.from?.id.toString()
+                                : '',
                         },
                     },
                 });

@@ -6,7 +6,7 @@ import { supportedTypesMap } from './history.ts';
 import { exists } from '@std/fs';
 import { Message, PhotoSize, Sticker } from 'grammy_types';
 import { GoogleGenAI } from '@google/genai';
-import { ModelMessage, ImagePart } from 'ai';
+import { ImagePart, ModelMessage } from 'ai';
 import { BotCharacter } from './memory.ts';
 // import { encodeBase64 } from "@std/encoding/base64";
 
@@ -317,7 +317,13 @@ export function createNameMatcher(names: Array<string | RegExp>) {
 }
 
 export function formatReply(
-    m: ModelMessage | ({ text: string; reply_to?: string; offset?: number } | { react: string; reply_to?: string; offset?: number })[],
+    m:
+        | ModelMessage
+        | ({ text: string; reply_to?: string; offset?: number } | {
+            react: string;
+            reply_to?: string;
+            offset?: number;
+        })[],
     char?: BotCharacter,
 ) {
     const charName = char?.name ?? 'Slusha';
@@ -358,7 +364,9 @@ export function formatReply(
             if ('text' in c) {
                 res = `    ${c.text}`;
             } else if ('react' in c) {
-                res = `    [react ${c.react}${c.reply_to ? ' -> ' + c.reply_to : ''}${typeof c.offset === 'number' ? ' #' + c.offset : ''}]`;
+                res = `    [react ${c.react}${
+                    c.reply_to ? ' -> ' + c.reply_to : ''
+                }${typeof c.offset === 'number' ? ' #' + c.offset : ''}]`;
             } else {
                 res = '';
             }

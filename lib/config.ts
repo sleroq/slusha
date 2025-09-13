@@ -34,7 +34,9 @@ const configSchema = z.object({
     names: z.array(z.union([z.string(), z.custom<RegExp>(isValidRegex)])),
     tendToReply: z.array(z.union([z.string(), z.custom<RegExp>(isValidRegex)])),
     tendToReplyProbability: z.number().default(50),
-    tendToIgnore: z.array(z.union([z.string(), z.custom<RegExp>(isValidRegex)])),
+    tendToIgnore: z.array(
+        z.union([z.string(), z.custom<RegExp>(isValidRegex)]),
+    ),
     tendToIgnoreProbability: z.number().default(90),
     randomReplyProbability: z.number().default(1),
     nepons: z.array(z.string()),

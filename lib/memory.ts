@@ -79,6 +79,7 @@ export interface Chat {
     messagesToPass?: number;
     randomReplyProbability?: number;
     hateMode?: boolean;
+    locale?: string;
 }
 
 export class Memory {
@@ -259,15 +260,17 @@ export class ChatMemory {
                 (c.type === 'emoji'
                     ? { type: 'emoji', emoji: c.emoji }
                     : { type: 'custom', customEmojiId: c.customEmojiId }) as
-                    | { type: 'emoji'; emoji: string }
-                    | { type: 'custom'; customEmojiId: string },
+                        | { type: 'emoji'; emoji: string }
+                        | { type: 'custom'; customEmojiId: string },
             );
             const existing = msg.reactions[key];
             if (!existing) {
                 msg.reactions[key] = {
                     type: c.type,
                     emoji: c.type === 'emoji' ? c.emoji : undefined,
-                    customEmojiId: c.type === 'custom' ? c.customEmojiId : undefined,
+                    customEmojiId: c.type === 'custom'
+                        ? c.customEmojiId
+                        : undefined,
                     by: [],
                     count: c.total,
                 };
