@@ -12,9 +12,8 @@ probability-set = Nova probabilidade de resposta: { $probability }%
 
 # Context commands
 context-help = Passe o número de mensagens que vou lembrar - `/context 16`
-
-Valores pequenos dão respostas mais precisas, valores grandes melhoram a memória. Máximo 200.
-Valor atual - { $currentValue }. Passe `default` para voltar ao número padrão de mensagens (atualmente { $defaultValue }, mas pode mudar com atualizações)
+    Valores pequenos dão respostas mais precisas, valores grandes melhoram a memória. Máximo 200.
+    Valor atual - { $currentValue }. Passe `default` para voltar ao número padrão de mensagens (atualmente { $defaultValue }, mas pode mudar com atualizações)
 context-admin-only = Este comando é apenas para administradores do chat
 context-default-set = Número de mensagens definido para valor padrão ({ $defaultValue })
 context-invalid-number = Não entendi o número de mensagens
@@ -23,8 +22,8 @@ context-set = Número de mensagens definido para { $count }
 
 # Random command
 random-help = Especifique um número de 0 a 50 para definir a frequência de respostas aleatórias: `/random <number>`
-Atualmente definido para `{ $currentValue }`%
-`/random default` - definir para valor padrão
+    Atualmente definido para `{ $currentValue }`%
+    `/random default` - definir para valor padrão
 random-admin-only = Este comando é apenas para administradores do chat
 random-updated = Probabilidade de resposta aleatória atualizada
 random-parse-error = Não consegui analisar o número. Tente novamente
@@ -38,18 +37,14 @@ notes-output = { $notes }
 hate-mode-status = ódio está agora { $status }
 hate-mode-admin-only = Este comando é apenas para administradores do chat
 hate-mode-msg = Este comando é apenas para administradores do chat
-Mas se for o caso, ódio está atualmente { $status }
+    Mas se for o caso, ódio está atualmente { $status }
 
 # Character commands
 character-search-help = Clique no botão de pesquisa para encontrar um personagem, não o digite no comando
 
 character-current = Personagem atual: { $name }.
-Nomes de personagem no chat: { $names }
-
-Encontre um personagem do Chub.ai para definir no chat
 character-search-error = Erro ao procurar personagem, tente novamente
 character-search-no-results = Nada encontrado
-Tente procurar por outra coisa
 character-search-results = Personagens daqui: https://venus.chub.ai/characters
 character-rate-limit = Muito frequente
 character-invalid-chat-id = ID de chat inválido
@@ -61,14 +56,14 @@ character-already-exists = Este personagem já está definido
 character-not-found = Não foi possível obter personagem
 character-download-error = Erro ao baixar personagem. Tente novamente
 character-names-help = Escreva variantes do nome "{ $characterName }", que os usuários podem usar como apelos a este personagem. As variantes devem estar em russo, inglês, formas carinhosas diminutivas e formas similares óbvias.
-Exemplo: nome "Cute Slusha". Variantes: ["Cute Slusha", "Slusha", "Слюша", "слюшаня", "слюшка", "шлюша", "слюш"]
-Exemplo: nome "Georgiy". Variantes: ["Georgiy", "Georgie", "George", "Geordie", "Geo", "Егор", "Герасим", "Жора", "Жорка", "Жорочка", "Гоша", "Гошенька", "Гера", "Герочка", "Гога"]
+    Exemplo: nome "Cute Slusha". Variantes: ["Cute Slusha", "Slusha", "Слюша", "слюшаня", "слюшка", "шлюша", "слюш"]
+    Exemplo: nome "Georgiy". Variantes: ["Georgiy", "Georgie", "George", "Geordie", "Geo", "Егор", "Герасим", "Жора", "Жорка", "Жорочка", "Гошा", "Гошенька", "Гера", "Герочка", "Гога"]
 character-names-error = Erro ao obter nomes para personagem. Tente novamente
 character-names-set = Erro ao definir nomes para personagem. Tente novamente
 character-set-success = { $userName } definiu personagem { $characterName }.
-Nomes de personagem no chat: { $names }
-
-Pode ser necessário limpar a memória (/lobotomy), se isso interferir com o novo personagem.
+    Nomes de personagem no chat: { $names }
+    
+    Pode ser necessário limpar a memória (/lobotomy), se isso interferir com o novo personagem.
 
 # Opt-out commands
 opt-out-users-list = Usuários que Slusha não vê:
@@ -127,9 +122,9 @@ character-user-returned-slusha = { $userName } retornou Slusha
 character-downloading = Baixando...
 character-set-again = Definir novamente
 character-set-success = { $userName } definiu personagem { $characterName }.
-Nomes de personagem no chat: { $names }
-
-Pode ser necessário limpar a memória (/lobotomy), se isso interferir com o novo personagem.
+    Nomes de personagem no chat: { $names }
+    
+    Pode ser necessário limpar a memória (/lobotomy), se isso interferir com o novo personagem.
 character-set-to = Personagem definido para { $name }
 
 # Opt-out commands

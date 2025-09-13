@@ -12,9 +12,8 @@ probability-set = Probabilitas respons baru: { $probability }%
 
 # Context commands
 context-help = Lewatkan jumlah pesan yang akan saya ingat - `/context 16`
-
-Nilai kecil memberikan respons yang lebih akurat, nilai besar meningkatkan memori. Maksimum 200.
-Nilai saat ini - { $currentValue }. Lewatkan `default` untuk kembali ke jumlah pesan default (saat ini { $defaultValue }, tetapi dapat berubah dengan pembaruan)
+    Nilai kecil memberikan respons yang lebih akurat, nilai besar meningkatkan memori. Maksimum 200.
+    Nilai saat ini - { $currentValue }. Lewatkan `default` untuk kembali ke jumlah pesan default (saat ini { $defaultValue }, tetapi dapat berubah dengan pembaruan)
 context-admin-only = Perintah ini hanya untuk administrator chat
 context-default-set = Jumlah pesan diatur ke nilai default ({ $defaultValue })
 context-invalid-number = Tidak mengerti jumlah pesan
@@ -23,8 +22,8 @@ context-set = Jumlah pesan diatur ke { $count }
 
 # Random command
 random-help = Tentukan angka dari 0 sampai 50 untuk mengatur frekuensi respons acak: `/random <number>`
-Saat ini diatur ke `{ $currentValue }`%
-`/random default` - atur ke nilai default
+    Saat ini diatur ke `{ $currentValue }`%
+    `/random default` - atur ke nilai default
 random-admin-only = Perintah ini hanya untuk administrator chat
 random-updated = Probabilitas respons acak diperbarui
 random-parse-error = Tidak bisa mengurai angka. Coba lagi
@@ -38,18 +37,14 @@ notes-output = { $notes }
 hate-mode-status = benci sekarang { $status }
 hate-mode-admin-only = Perintah ini hanya untuk administrator chat
 hate-mode-msg = Perintah ini hanya untuk administrator chat
-Tapi jika ada, benci saat ini { $status }
+    Tapi jika ada, benci saat ini { $status }
 
 # Character commands
 character-search-help = Klik tombol pencarian untuk menemukan karakter, jangan masukkan di perintah
 
 character-current = Karakter saat ini: { $name }.
-Nama karakter di chat: { $names }
-
-Temukan karakter dari Chub.ai untuk diatur di chat
 character-search-error = Kesalahan mencari karakter, coba lagi
 character-search-no-results = Tidak ada yang ditemukan
-Coba cari yang lain
 character-search-results = Karakter dari sini: https://venus.chub.ai/characters
 character-rate-limit = Terlalu sering
 character-invalid-chat-id = ID chat tidak valid
@@ -61,14 +56,14 @@ character-already-exists = Karakter ini sudah diatur
 character-not-found = Tidak bisa mendapatkan karakter
 character-download-error = Kesalahan mengunduh karakter. Coba lagi
 character-names-help = Tulis varian nama "{ $characterName }", yang bisa digunakan pengguna sebagai panggilan untuk karakter ini. Varian harus dalam bahasa Rusia, Inggris, bentuk diminutif sayang dan bentuk serupa yang jelas.
-Contoh: nama "Cute Slusha". Varian: ["Cute Slusha", "Slusha", "Слюша", "слюшаня", "слюшка", "шлюша", "слюш"]
-Contoh: nama "Georgiy". Varian: ["Georgiy", "Georgie", "George", "Geordie", "Geo", "Егор", "Герасим", "Жора", "Жорка", "Жорочка", "Гоша", "Гошенька", "Гера", "Герочка", "Гога"]
+    Contoh: nama "Cute Slusha". Varian: ["Cute Slusha", "Slusha", "Слюша", "слюшаня", "слюшка", "шлюша", "слюш"]
+    Contoh: nama "Georgiy". Varian: ["Georgiy", "Georgie", "George", "Geordie", "Geo", "Егор", "Герасим", "Жора", "Жорка", "Жорочка", "Гошा", "Гошенька", "Гера", "Герочка", "Гога"]
 character-names-error = Kesalahan mendapatkan nama untuk karakter. Coba lagi
 character-names-set = Kesalahan mengatur nama untuk karakter. Coba lagi
 character-set-success = { $userName } mengatur karakter { $characterName }.
-Nama karakter di chat: { $names }
-
-Mungkin perlu membersihkan memori (/lobotomy), jika ini mengganggu karakter baru.
+    Nama karakter di chat: { $names }
+    
+    Mungkin perlu membersihkan memori (/lobotomy), jika ini mengganggu karakter baru.
 
 # Opt-out commands
 opt-out-users-list = Pengguna yang tidak dilihat Slusha:
@@ -127,9 +122,9 @@ character-user-returned-slusha = { $userName } mengembalikan Slusha
 character-downloading = Mengunduh...
 character-set-again = Atur lagi
 character-set-success = { $userName } mengatur karakter { $characterName }.
-Nama karakter di chat: { $names }
-
-Mungkin perlu membersihkan memori (/lobotomy), jika ini mengganggu karakter baru.
+    Nama karakter di chat: { $names }
+    
+    Mungkin perlu membersihkan memori (/lobotomy), jika ini mengganggu karakter baru.
 character-set-to = Karakter diatur ke { $name }
 
 # Opt-out commands
