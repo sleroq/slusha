@@ -6,7 +6,7 @@ import { APICallError, generateObject, ModelMessage } from 'ai';
 import { google } from '@ai-sdk/google';
 import { makeHistoryV2 } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
-import { doTyping, replyGeneric, replyWithMarkdownId } from '../helpers.ts';
+import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
 import { ReplyTo } from '../../memory.ts';
 import {
     chatResponseSchema,
@@ -17,7 +17,6 @@ import { canonicalizeReaction } from '../reactions.ts';
 
 export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
     bot.on('message', async (ctx) => {
-        const typing = doTyping(ctx, logger);
 
         const messages: ModelMessage[] = [];
 
@@ -289,7 +288,6 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             let replyText = (res.text ?? '').trim();
             if (replyText.length === 0) {
                 logger.info('Empty response from AI');
-                typing.abort();
                 return;
             }
 
@@ -372,6 +370,5 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             await new Promise((resolve) => setTimeout(resolve, msToWait));
         }
 
-        typing.abort();
     });
 }

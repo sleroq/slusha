@@ -2,6 +2,7 @@ import logger from '../../logger.ts';
 import { SlushaContext } from '../setup-bot.ts';
 import { Config } from '../../config.ts';
 import { Composer } from 'grammy';
+import { doTyping } from '../helpers.ts';
 
 export default function msgDelay(config: Config) {
     const bot = new Composer<SlushaContext>();
@@ -32,7 +33,12 @@ export default function msgDelay(config: Config) {
                 logger.info(
                     'Replying but could not find last message from user',
                 );
-                await handleNext();
+                const typing = doTyping(ctx, logger);
+                try {
+                    await handleNext();
+                } finally {
+                    typing.abort();
+                }
                 return;
             }
 
@@ -47,8 +53,12 @@ export default function msgDelay(config: Config) {
                 ctx.info.userToReply = ctx.msg.from?.username ??
                     ctx.chat.first_name;
             }
-
-            await handleNext();
+            const typing = doTyping(ctx, logger);
+            try {
+                await handleNext();
+            } finally {
+                typing.abort();
+            }
         }, config.responseDelay * 1000);
     });
 
