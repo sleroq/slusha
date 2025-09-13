@@ -96,5 +96,3 @@ bot.callbackQuery(/set-lang .*/, async (ctx) => {
 });
 
 export default bot;
-
-
