@@ -5,18 +5,18 @@ import setupBot from './lib/telegram/setup-bot.ts';
 import { run } from '@grammyjs/runner';
 import { loadMemory, ReplyTo } from './lib/memory.ts';
 
-import { APICallError, generateText, ModelMessage, Output } from 'ai';
+import { APICallError, generateObject, ModelMessage } from 'ai';
 import { google } from '@ai-sdk/google';
 
 import {
     createNameMatcher,
     deleteOldFiles,
-    formatReply,
+    // formatReply,
     getRandomNepon,
     msgTypeSupported,
     prettyDate,
     probability,
-    sliceMessage,
+    // sliceMessage,
     testMessage,
 } from './lib/helpers.ts';
 import {
@@ -26,6 +26,7 @@ import {
     replyWithMarkdownId,
 } from './lib/telegram/helpers.ts';
 import { limit } from 'grammy_ratelimiter';
+import { I18n } from '@grammyjs/i18n';
 import character from './lib/telegram/bot/character.ts';
 import optOut from './lib/telegram/bot/opt-out.ts';
 import msgDelay from './lib/telegram/bot/msg-delay.ts';
@@ -33,16 +34,155 @@ import notes from './lib/telegram/bot/notes.ts';
 import { makeHistoryV2 } from './lib/history.ts';
 import z from 'zod';
 import contextCommand from './lib/telegram/bot/context.ts';
+import language from './lib/telegram/bot/language.ts';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { LangfuseExporter } from 'langfuse-vercel';
 
 const sdk = new NodeSDK({
-  traceExporter: new LangfuseExporter(),
-  instrumentations: [getNodeAutoInstrumentations()],
+    traceExporter: new LangfuseExporter(),
+    instrumentations: [getNodeAutoInstrumentations()],
 });
 
 sdk.start();
+
+const chatEntrySchema = z.union([
+    z.object({
+        text: z.string(),
+        reply_to: z.string().optional(),
+        offset: z.number().int().min(0).optional(),
+    }),
+    z.object({
+        react: z.string(),
+        reply_to: z.string().optional(),
+        offset: z.number().int().min(0).optional(),
+    }),
+]);
+const chatResponseSchema = z.array(chatEntrySchema);
+type ChatEntry = z.infer<typeof chatEntrySchema>;
+type TextEntry = Extract<ChatEntry, { text: string }>;
+type ReactEntry = Extract<ChatEntry, { react: string }>;
+const isReactEntry = (e: ChatEntry): e is ReactEntry => 'react' in e;
+const isTextEntry = (e: ChatEntry): e is TextEntry => 'text' in e;
+
+// Allowed free Telegram reactions (bots cannot use paid/custom unless present)
+const ALLOWED_REACTIONS = [
+    '❤',
+    '👍',
+    '👎',
+    '🔥',
+    '🥰',
+    '👏',
+    '😁',
+    '🤔',
+    '🤯',
+    '😱',
+    '🤬',
+    '😢',
+    '🎉',
+    '🤩',
+    '🤮',
+    '💩',
+    '🙏',
+    '👌',
+    '🕊',
+    '🤡',
+    '🥱',
+    '🥴',
+    '😍',
+    '🐳',
+    '❤‍🔥',
+    '🌚',
+    '🌭',
+    '💯',
+    '🤣',
+    '⚡',
+    '🍌',
+    '🏆',
+    '💔',
+    '🤨',
+    '😐',
+    '🍓',
+    '🍾',
+    '💋',
+    '🖕',
+    '😈',
+    '😴',
+    '😭',
+    '🤓',
+    '👻',
+    '👨‍💻',
+    '👀',
+    '🎃',
+    '🙈',
+    '😇',
+    '😨',
+    '🤝',
+    '✍',
+    '🤗',
+    '🫡',
+    '🎅',
+    '🎄',
+    '☃',
+    '💅',
+    '🤪',
+    '🗿',
+    '🆒',
+    '💘',
+    '🙉',
+    '🦄',
+    '😘',
+    '💊',
+    '🙊',
+    '😎',
+    '👾',
+    '🤷‍♂',
+    '🤷',
+    '🤷‍♀',
+    '😡',
+] as const;
+type AllowedReaction = typeof ALLOWED_REACTIONS[number];
+function isAllowedReaction(emoji: string): emoji is AllowedReaction {
+    // Using array includes retains the literal union for narrowing
+    return (ALLOWED_REACTIONS as readonly string[]).includes(emoji);
+}
+
+// Decode strings like "U+2764 U+FE0F" to actual characters
+function decodeUnicodeTokens(input: string): string {
+    return input.replace(/U\+([0-9a-fA-F]{4,6})/g, (_, hex) => {
+        const codepoint = parseInt(hex, 16);
+        try {
+            return String.fromCodePoint(codepoint);
+        } catch (_) {
+            return '';
+        }
+    }).trim();
+}
+
+// Remove text/emoji presentation variation selectors, keep ZWJ sequences intact
+function stripVariationSelectors(input: string): string {
+    return input.replace(/[\uFE0E\uFE0F]/g, '');
+}
+
+// Canonicalize any incoming emoji into an allowed reaction if possible
+function canonicalizeReaction(input: string): AllowedReaction | null {
+    const candidate = decodeUnicodeTokens(input);
+
+    // Exact match first
+    if (isAllowedReaction(candidate)) {
+        return candidate;
+    }
+
+    const base = stripVariationSelectors(candidate);
+
+    for (const allowed of ALLOWED_REACTIONS) {
+        if (stripVariationSelectors(allowed) === base) {
+            return allowed as AllowedReaction;
+        }
+    }
+
+    return null;
+}
 
 let config: Config;
 try {
@@ -57,25 +197,46 @@ logger.info('Memory loaded');
 
 const bot = await setupBot(config, memory);
 
-bot.command('start', (ctx) => ctx.reply(config.startMessage));
+// Set up internationalization
+const i18n = new I18n({
+    defaultLocale: 'ru', // Russian as default since the bot is primarily Russian-speaking
+    directory: 'locales',
+});
+
+bot.use(i18n);
+// Apply per-chat locale from memory on each update
+bot.use(async (ctx, next) => {
+    try {
+        const memLocale = ctx.m?.getChat().locale;
+        if (memLocale) {
+            await ctx.i18n.useLocale(memLocale);
+        }
+    } catch (_) {
+        // ignore
+    }
+    return next();
+});
+
+bot.command('start', (ctx) => ctx.reply(ctx.t('start-msg')));
+
 
 bot.command('forget', async (ctx) => {
     ctx.m.clear();
-    await ctx.reply('История очищена');
+    await ctx.reply(ctx.t('history-cleared'));
 });
 
 bot.command('lobotomy', async (ctx) => {
     if (ctx.chat.type !== 'private') {
         const admins = await ctx.getChatAdministrators();
         if (!admins.some((a) => a.user.id === ctx.from?.id)) {
-            return ctx.reply('Эта команда только для администраторов чата');
+            return ctx.reply(ctx.t('admin-only'));
         }
     }
 
     ctx.m.clear();
     ctx.m.getChat().notes = [];
     ctx.m.getChat().memory = undefined;
-    await ctx.reply('История очищена');
+    await ctx.reply(ctx.t('history-cleared'));
 });
 
 bot.command('changelog', async (ctx) => {
@@ -87,6 +248,7 @@ bot.command('changelog', async (ctx) => {
 
 bot.use(optOut);
 bot.use(contextCommand);
+bot.use(language);
 bot.use(character);
 
 bot.command('model', (ctx) => {
@@ -95,7 +257,7 @@ bot.command('model', (ctx) => {
         !config.adminIds || !ctx.msg.from ||
         !config.adminIds.includes(ctx.msg.from.id)
     ) {
-        return ctx.reply('Not bot admin ' + ctx.msg.from?.id);
+        return ctx.reply(ctx.t('admin-only'));
     }
 
     const args = ctx.msg.text
@@ -105,18 +267,22 @@ bot.command('model', (ctx) => {
 
     // If no parameter is passed, show current model
     if (args.length === 1) {
-        return ctx.reply(ctx.m.getChat().chatModel ?? config.ai.model);
+        return ctx.reply(
+            ctx.t('model-current', {
+                model: ctx.m.getChat().chatModel ?? config.ai.model,
+            }),
+        );
     }
 
     // If parameter is passed, set new model
     const newModel = args[1];
     if (newModel === 'default') {
         ctx.m.getChat().chatModel = undefined;
-        return ctx.reply('Model reset');
+        return ctx.reply(ctx.t('model-reset'));
     }
 
     ctx.m.getChat().chatModel = newModel;
-    return ctx.reply(`Model set to ${newModel}`);
+    return ctx.reply(ctx.t('model-set', { model: newModel }));
 });
 
 bot.command('random', async (ctx) => {
@@ -131,34 +297,30 @@ bot.command('random', async (ctx) => {
     if (args.length === 1) {
         return replyWithMarkdown(
             ctx,
-            'Укажи число от 0 до 50 вторым аргументом, чтобы настроить частоту случайных ответов: `/random <number>`\n' +
-                `Сейчас стоит \`${currentValue}\`%\n` +
-                '`/random default` - поставить значение по умолчанию',
+            ctx.t('random-help', { currentValue }),
         );
     }
 
     if (ctx.chat.type !== 'private') {
         const admins = await ctx.getChatAdministrators();
         if (!admins.some((a) => a.user.id === ctx.from?.id)) {
-            return ctx.reply('Эта команда только для администраторов чата');
+            return ctx.reply(ctx.t('random-admin-only'));
         }
     }
 
     const newValue = args[1];
     if (newValue === 'default') {
         ctx.m.getChat().randomReplyProbability = undefined;
-        return ctx.reply('Шанс случайных ответов обновлен');
+        return ctx.reply(ctx.t('random-updated'));
     }
 
     const probability = parseFloat(newValue);
     if (isNaN(probability) || probability < 0 || probability > 50) {
-        return ctx.reply(
-            'Нераспарсилось число. Попробуй снова',
-        );
+        return ctx.reply(ctx.t('random-parse-error'));
     }
 
     ctx.m.getChat().randomReplyProbability = probability;
-    return ctx.reply(`Новая вероятность ответа: ${probability}%`);
+    return ctx.reply(ctx.t('random-set', { probability }));
 });
 
 bot.command('summary', (ctx) => {
@@ -166,28 +328,38 @@ bot.command('summary', (ctx) => {
     const notes = ctx.m.getChat().notes.slice(-config.maxNotesToStore - 2);
 
     if (notes.length === 0) {
-        return ctx.reply('Пока маловато сообщений прошло, сам прочитай');
+        return ctx.reply(ctx.t('notes-too-few-messages'));
     }
 
-    return ctx.reply(notes.join('\n').replaceAll('\n\n', '\n'));
+    return ctx.reply(
+        ctx.t('notes-output', {
+            notes: notes.join('\n').replaceAll('\n\n', '\n'),
+        }),
+    );
 });
 
 bot.command('hatemode', async (ctx) => {
     if (ctx.chat.type !== 'private') {
         const admins = await ctx.getChatAdministrators();
         if (!admins.some((a) => a.user.id === ctx.from?.id)) {
-            const msg = 'Эта команда только для администраторов чата' + '\n' +
-                `Но если что, хейт сейчас ${
-                    ctx.m.getChat().hateMode ? 'включен' : 'выключен'
-                }`;
-            return ctx.reply(msg);
+            return ctx.reply(
+                ctx.t('hate-mode-msg', {
+                    status: ctx.m.getChat().hateMode
+                        ? ctx.t('enabled')
+                        : ctx.t('disabled'),
+                }),
+            );
         }
     }
 
     ctx.m.getChat().hateMode = !ctx.m.getChat().hateMode;
 
     return ctx.reply(
-        `хейт теперь ${ctx.m.getChat().hateMode ? 'включен' : 'выключен'}`,
+        ctx.t('hate-mode-status', {
+            status: ctx.m.getChat().hateMode
+                ? ctx.t('enabled')
+                : ctx.t('disabled'),
+        }),
     );
 });
 
@@ -268,9 +440,9 @@ bot.on('message', (ctx, next) => {
         testMessage(config.tendToReply, msg.text) &&
         probability(config.tendToReplyProbability)
     ) {
-        logger.info(
-            `Replying because of tend to reply "${sliceMessage(msg.text, 50)}"`,
-        );
+        // logger.info(
+        //     `Replying because of tend to reply "${sliceMessage(msg.text, 50)}"`,
+        // );
         ctx.info.isRandom = true;
         return next();
     }
@@ -279,7 +451,7 @@ bot.on('message', (ctx, next) => {
         config.randomReplyProbability;
 
     if (probability(randomReplyProbability)) {
-        logger.info('Replying because of random reply probability');
+        // logger.info('Replying because of random reply probability');
         ctx.info.isRandom = true;
         return next();
     }
@@ -421,6 +593,7 @@ bot.on('message', async (ctx) => {
                 messagesLimit: messagesToPass,
                 bytesLimit: config.ai.bytesLimit,
                 symbolLimit: config.ai.messageMaxLength,
+                includeReactions: true,
             },
         );
     } catch (error) {
@@ -460,15 +633,15 @@ bot.on('message', async (ctx) => {
     // TODO: Fix repeating replies
     let result;
     try {
-        result = await generateText({
+        result = await generateObject({
             model: google(model),
-            providerOptions: { google: { safetySettings } },
-            experimental_output: Output.object({
-                schema: z.array(z.object({
-                    text: z.string(),
-                    reply_to: z.string().optional(),
-                })),
-            }),
+            providerOptions: {
+                google: {
+                    safetySettings,
+                    thinkingConfig: { thinkingBudget: 1024 },
+                },
+            },
+            schema: chatResponseSchema,
             temperature: config.ai.temperature,
             topK: config.ai.topK,
             topP: config.ai.topP,
@@ -478,7 +651,9 @@ bot.on('message', async (ctx) => {
                 functionId: 'user-message',
                 metadata: {
                     sessionId: ctx.chat.id.toString(),
-                    userId: ctx.chat.type === 'private' ? ctx.from?.id.toString() : '',
+                    userId: ctx.chat.type === 'private'
+                        ? ctx.from?.id.toString()
+                        : '',
                     tags,
                 },
             },
@@ -512,10 +687,7 @@ bot.on('message', async (ctx) => {
         return;
     }
 
-    const output = result.experimental_output as {
-        text: string;
-        reply_to?: string;
-    }[];
+    const output = result.object;
 
     const name = ctx.chat.first_name ?? ctx.chat.title;
     const username = ctx.chat?.username ? `(@${ctx.chat.username})` : '';
@@ -527,16 +699,103 @@ bot.on('message', async (ctx) => {
     //         .join('\n\n'),
     // );
     logger.info(
-        'Time to get response:',
+        `Time to get response ${ctx.info.isRandom ? '(random)' : ''}:`,
         (new Date().getTime() - time) / 1000,
-        `for "${name}" ${username}. Response:\n`,
-        formatReply(output, character),
+        `for "${name}" ${username}. `,
+        // + ` Response:\n formatReply(output, character)`,
     );
 
-    let lastMsgId = null;
+    function resolveTargetMessageId(
+        replyToUsername?: string,
+        offset?: number,
+        fallbackToLast = true,
+    ): number | undefined {
+        const normOffset = typeof offset === 'number' && offset >= 0
+            ? offset
+            : 0;
+
+        const history = savedHistory;
+        if (history.length === 0) {
+            return undefined;
+        }
+
+        const uname = replyToUsername?.startsWith('@')
+            ? replyToUsername.slice(1)
+            : replyToUsername;
+
+        // Build candidate list according to username presence
+        // Default to user messages (not the bot itself)
+        let candidates = history.filter((m) => !m.isMyself);
+        if (uname) {
+            candidates = history.filter((m) => m.info.from?.username === uname);
+            if (candidates.length === 0) {
+                // Username not found → fallback to all messages
+                candidates = history.filter((m) => !m.isMyself);
+            }
+        }
+
+        // Pick from the end applying offset; clamp to range
+        const idxFromEnd = Math.max(
+            0,
+            Math.min(normOffset, candidates.length - 1),
+        );
+        const target = candidates[candidates.length - 1 - idxFromEnd];
+        if (target?.id) return target.id;
+
+        if (fallbackToLast) {
+            return history[history.length - 1]?.id;
+        }
+        return undefined;
+    }
+
+    let lastMsgId: number | undefined = undefined;
     for (let i = 0; i < output.length; i++) {
         const res = output[i];
-        let replyText = res.text.trim();
+
+        // Handle reaction-only entries
+        if (
+            isReactEntry(res) && typeof res.react === 'string' &&
+            res.react.trim().length > 0
+        ) {
+            const canon = canonicalizeReaction(res.react.trim());
+            if (canon) {
+                const targetId = resolveTargetMessageId(
+                    res.reply_to,
+                    res.offset,
+                    true,
+                );
+                if (targetId) {
+                    try {
+                        await ctx.api.setMessageReaction(
+                            ctx.chat.id,
+                            targetId,
+                            [{ type: 'emoji', emoji: canon }],
+                        );
+                        // Save bot's reaction on success
+                        ctx.m.addEmojiReaction(targetId, canon, {
+                            id: bot.botInfo.id,
+                            username: bot.botInfo.username,
+                            first_name: bot.botInfo.first_name ?? 'Slusha',
+                        });
+                    } catch (error) {
+                        logger.warn('Could not set reaction: ', error);
+                    }
+                } else {
+                    logger.debug('Reaction target not found, skipping');
+                }
+            } else {
+                logger.debug('Reaction not allowed, dropping: ' + res.react);
+            }
+
+            continue;
+        }
+
+        if (!isTextEntry(res)) {
+            // Not a text entry and not a reaction entry (shouldn't happen) → skip
+            continue;
+        }
+
+        let replyText = (res.text ?? '').trim();
 
         if (replyText.length === 0) {
             logger.info(
@@ -554,12 +813,9 @@ bot.on('message', async (ctx) => {
             replyText = '-' + replyText;
         }
 
-        let msgToReply;
-        if (res.reply_to) {
-            // Find latest message with this username
-            msgToReply = savedHistory.findLast((m) =>
-                '@' + m.info.from?.username === res.reply_to
-            )?.id;
+        let msgToReply: number | undefined;
+        if (res.reply_to || typeof res.offset === 'number') {
+            msgToReply = resolveTargetMessageId(res.reply_to, res.offset, true);
         }
 
         if (!msgToReply && lastMsgId) {
@@ -620,7 +876,12 @@ bot.on('message', async (ctx) => {
         }
 
         const typingSpeed = 1200; // symbol per minute
-        let msToWait = output[i + 1].text.length / typingSpeed * 60 * 1000;
+        const next = output[i + 1];
+        const nextLen =
+            next && isTextEntry(next) && typeof next.text === 'string'
+                ? next.text.length
+                : 0;
+        let msToWait = nextLen / typingSpeed * 60 * 1000;
 
         if (msToWait > 5000) {
             msToWait = 5000;
@@ -634,8 +895,11 @@ bot.on('message', async (ctx) => {
 
 run(bot, {
     runner: {
-        // @ts-expect-error TODO: Seems to work
+        // @ts-expect-error drop_pending_updates is supported by grammY runner
         drop_pending_updates: true,
+        fetch: {
+            allowed_updates: [] as const, // TODO: Add reactions here, but make sure to preserve all default event types
+        },
     },
 });
 logger.info('Bot started');

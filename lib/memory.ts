@@ -10,12 +10,39 @@ export interface ReplyTo {
     isMyself: boolean;
 }
 
+export interface ReactionBy {
+    id: number;
+    username?: string;
+    name: string;
+}
+
+export interface ReactionRecord {
+    type: 'emoji' | 'custom';
+    emoji?: string;
+    customEmojiId?: string;
+    by: ReactionBy[];
+    count: number;
+}
+
+export type MessageReactions = { [key: string]: ReactionRecord };
+
+function reactionKey(
+    reaction:
+        | { type: 'emoji'; emoji: string }
+        | { type: 'custom'; customEmojiId: string },
+): string {
+    return reaction.type === 'emoji'
+        ? `e:${reaction.emoji}`
+        : `c:${reaction.customEmojiId}`;
+}
+
 export interface ChatMessage {
     id: number;
     text: string;
     replyTo?: ReplyTo;
     isMyself: boolean;
     info: Message;
+    reactions?: MessageReactions;
 }
 
 export interface OptOutUser {
@@ -52,6 +79,7 @@ export interface Chat {
     messagesToPass?: number;
     randomReplyProbability?: number;
     hateMode?: boolean;
+    locale?: string;
 }
 
 export class Memory {
@@ -178,6 +206,143 @@ export class ChatMemory {
         );
 
         return activeMembers.slice(0, limit);
+    }
+
+    getMessageById(messageId: number) {
+        return this.getHistory().find((m) => m.id === messageId);
+    }
+
+    addEmojiReaction(
+        messageId: number,
+        emoji: string,
+        by?: Pick<User, 'id' | 'username' | 'first_name'>,
+    ) {
+        this.upsertReaction(messageId, { type: 'emoji', emoji }, by);
+    }
+
+    removeEmojiReaction(
+        messageId: number,
+        emoji: string,
+        by?: Pick<User, 'id' | 'username' | 'first_name'>,
+    ) {
+        this.removeReaction(messageId, { type: 'emoji', emoji }, by);
+    }
+
+    addCustomReaction(
+        messageId: number,
+        customEmojiId: string,
+        by?: Pick<User, 'id' | 'username' | 'first_name'>,
+    ) {
+        this.upsertReaction(messageId, { type: 'custom', customEmojiId }, by);
+    }
+
+    removeCustomReaction(
+        messageId: number,
+        customEmojiId: string,
+        by?: Pick<User, 'id' | 'username' | 'first_name'>,
+    ) {
+        this.removeReaction(messageId, { type: 'custom', customEmojiId }, by);
+    }
+
+    setReactionCounts(
+        messageId: number,
+        counts: Array<
+            | { type: 'emoji'; emoji: string; total: number }
+            | { type: 'custom'; customEmojiId: string; total: number }
+        >,
+    ) {
+        const msg = this.getMessageById(messageId);
+        if (!msg) return;
+        if (!msg.reactions) msg.reactions = {};
+
+        for (const c of counts) {
+            const key = reactionKey(
+                (c.type === 'emoji'
+                    ? { type: 'emoji', emoji: c.emoji }
+                    : { type: 'custom', customEmojiId: c.customEmojiId }) as
+                        | { type: 'emoji'; emoji: string }
+                        | { type: 'custom'; customEmojiId: string },
+            );
+            const existing = msg.reactions[key];
+            if (!existing) {
+                msg.reactions[key] = {
+                    type: c.type,
+                    emoji: c.type === 'emoji' ? c.emoji : undefined,
+                    customEmojiId: c.type === 'custom'
+                        ? c.customEmojiId
+                        : undefined,
+                    by: [],
+                    count: c.total,
+                };
+            } else {
+                existing.count = c.total;
+                msg.reactions[key] = existing;
+            }
+        }
+    }
+
+    private upsertReaction(
+        messageId: number,
+        reaction:
+            | { type: 'emoji'; emoji: string }
+            | { type: 'custom'; customEmojiId: string },
+        by?: Pick<User, 'id' | 'username' | 'first_name'>,
+    ) {
+        const msg = this.getMessageById(messageId);
+        if (!msg) return;
+        if (!msg.reactions) msg.reactions = {};
+
+        const key = reactionKey(reaction);
+        let rec = msg.reactions[key];
+        if (!rec) {
+            rec = msg.reactions[key] = {
+                type: reaction.type,
+                emoji: reaction.type === 'emoji' ? reaction.emoji : undefined,
+                customEmojiId: reaction.type === 'custom'
+                    ? reaction.customEmojiId
+                    : undefined,
+                by: [],
+                count: 0,
+            };
+        }
+
+        rec.count = Math.max(1, rec.count + 1);
+        if (by) {
+            const existingIdx = rec.by.findIndex((u) => u.id === by.id);
+            const userRec = {
+                id: by.id,
+                username: by.username,
+                name: by.first_name,
+            } as ReactionBy;
+            if (existingIdx === -1) rec.by.push(userRec);
+            else rec.by[existingIdx] = userRec;
+        }
+    }
+
+    private removeReaction(
+        messageId: number,
+        reaction:
+            | { type: 'emoji'; emoji: string }
+            | { type: 'custom'; customEmojiId: string },
+        by?: Pick<User, 'id' | 'username' | 'first_name'>,
+    ) {
+        const msg = this.getMessageById(messageId);
+        if (!msg || !msg.reactions) return;
+
+        const key = reactionKey(reaction);
+        const rec = msg.reactions[key];
+        if (!rec) return;
+
+        if (by) {
+            rec.by = rec.by.filter((u) => u.id !== by.id);
+        }
+
+        if (rec.count > 0) rec.count -= 1;
+        if (rec.count <= 0 && rec.by.length === 0) {
+            delete msg.reactions[key];
+        } else {
+            msg.reactions[key] = rec;
+        }
     }
 }
 

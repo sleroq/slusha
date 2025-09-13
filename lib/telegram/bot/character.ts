@@ -28,25 +28,31 @@ bot.command('character', async (ctx) => {
     let replyText = '';
 
     if (textParts.length > 1) {
-        replyText +=
-            'Тыкни на кнопку поиска чтобы найти персонажа, не нужно вводить в команду\n\n';
+        replyText += ctx.t('character-search-help');
     }
 
     let keyboard = new InlineKeyboard()
-        .switchInlineCurrent('Поиск', `@${ctx.chat.id} `);
+        .switchInlineCurrent(ctx.t('search'), `@${ctx.chat.id} `);
 
     const character = ctx.m.getChat().character;
 
-    const name = character?.name ?? 'Слюша';
+    const name = character?.name ?? ctx.t('slusha-name');
 
-    replyText = `${replyText}\n\nТекущий персонаж: ${name}.\n`;
+    replyText = `${replyText}\n\n${ctx.t('character-current', { name })}\n`;
 
     if (character) {
-        keyboard = keyboard.text('Вернуть Слюшу', `set ${ctx.chat.id} default`);
-        replyText += `Имена в чате: ${character.names.join(', ')}\n`;
+        keyboard = keyboard.text(
+            ctx.t('character-return-slusha'),
+            `set ${ctx.chat.id} default`,
+        );
+        replyText += `${
+            ctx.t('character-names-in-chat', {
+                names: character.names.join(', '),
+            })
+        }\n`;
     }
 
-    replyText += `\nНайдите персонажа из Chub.ai чтобы установить его в чат`;
+    replyText += `\n${ctx.t('character-find-from-chub')}`;
 
     // Reply with search button
     await ctx.reply(
@@ -55,50 +61,49 @@ bot.command('character', async (ctx) => {
     );
 });
 
-const noChatIdErrorResult = InlineQueryResultBuilder
-    .article('696969', 'Нет поиска', {
-        description: 'Так просто искать нельзя, используй команду /character',
-    })
-    .text(
-        'Открой поиск через команду /character',
-    );
-
-function errorResult(chatId: number) {
+function noChatIdErrorResult(ctx: SlushaContext) {
     return InlineQueryResultBuilder
-        .article('696969', 'Поиск по имени персонажа в Chub.ai', {
-            description: 'Ошибка при поиске персонажа, попробуйте еще раз',
-            reply_markup: new InlineKeyboard()
-                .switchInlineCurrent('Поиск', `@${chatId} `),
+        .article('696969', ctx.t('character-no-search'), {
+            description: ctx.t('character-search-not-allowed'),
         })
-        .text('Ошибка при поиске персонажа');
+        .text(ctx.t('character-open-search'));
 }
 
-function headerResult(chatId: number, query: string) {
+function errorResult(chatId: number, ctx: SlushaContext) {
     return InlineQueryResultBuilder
-        .article('696969', 'Поиск по имени персонажа в Chub.ai', {
-            description:
-                'Подсказка: добавь /nsfw в запрос, чтобы включить nsfw результаты',
+        .article('696969', ctx.t('character-search-title'), {
+            description: ctx.t('character-search-error'),
+            reply_markup: new InlineKeyboard()
+                .switchInlineCurrent(ctx.t('search'), `@${chatId} `),
+        })
+        .text(ctx.t('character-search-error-text'));
+}
+
+function headerResult(chatId: number, query: string, ctx: SlushaContext) {
+    return InlineQueryResultBuilder
+        .article('696969', ctx.t('character-search-title'), {
+            description: ctx.t('character-nsfw-hint'),
             thumbnail_url: 'https://chub.ai/logo_cataract.png',
             reply_markup: new InlineKeyboard()
-                .switchInlineCurrent('Поиск', `@${chatId} ${query}`),
+                .switchInlineCurrent(ctx.t('search'), `@${chatId} ${query}`),
         })
-        .text('Персонажи отсюда: https://venus.chub.ai/characters');
+        .text(ctx.t('character-source-link'));
 }
 
-function notFoundResult(chatId: number) {
+function notFoundResult(chatId: number, ctx: SlushaContext) {
     return InlineQueryResultBuilder
         .article(
-            'Ничего не найдено',
-            'Попробуйте искать что-нибудь другое',
+            ctx.t('character-nothing-found'),
+            ctx.t('character-try-different-search'),
             {
-                description: 'Ничего не найдено',
+                description: ctx.t('character-nothing-found'),
                 thumbnail_url:
                     'https://imgs.search.brave.com/g1uD8EeI5LKrOZlyrIsyEtHoHvDxV4TWWjSqjQSsndQ/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9jZG4u/cGl4YWJheS5jb20v/cGhvdG8vMjAxNy8w/My8xMy8wNy8yOC9j/b21tdW5pY2F0aW9u/LTIxMzg5ODBfNjQw/LmpwZw',
                 reply_markup: new InlineKeyboard()
-                    .switchInlineCurrent('Поиск', `@${chatId} `),
+                    .switchInlineCurrent(ctx.t('search'), `@${chatId} `),
             },
         )
-        .text('Ничего не найдено');
+        .text(ctx.t('character-nothing-found'));
 }
 
 bot.inlineQuery(/.*/, async (ctx) => {
@@ -110,7 +115,7 @@ bot.inlineQuery(/.*/, async (ctx) => {
 
     const chatId = parseInt(args[0]?.replace('@', ''));
     if (isNaN(chatId)) {
-        return ctx.answerInlineQuery([noChatIdErrorResult]);
+        return ctx.answerInlineQuery([noChatIdErrorResult(ctx)]);
     }
     args.splice(0, 1);
 
@@ -148,15 +153,17 @@ bot.inlineQuery(/.*/, async (ctx) => {
         characters = await getCharacters(query, page, excludeNsfw);
     } catch (error) {
         logger.error('Could not get characters: ', error);
-        return ctx.answerInlineQuery([errorResult(chatId)], { cache_time: 0 });
+        return ctx.answerInlineQuery([errorResult(chatId, ctx)], {
+            cache_time: 0,
+        });
     }
 
     const results: InlineQueryResultArticle[] = [];
 
-    results.push(headerResult(chatId, query));
+    results.push(headerResult(chatId, query, ctx));
 
     if (characters.length === 0) {
-        results.push(notFoundResult(chatId));
+        results.push(notFoundResult(chatId, ctx));
         return ctx.answerInlineQuery(results);
     }
 
@@ -223,8 +230,8 @@ bot.inlineQuery(/.*/, async (ctx) => {
         text += ` <a href="${url}">${starCount}</a> ⭐`;
 
         const keyboard = new InlineKeyboard()
-            .switchInlineCurrent('Поиск', `@${chatId} `)
-            .text('Установить', `set ${chatId} ${character.id}`);
+            .switchInlineCurrent(ctx.t('search'), `@${chatId} `)
+            .text(ctx.t('character-set'), `set ${chatId} ${character.id}`);
 
         const result = InlineQueryResultBuilder
             .article(
@@ -249,23 +256,23 @@ bot.inlineQuery(/.*/, async (ctx) => {
     if (characters.length == pageSize) {
         const nextPageKeyboard = new InlineKeyboard()
             .switchInlineCurrent(
-                'Следующая страница',
+                ctx.t('character-next-page'),
                 `@${chatId} /p ${page + 1} ${query}`,
             );
 
         results.push(
             InlineQueryResultBuilder
                 .article(
-                    'Следующая страница',
-                    'кликай чтобы открыть следующую страницу',
+                    ctx.t('character-next-page'),
+                    ctx.t('character-click-next-page'),
                     {
-                        description: 'Поиск - Следующая страница',
+                        description: ctx.t('character-search-next-page'),
                         thumbnail_url:
                             'https://imgs.search.brave.com/6T6lo-oOr54SXQjAYk66hQUadauJQe69QkXl2EE-4Mw/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9nZXRk/cmF3aW5ncy5jb20v/ZnJlZS1pY29uL25l/eHQtcGFnZS1pY29u/LTY3LnBuZw',
                         reply_markup: nextPageKeyboard,
                     },
                 )
-                .text('Следующая страница'),
+                .text(ctx.t('character-next-page')),
         );
     }
 
@@ -279,7 +286,7 @@ bot.use(limit(
         limit: 1,
 
         onLimitExceeded: async (ctx) => {
-            await ctx.answerCallbackQuery('Слишком часто');
+            await ctx.answerCallbackQuery(ctx.t('character-rate-limit'));
         },
 
         keyGenerator: (ctx) => {
@@ -308,12 +315,12 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     const chatId = parseInt(args[1]);
     const chat = ctx.memory.chats[chatId];
     if (isNaN(chatId) || chat === undefined) {
-        return ctx.answerCallbackQuery('Invalid chat id');
+        return ctx.answerCallbackQuery(ctx.t('character-invalid-chat-id'));
     }
 
     const userInChat = chat.members.find((member) => member.id === ctx.from.id);
     if (!userInChat) {
-        return ctx.answerCallbackQuery('You are not a member of this chat');
+        return ctx.answerCallbackQuery(ctx.t('character-not-member'));
     }
 
     // Manually set chat by query id cause it's not available in ctx
@@ -325,15 +332,17 @@ bot.callbackQuery(/set.*/, async (ctx) => {
 
     if (args[2] === 'default') {
         let slushaBackKeyboard = new InlineKeyboard()
-            .switchInlineCurrent('Поиск', `@${chatId} `);
+            .switchInlineCurrent(ctx.t('search'), `@${chatId} `);
 
         if (chat.character === undefined) {
-            return ctx.answerCallbackQuery('Слюша уже стоит');
+            return ctx.answerCallbackQuery(ctx.t('character-already-set'));
         } else {
             slushaBackKeyboard = new InlineKeyboard()
-                .switchInlineCurrent('Поиск', `@${chatId} `)
+                .switchInlineCurrent(ctx.t('search'), `@${chatId} `)
                 .text(
-                    `Вернуть ${chat.character.name}`,
+                    ctx.t('character-return-character', {
+                        name: chat.character.name,
+                    }),
                     `set ${chatId} ${chat.character.id}`,
                 );
         }
@@ -342,10 +351,12 @@ bot.callbackQuery(/set.*/, async (ctx) => {
 
         try {
             await Promise.all([
-                ctx.answerCallbackQuery('Установлена Слюша'),
+                ctx.answerCallbackQuery(ctx.t('character-set-slusha')),
                 ctx.api.sendMessage(
                     chatId,
-                    `${ctx.from.first_name} вернул Слюшу`,
+                    ctx.t('character-user-returned-slusha', {
+                        userName: ctx.from.first_name,
+                    }),
                     {
                         reply_markup: slushaBackKeyboard,
                     },
@@ -360,16 +371,19 @@ bot.callbackQuery(/set.*/, async (ctx) => {
 
     const characterId = parseInt(args[2]);
     if (isNaN(characterId)) {
-        return ctx.answerCallbackQuery('Invalid character id');
+        return ctx.answerCallbackQuery(ctx.t('character-invalid-id'));
     }
 
     if (chat.character?.id === characterId) {
-        return ctx.answerCallbackQuery('Этот персонаж уже установлен');
+        return ctx.answerCallbackQuery(ctx.t('character-already-exists'));
     }
 
     const keyboardProgress = new InlineKeyboard()
-        .switchInlineCurrent('Поиск', `@${chatId} `)
-        .text('Скачиваю...', `progress set ${chatId} ${characterId}`);
+        .switchInlineCurrent(ctx.t('search'), `@${chatId} `)
+        .text(
+            ctx.t('character-downloading'),
+            `progress set ${chatId} ${characterId}`,
+        );
 
     try {
         await ctx.editMessageReplyMarkup(
@@ -392,10 +406,11 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         character = await getCharacter(characterId);
     } catch (error) {
         logger.error('Could not get character: ', error);
-        return ctx.answerCallbackQuery('Could not get character');
+        return ctx.answerCallbackQuery(ctx.t('character-not-found'));
     }
 
     const config = ctx.info.config;
+    // TODO: Allow to set different model for generating character names
     const model = chat.chatModel ?? config.model;
 
     let namesResult;
@@ -403,6 +418,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         namesResult = await generateText({
             model: google(model),
             providerOptions: { google: { safetySettings } },
+            // TODO: Remove experimental stuff and move to new stable API
             experimental_output: Output.object({
                 schema: z.array(z.string()),
             }),
@@ -425,18 +441,16 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         });
     } catch (error) {
         logger.error(error, 'Error getting names for character');
-        return await ctx.reply(
-            'Ошибка при получении имен для персонажа. Попробуйте снова',
-        );
+        return await ctx.reply(ctx.t('character-names-error'));
     }
 
     const names = namesResult.experimental_output as Array<string>;
     chat.character = { ...character, names };
 
     const keyboard = new InlineKeyboard()
-        .text('Вернуть Слюшу', `set ${chatId} default`)
-        .text('Установить повторно', `set ${chatId} ${characterId}`)
-        .switchInlineCurrent('Поиск', `@${chatId} `);
+        .text(ctx.t('character-return-slusha'), `set ${chatId} default`)
+        .text(ctx.t('character-set-again'), `set ${chatId} ${characterId}`)
+        .switchInlineCurrent(ctx.t('search'), `@${chatId} `);
 
     try {
         await ctx.editMessageReplyMarkup(
@@ -455,15 +469,17 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     }
 
     const keyboard2 = new InlineKeyboard()
-        .text('Вернуть Слюшу', `set ${chatId} default`)
-        .switchInlineCurrent('Поиск', `@${chatId} `);
+        .text(ctx.t('character-return-slusha'), `set ${chatId} default`)
+        .switchInlineCurrent(ctx.t('search'), `@${chatId} `);
 
     try {
         await ctx.api.sendMessage(
             chatId,
-            `${ctx.from.first_name} установил персонажа ${character.name}.\n` +
-                `Имена в чате: ${chat.character.names.join(', ')}` +
-                '\n\nМожет иметь смысл стереть память (/lobotomy), если это мешает новому персонажу.',
+            ctx.t('character-set-success', {
+                userName: ctx.from.first_name,
+                characterName: character.name,
+                names: chat.character.names.join(', '),
+            }),
             {
                 reply_markup: keyboard2,
             },
@@ -474,7 +490,9 @@ bot.callbackQuery(/set.*/, async (ctx) => {
 
     ctx.m.clear();
 
-    return ctx.answerCallbackQuery('Character is set to ' + character.name);
+    return ctx.answerCallbackQuery(
+        ctx.t('character-set-to', { name: character.name }),
+    );
 });
 
 export default bot;

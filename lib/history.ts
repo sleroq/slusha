@@ -12,33 +12,13 @@ import { Message } from 'grammy_types';
 import { Logger } from '@deno-library/logger';
 import logger from './logger.ts';
 
-export interface FileContent {
-    type: 'file';
-    mimeType: string;
-    data: Uint8Array | ArrayBuffer | string;
-}
-
-export interface TextPart {
-    type: 'text';
-    text: string;
-}
-
-export interface ImagePart {
-    type: 'image';
-    image: Uint8Array | ArrayBuffer | URL | string;
-    mimeType?: string;
-}
-
-type ContentPart = TextPart | ImagePart | FileContent;
-
-type MessageContent = ContentPart[];
-
 interface HistoryOptions {
     symbolLimit: number;
     messagesLimit: number;
     bytesLimit: number;
     attachments?: boolean;
     resolveReplyThread?: boolean;
+    includeReactions?: boolean;
 }
 
 function resolveReplyThread(
@@ -152,6 +132,7 @@ interface ConstructMsgOptions {
     symbolLimit: number;
     attachments: boolean;
     characterName?: string;
+    includeReactions?: boolean;
 }
 
 function getTimeString(date: Date): string {
@@ -169,6 +150,7 @@ async function constructMsg(
 ): Promise<ModelMessage> {
     const { symbolLimit, characterName } = options;
     const attachAttachments = options.attachments;
+    const includeReactions = options.includeReactions ?? false;
 
     const role = msg.isMyself ? 'assistant' : 'user';
     const firstName = msg.info.from?.first_name ?? 'User';
@@ -192,7 +174,9 @@ async function constructMsg(
                 const prettyJsonObject = removeFieldsWithSuffixes(
                     msg.info[type],
                 );
-                text += `\n"${String(type)}": ${JSON.stringify(prettyJsonObject)}`;
+                text += `\n"${String(type)}": ${
+                    JSON.stringify(prettyJsonObject)
+                }`;
             }
         }
     }
@@ -285,6 +269,32 @@ async function constructMsg(
 
     prettyInputMessage += `${text.trim()}`;
 
+    if (
+        includeReactions && msg.reactions &&
+        Object.keys(msg.reactions).length > 0
+    ) {
+        const parts: string[] = [];
+        for (const rec of Object.values(msg.reactions)) {
+            let label = '';
+            if (rec.type === 'emoji' && rec.emoji) label = rec.emoji;
+            else if (rec.type === 'custom' && rec.customEmojiId) {
+                label = `custom:${rec.customEmojiId}`;
+            } else continue;
+
+            if (rec.by && rec.by.length > 0) {
+                const users = rec.by.map((u) =>
+                    u.username ? `@${u.username}` : u.name
+                ).join(', ');
+                parts.push(`${label} by ${users}`);
+            } else if (rec.count && rec.count > 0) {
+                parts.push(`${label} x${rec.count}`);
+            }
+        }
+        if (parts.length > 0) {
+            prettyInputMessage += ` <reactions: ${parts.join(', ')}>`;
+        }
+    }
+
     parts.push({
         type: 'text',
         text: prettyInputMessage,
@@ -358,6 +368,7 @@ export async function makeHistoryV2(
                     {
                         symbolLimit,
                         attachments: attachAttachments,
+                        includeReactions: options.includeReactions,
                     },
                 );
             } catch (error) {

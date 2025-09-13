@@ -8,7 +8,7 @@ COPY deno.json deno.lock ./
 
 COPY . .
 
-RUN deno cache --allow-import main.ts
+RUN deno cache --allow-import --allow-scripts main.ts
 
 FROM denoland/deno:latest
 
@@ -20,8 +20,8 @@ WORKDIR /app
 
 COPY --from=builder --chown=deno:deno /app .
 
-RUN mkdir -p ./tmp ./log ./out ./backups && \
-    chown -R deno:deno ./tmp ./log ./out ./backups
+RUN mkdir -p ./tmp ./log && \
+    chown -R deno:deno ./tmp ./log
 
 USER deno
 
@@ -30,5 +30,7 @@ CMD ["deno", "run", \
      "--allow-net", \
      "--allow-read=.", \
      "--allow-import", \
-     "--allow-write=memory.json,tmp,log,out,backups", \
+     "--allow-write", \
+     "--allow-sys", \
+     "--unstable-detect-cjs", \
      "main.ts"] 
