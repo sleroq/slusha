@@ -17,7 +17,6 @@ import { canonicalizeReaction } from '../reactions.ts';
 
 export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
     bot.on('message', async (ctx) => {
-
         const messages: ModelMessage[] = [];
 
         const useJsonResponses = config.ai.useJsonResponses;
@@ -26,11 +25,10 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
         if (useJsonResponses) {
             prompt = (config.ai.prePrompt ?? '') + '\n\n';
         } else {
-            const fallbackDumbPre = (
+            const fallbackDumbPre =
                 'Отвечай одним сообщением простым текстом без какого-либо JSON.' +
                 '\nНе используй реакции. Пиши кратко и по делу.' +
-                '\nИспользуй Telegram markdown, но без заголовков.'
-            );
+                '\nИспользуй Telegram markdown, но без заголовков.';
             prompt = (config.ai.dumbPrePrompt ?? fallbackDumbPre) + '\n\n';
         }
         const savedHistory = ctx.m.getHistory();
@@ -418,6 +416,5 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             }
             await new Promise((resolve) => setTimeout(resolve, msToWait));
         }
-
     });
 }

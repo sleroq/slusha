@@ -488,7 +488,6 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         return await ctx.reply(ctx.t('character-names-error'));
     }
 
-    
     chat.character = { ...character, names };
 
     const keyboard = new InlineKeyboard()
