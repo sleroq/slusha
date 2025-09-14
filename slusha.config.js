@@ -86,6 +86,8 @@ export default {
         notesFrequency: 190,
         memoryFrequency: 150,
         messageMaxLength: 4096,
+        // Include user message attachments (images, videos, voice, etc.) in history
+        includeAttachmentsInHistory: true,
 
         // Prompt limit in bytes (forced by api provider)
         bytesLimit: 20971520,

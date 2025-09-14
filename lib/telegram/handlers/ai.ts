@@ -152,6 +152,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                     bytesLimit: config.ai.bytesLimit,
                     symbolLimit: config.ai.messageMaxLength,
                     includeReactions: true,
+                    attachments: config.ai.includeAttachmentsInHistory,
                 },
             );
         } catch (error) {

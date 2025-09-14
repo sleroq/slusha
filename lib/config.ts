@@ -45,6 +45,11 @@ const configSchema = z.object({
         notesFrequency: z.number().default(150),
         memoryFrequency: z.number().default(50),
         messageMaxLength: z.number().default(4096),
+        /**
+         * Whether to include attachments (images, videos, voice, etc.)
+         * from user messages when constructing model history
+         */
+        includeAttachmentsInHistory: z.boolean().default(true),
         bytesLimit: z.number().default(20 * 1024 * 1024),
     }),
     startMessage: z.string(),
