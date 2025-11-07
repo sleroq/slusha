@@ -33,4 +33,4 @@ CMD ["deno", "run", \
      "--allow-write", \
      "--allow-sys", \
      "--unstable-detect-cjs", \
-     "main.ts"] 
+     "main.ts"]

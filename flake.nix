@@ -6,10 +6,10 @@
     systems.url = "github:nix-systems/default";
   };
 
-  outputs = { self, nixpkgs, parts, systems } @ inputs: parts.lib.mkFlake { inherit inputs; } {
+  outputs = { parts, systems } @ inputs: parts.lib.mkFlake { inherit inputs; } {
     systems = import systems;
 
-    perSystem = { lib, pkgs, system, ... }: {
+    perSystem = { pkgs, ... }: {
       devShells.default = pkgs.mkShell {
         packages = with pkgs; [
           deno

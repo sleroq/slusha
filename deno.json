@@ -3,21 +3,13 @@
     "strict": true
   },
   "lint": {
-    "include": [
-      "*.ts",
-      "lib/"
-    ],
+    "include": ["*.ts", "lib/"],
     "rules": {
-      "tags": [
-        "recommended"
-      ]
+      "tags": ["recommended"]
     }
   },
   "fmt": {
-    "include": [
-      "*.ts",
-      "lib/"
-    ],
+    "include": ["*.ts", "lib/"],
     "useTabs": false,
     "lineWidth": 80,
     "indentWidth": 4,
