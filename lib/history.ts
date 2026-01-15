@@ -1,5 +1,5 @@
 import { Api, RawApi } from 'grammy';
-import { ModelMessage, UserContent } from 'npm:ai';
+import { ModelMessage, UserContent } from 'ai';
 import {
     chooseSize,
     downloadFile,
@@ -269,6 +269,7 @@ async function constructMsg(
 
     prettyInputMessage += `${text.trim()}`;
 
+    // TODO: Refactor this
     if (
         includeReactions && msg.reactions &&
         Object.keys(msg.reactions).length > 0

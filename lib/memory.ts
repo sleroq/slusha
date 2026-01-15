@@ -281,6 +281,7 @@ export class ChatMemory {
         }
     }
 
+    // TODO: Refactor this mess
     private upsertReaction(
         messageId: number,
         reaction:

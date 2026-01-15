@@ -8,6 +8,7 @@ export function createI18n() {
     });
 }
 
+// FIXME: Figure out why sometimes it defaults to English by mistake
 export function applyLocaleFromMemory() {
     return async (ctx: SlushaContext, next: () => Promise<void>) => {
         try {
