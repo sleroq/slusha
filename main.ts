@@ -4,6 +4,7 @@ import resolveConfig, { Config } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
 import { run } from '@grammyjs/runner';
 import { loadMemory } from './lib/memory.ts';
+import { migrateDb } from './lib/db/migrate.ts';
 
 // AI runtime details moved to handler module
 
@@ -26,6 +27,8 @@ try {
     Deno.exit(1);
 }
 
+await migrateDb();
+
 const memory = await loadMemory();
 logger.info('Memory loaded');
 
@@ -47,7 +50,7 @@ logger.info('Bot started');
 
 // TODO: Remind users about bot existence
 
-const _stopSchedulers = startSchedulers({ memory, config, logger });
+const _stopSchedulers = startSchedulers({ config, logger });
 
 // Save memory on exit
-wireShutdown(bot, memory, sdk);
+wireShutdown(bot, sdk);

@@ -6,7 +6,7 @@ export function registerModel(
     composer: Composer<SlushaContext>,
     config: Config,
 ) {
-    composer.command('model', (ctx) => {
+    composer.command('model', async (ctx) => {
         if (
             !config.adminIds || !ctx.msg.from ||
             !config.adminIds.includes(ctx.msg.from.id)
@@ -22,18 +22,18 @@ export function registerModel(
         if (args.length === 1) {
             return ctx.reply(
                 ctx.t('model-current', {
-                    model: ctx.m.getChat().chatModel ?? config.ai.model,
+                    model: (await ctx.m.getChat()).chatModel ?? config.ai.model,
                 }),
             );
         }
 
         const newModel = args[1];
         if (newModel === 'default') {
-            ctx.m.getChat().chatModel = undefined;
+            await ctx.m.setChatModel(undefined);
             return ctx.reply(ctx.t('model-reset'));
         }
 
-        ctx.m.getChat().chatModel = newModel;
+        await ctx.m.setChatModel(newModel);
         return ctx.reply(ctx.t('model-set', { model: newModel }));
     });
 }

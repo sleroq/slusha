@@ -15,8 +15,8 @@ export function shouldReply(config: {
     tendToReplyProbability: number;
     randomReplyProbability: number;
 }) {
-    return (ctx: SlushaContext, next: () => Promise<void>) => {
-        const msg = ctx.m.getLastMessage();
+    return async (ctx: SlushaContext, next: () => Promise<void>) => {
+        const msg = await ctx.m.getLastMessage();
         const currentMessage = ctx.msg;
 
         if (!msg || !currentMessage) return;
@@ -33,12 +33,12 @@ export function shouldReply(config: {
         }
 
         if (currentMessage.chat.type === 'private') {
-            ctx.m.getChat().lastUse = Date.now();
+            await ctx.m.setLastUse(Date.now());
             return next();
         }
 
         if (currentMessage.reply_to_message?.from?.id === ctx.me.id) {
-            ctx.m.getChat().lastUse = Date.now();
+            await ctx.m.setLastUse(Date.now());
             return next();
         }
 
@@ -46,7 +46,7 @@ export function shouldReply(config: {
             return next();
         }
 
-        const characterNames = ctx.m.getChat().character?.names;
+        const characterNames = (await ctx.m.getChat()).character?.names;
         const names = config.names.concat(characterNames ?? []);
         const nameRegex = createNameMatcher(names);
 
@@ -55,7 +55,7 @@ export function shouldReply(config: {
             !(msg.info.forward_origin?.type === 'user' &&
                 msg.info.forward_origin.sender_user.id === ctx.me.id)
         ) {
-            ctx.m.getChat().lastUse = Date.now();
+            await ctx.m.setLastUse(Date.now());
             logger.info("Replying because of mentioned bot's name");
             return next();
         }
@@ -76,8 +76,9 @@ export function shouldReply(config: {
             return next();
         }
 
-        const randomReplyProbability = ctx.m.getChat().randomReplyProbability ??
-            config.randomReplyProbability;
+        const randomReplyProbability =
+            (await ctx.m.getChat()).randomReplyProbability ??
+                config.randomReplyProbability;
 
         if (probability(randomReplyProbability)) {
             ctx.info.isRandom = true;

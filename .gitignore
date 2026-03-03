@@ -1,6 +1,7 @@
 /scripts/env.bash
 /log
 /memory.json
+/slusha.sqlite
 /out/
 /tmp/
 /backups/
