@@ -39,6 +39,10 @@
     "remark-html": "npm:remark-html@^16.0.1",
     "remark-parse": "npm:remark-parse@^11.0.0",
     "unified": "npm:unified@^11.0.5",
-    "zod": "npm:zod@^4.1.1"
+    "zod": "npm:zod@^4.1.1",
+    "@prisma/client": "npm:@prisma/client@6.19.2",
+    "@prisma/client/runtime/library": "npm:@prisma/client@6.19.2/runtime/library",
+    "@prisma/client/runtime/index-browser": "npm:@prisma/client@6.19.2/runtime/index-browser",
+    "prisma": "npm:prisma@6.19.2"
   }
 }

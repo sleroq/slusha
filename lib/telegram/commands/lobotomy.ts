@@ -11,9 +11,8 @@ bot.command('lobotomy', async (ctx) => {
         }
     }
 
-    ctx.m.clear();
-    ctx.m.getChat().notes = [];
-    ctx.m.getChat().memory = undefined;
+    await ctx.m.clear();
+    await ctx.m.setChatFields({ notes: [], memory: null });
     await ctx.reply(ctx.t('history-cleared'));
 });
 

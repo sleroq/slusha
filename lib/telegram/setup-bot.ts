@@ -60,37 +60,30 @@ export default async function setupBot(config: Config, memory: Memory) {
         return next();
     });
 
+    async function getChat(ctx: SlushaContext) {
+        return await ctx.m.getChat();
+    }
+
     // TODO: Reaction updates (added/removed/changed by users)
 
     // TODO: Save other message types, like special events
-    bot.on('message', (ctx, next) => {
+    bot.on('message', async (ctx, next) => {
         // Filter out old messages (1 minute)
         if (ctx.msg.date - startDate.getTime() / 1000 < 1) {
-            // console.log(
-            //     'Skipping old message',
-            //     ctx.msg.date,
-            //     startDate.getTime() / 1000,
-            // );
             return;
-        } else {
-            // console.log(
-            //     'Processing message',
-            //     ctx.msg.date,
-            //     startDate.getTime() / 1000,
-            // );
         }
+
+        const chat = await getChat(ctx);
 
         // Ignore opted out users and commands
         if (
-            ctx.m.getChat().optOutUsers.some((u) => u.id === ctx.from?.id) &&
+            chat.optOutUsers.some((u) => u.id === ctx.from?.id) &&
             !ctx.msg.text?.startsWith('/optin')
         ) {
             return;
         }
 
-        if (
-            commands.some((c) => ctx.msg.text?.startsWith(c))
-        ) {
+        if (commands.some((c) => ctx.msg.text?.startsWith(c))) {
             return next();
         }
 
@@ -107,7 +100,7 @@ export default async function setupBot(config: Config, memory: Memory) {
         }
 
         // Save every message to memory
-        ctx.m.addMessage({
+        await ctx.m.addMessage({
             id: ctx.msg.message_id,
             text: ctx.msg.text ?? ctx.msg.caption ?? '',
             replyTo,
@@ -116,40 +109,34 @@ export default async function setupBot(config: Config, memory: Memory) {
         });
 
         if (ctx.from) {
-            ctx.m.updateUser(ctx.from);
+            await ctx.m.updateUser(ctx.from);
         }
 
-        ctx.m.removeOldMessages(config.maxMessagesToStore);
+        await ctx.m.removeOldMessages(config.maxMessagesToStore);
 
         return next();
     });
 
-    bot.on(':left_chat_member', (ctx, next) => {
-        ctx.m.getChat().members = ctx.m.getChat().members.filter((m) =>
-            m.id !== ctx.from?.id
+    bot.on(':left_chat_member', async (ctx, next) => {
+        if (ctx.from) {
+            await ctx.m.removeMember(ctx.from.id);
+        }
+        return next();
+    });
+
+    bot.on('edit:text', async (ctx, next) => {
+        await ctx.m.updateEditedMessageText(
+            ctx.msg.message_id,
+            ctx.msg.text ?? ctx.msg.caption ?? '',
         );
-
         return next();
     });
 
-    bot.on('edit:text', (ctx, next) => {
-        const history = ctx.m.getChat().history;
-
-        for (const msg of history) {
-            if (msg.id === ctx.msg.message_id) {
-                msg.text = ctx.msg.text ?? ctx.msg.caption ?? '';
-            }
-        }
-
-        return next();
-    });
-
-    bot.on(':migrate_from_chat_id', (ctx, next) => {
+    bot.on(':migrate_from_chat_id', async (ctx, next) => {
         const from = ctx.msg.migrate_from_chat_id;
         const to = ctx.chat.id;
 
-        ctx.memory.chats[to] = ctx.memory.chats[from];
-        delete ctx.memory.chats[from];
+        await ctx.m.migrateFromChatId(from);
 
         logger.debug(
             `Successfully migrated "${ctx.chat.title}" from ${from} to ${to}`,

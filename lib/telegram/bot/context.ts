@@ -8,7 +8,7 @@ bot.command('context', async (ctx) => {
     const textParts = ctx.msg.text.split(' ').map((arg) => arg.trim());
     const config = ctx.info.config;
 
-    const currentValue = ctx.m.getChat().messagesToPass ??
+    const currentValue = (await ctx.m.getChat()).messagesToPass ??
         config.messagesToPass;
 
     if (textParts.length < 2) {
@@ -29,7 +29,7 @@ bot.command('context', async (ctx) => {
     }
 
     if (textParts[1] === 'default') {
-        ctx.m.getChat().messagesToPass = undefined;
+        await ctx.m.setChatFields({ messagesToPass: null });
         return replyWithMarkdown(
             ctx,
             ctx.t('context-default-set', {
@@ -47,7 +47,7 @@ bot.command('context', async (ctx) => {
         return ctx.reply(ctx.t('context-out-of-range'));
     }
 
-    ctx.m.getChat().messagesToPass = count;
+    await ctx.m.setChatFields({ messagesToPass: count });
 
     let msg = ctx.t('context-set', { count });
     if (count > 60) {

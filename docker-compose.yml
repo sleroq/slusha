@@ -1,14 +1,29 @@
 services:
-  slusha:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: slusha
+      POSTGRES_PASSWORD: slusha_dev
+      POSTGRES_DB: slusha
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  slusha-prod:
+    profiles: ["production"]
     image: slusha:latest
     container_name: slusha
     environment:
       - DENO_ENV=production
       - BOT_TOKEN=${BOT_TOKEN}
       - AI_TOKEN=${AI_TOKEN}
+      - DATABASE_URL=${DATABASE_URL}
     volumes:
-      - ./memory.json:/app/memory.json:Z
       - ./slusha.config.js:/app/slusha.config.js:ro,Z
       - ./tmp:/app/tmp:Z
       - ./log:/app/log:Z
     restart: unless-stopped
+
+volumes:
+  postgres_data:

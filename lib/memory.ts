@@ -1,7 +1,40 @@
-import { Chat as TgChat, Message, User } from 'grammy_types';
+import { Chat as TgChat, Message as TgMessage, User } from 'grammy_types';
+import type {
+    Chat as DbChat,
+    Member as DbMember,
+    OptOutUser as DbOptOutUser,
+    Reaction as DbReaction,
+} from '../generated/prisma/client.ts';
+
 import logger from './logger.ts';
 import { ReplyMessage } from './telegram/helpers.ts';
 import { Character } from './charhub/api.ts';
+
+import { getChatById, getOrCreateChat, updateChat } from './db/chat.ts';
+import {
+    addMessage as dbAddMessage,
+    type DbMessageWithReactions,
+    getMessageByTelegramId as dbGetMessageByTelegramId,
+    getMessages as dbGetMessages,
+    updateMessageText as dbUpdateMessageText,
+} from './db/message.ts';
+import {
+    addReaction as dbAddReaction,
+    getReactionsForMessage as dbGetReactionsForMessage,
+    removeReaction as dbRemoveReaction,
+    toMemoryReactions,
+} from './db/reaction.ts';
+import {
+    getActiveMembers as dbGetActiveMembers,
+    removeMember as dbRemoveMember,
+    upsertMember,
+} from './db/member.ts';
+import {
+    addOptOut as dbAddOptOut,
+    getOptOutUsers as dbGetOptOutUsers,
+    isOptedOut as dbIsOptedOut,
+    removeOptOut as dbRemoveOptOut,
+} from './db/optout.ts';
 
 export interface ReplyTo {
     id: number;
@@ -26,22 +59,12 @@ export interface ReactionRecord {
 
 export type MessageReactions = { [key: string]: ReactionRecord };
 
-function reactionKey(
-    reaction:
-        | { type: 'emoji'; emoji: string }
-        | { type: 'custom'; customEmojiId: string },
-): string {
-    return reaction.type === 'emoji'
-        ? `e:${reaction.emoji}`
-        : `c:${reaction.customEmojiId}`;
-}
-
 export interface ChatMessage {
     id: number;
     text: string;
     replyTo?: ReplyTo;
     isMyself: boolean;
-    info: Message;
+    info: TgMessage;
     reactions?: MessageReactions;
 }
 
@@ -83,45 +106,11 @@ export interface Chat {
 }
 
 export class Memory {
-    chats: {
-        [key: string]: Chat;
-    };
-
-    constructor(data?: NonFunctionProperties<Memory>) {
-        if (!data) data = { chats: {} };
-        this.chats = data.chats;
-    }
-
-    getChat(tgChat: TgChat) {
-        let chat = this.chats[tgChat.id];
-
-        if (!chat) {
-            chat = {
-                notes: [],
-                lastNotes: 0,
-                lastMemory: 0,
-                history: [],
-                lastUse: Date.now(),
-                info: tgChat,
-                optOutUsers: [],
-                members: [],
-            };
-
-            this.chats[tgChat.id] = chat;
-        }
-
-        return chat;
-    }
-
-    save() {
-        const jsonData = JSON.stringify(this);
-        return Deno.writeTextFile('memory.json', jsonData);
+    async getChat(tgChat: TgChat): Promise<DbChat> {
+        return await getOrCreateChat(tgChat);
     }
 }
 
-// Class avalivle when handling message
-// with functionality specific to current chat
-// like get previous messages from this user, get last notes, etc
 export class ChatMemory {
     memory: Memory;
     chatInfo: TgChat;
@@ -131,245 +120,331 @@ export class ChatMemory {
         this.chatInfo = chat;
     }
 
-    getChat() {
-        return this.memory.getChat(this.chatInfo);
+    private get chatId(): bigint {
+        return BigInt(this.chatInfo.id);
     }
 
-    getHistory() {
-        return this.getChat().history;
-    }
+    async getChat() {
+        const chat = await this.memory.getChat(this.chatInfo);
 
-    clear() {
-        this.getChat().history = [];
-        this.getChat().lastNotes = 0;
-    }
-
-    getLastMessage() {
-        // TODO: Fix this
-        return this.getHistory().slice(-1)[0];
-    }
-
-    addMessage(message: ChatMessage) {
-        this.getHistory().push(message);
-    }
-
-    removeOldMessages(maxLength: number) {
-        const history = this.getHistory();
-        if (history.length > maxLength) {
-            history.splice(0, maxLength);
-        }
-    }
-
-    removeOldNotes(maxLength: number) {
-        const notes = this.getChat().notes;
-        if (notes.length > maxLength) {
-            notes.splice(0, maxLength);
-        }
-    }
-
-    updateUser(user: User) {
-        const chat = this.getChat();
-        if (!chat.members) {
-            chat.members = [];
-        }
-
-        const member: Member = {
-            id: user.id,
-            username: user.username,
-            first_name: user.first_name,
-            info: user,
-            description: '',
-            lastUse: Date.now(),
-        };
-
-        const userIndex = chat.members.findIndex((u) => u.id === user.id);
-        if (userIndex === -1) {
-            chat.members.push(member);
-        } else {
-            chat.members[userIndex] = member;
-        }
-    }
-
-    /**
-     * Returns list of active members in chat
-     * with last use less than 3 days ago
-     * @returns Member[]
-     */
-    getActiveMembers(days = 7, limit = 10) {
-        const chat = this.getChat();
-        if (!chat.members) {
-            return [];
-        }
-
-        const activeMembers = chat.members.filter((m) =>
-            m.lastUse > Date.now() - 1000 * 60 * 60 * 24 * days
+        const optOutUsers: DbOptOutUser[] = await dbGetOptOutUsers(chat.id);
+        const members: DbMember[] = await dbGetActiveMembers(
+            chat.id,
+            3650,
+            1000,
         );
 
-        return activeMembers.slice(0, limit);
+        const info = chat.telegramInfo as unknown as TgChat;
+
+        return {
+            notes: chat.notes,
+            lastNotes: chat.lastNotesMessageId ?? 0,
+            lastMemory: chat.lastMemoryMessageId ?? 0,
+            history: [],
+            memory: chat.memory ?? undefined,
+            lastUse: chat.lastUse.getTime(),
+            info,
+            chatModel: chat.chatModel ?? undefined,
+            character: chat.character as unknown as BotCharacter | undefined,
+            messagesToPass: chat.messagesToPass ?? undefined,
+            randomReplyProbability: chat.randomReplyProbability ?? undefined,
+            hateMode: chat.hateMode,
+            locale: chat.locale ?? undefined,
+            optOutUsers: optOutUsers.map((u) => ({
+                id: Number(u.telegramId),
+                username: u.username ?? undefined,
+                first_name: u.firstName,
+            })),
+            members: members.map((m) => ({
+                id: Number(m.telegramId),
+                username: m.username ?? undefined,
+                first_name: m.firstName,
+                description: m.description,
+                info: m.telegramInfo as unknown as User,
+                lastUse: m.lastUse.getTime(),
+            })),
+        } satisfies Chat;
     }
 
-    getMessageById(messageId: number) {
-        return this.getHistory().find((m) => m.id === messageId);
+    async getHistory(limit = 0) {
+        const chat = await this.memory.getChat(this.chatInfo);
+
+        const take = limit > 0 ? limit : 100;
+        const msgs: DbMessageWithReactions[] = await dbGetMessages(
+            chat.id,
+            take,
+        );
+
+        const filtered = chat.historyStartAt
+            ? msgs.filter((m) => m.date > chat.historyStartAt!)
+            : msgs;
+
+        return filtered.map((m): ChatMessage => {
+            return {
+                id: m.telegramId,
+                text: m.text,
+                isMyself: m.isMyself,
+                info: m.telegramInfo as unknown as TgMessage,
+                reactions: toMemoryReactions(
+                    (m.reactions ?? []).map((r: DbReaction) => ({
+                        type: r.type,
+                        emoji: r.emoji ?? null,
+                        customEmojiId: r.customEmojiId ?? null,
+                        userId: r.userId,
+                        userUsername: r.userUsername ?? null,
+                        userFirstName: r.userFirstName ?? null,
+                    })),
+                ),
+            };
+        });
     }
 
-    addEmojiReaction(
+    async clear() {
+        const chat = await this.memory.getChat(this.chatInfo);
+
+        await updateChat(chat.id, {
+            historyStartAt: new Date(),
+            lastNotesMessageId: 0,
+        });
+    }
+
+    async getLastMessage() {
+        const history = await this.getHistory(1);
+        return history.slice(-1)[0];
+    }
+
+    async addMessage(message: ChatMessage) {
+        const chat = await this.memory.getChat(this.chatInfo);
+
+        await dbAddMessage(chat.id, {
+            telegramId: message.id,
+            text: message.text,
+            isMyself: message.isMyself,
+            date: new Date(message.info.date * 1000),
+            telegramInfo: message.info,
+            sender: message.info.from
+                ? {
+                    id: message.info.from.id,
+                    username: message.info.from.username,
+                    first_name: message.info.from.first_name,
+                }
+                : undefined,
+            caption: message.info.caption ?? undefined,
+            replyToTelegramId: message.replyTo?.id,
+            replyToText: message.replyTo?.text,
+        });
+    }
+
+    removeOldMessages(_maxLength: number) {
+        return;
+    }
+
+    async removeOldNotes(maxLength: number) {
+        const chat = await this.memory.getChat(this.chatInfo);
+
+        if (chat.notes.length <= maxLength) {
+            return;
+        }
+
+        const trimmed = chat.notes.slice(-maxLength);
+        await updateChat(chat.id, { notes: trimmed });
+    }
+
+    async updateUser(user: User) {
+        const chat = await this.memory.getChat(this.chatInfo);
+        await upsertMember(chat.id, user);
+    }
+
+    async removeMember(userId: number) {
+        const chat = await this.memory.getChat(this.chatInfo);
+        await dbRemoveMember(chat.id, BigInt(userId));
+    }
+
+    async getActiveMembers(days = 7, limit = 10) {
+        const chat = await this.memory.getChat(this.chatInfo);
+        const members: DbMember[] = await dbGetActiveMembers(
+            chat.id,
+            days,
+            limit,
+        );
+
+        return members.map((m) => ({
+            id: Number(m.telegramId),
+            username: m.username ?? undefined,
+            first_name: m.firstName,
+            description: m.description,
+            info: m.telegramInfo as unknown as User,
+            lastUse: m.lastUse.getTime(),
+        })) satisfies Member[];
+    }
+
+    async getMessageById(messageId: number) {
+        const chat = await this.memory.getChat(this.chatInfo);
+        const msg = await dbGetMessageByTelegramId(chat.id, messageId);
+        if (!msg) return undefined;
+
+        const reactions: DbReaction[] = await dbGetReactionsForMessage(msg.id);
+
+        return {
+            id: msg.telegramId,
+            text: msg.text,
+            isMyself: msg.isMyself,
+            info: msg.telegramInfo as unknown as TgMessage,
+            reactions: toMemoryReactions(
+                reactions.map((r) => ({
+                    type: r.type,
+                    emoji: r.emoji ?? null,
+                    customEmojiId: r.customEmojiId ?? null,
+                    userId: r.userId,
+                    userUsername: r.userUsername ?? null,
+                    userFirstName: r.userFirstName ?? null,
+                })),
+            ),
+        } satisfies ChatMessage;
+    }
+
+    async addEmojiReaction(
         messageId: number,
         emoji: string,
         by?: Pick<User, 'id' | 'username' | 'first_name'>,
     ) {
-        this.upsertReaction(messageId, { type: 'emoji', emoji }, by);
+        const chat = await this.memory.getChat(this.chatInfo);
+        const msg = await dbGetMessageByTelegramId(chat.id, messageId);
+        if (!msg) return;
+
+        try {
+            await dbAddReaction(msg.id, { type: 'emoji', emoji, by });
+        } catch (error) {
+            logger.warn('Could not add reaction: ', error);
+        }
     }
 
-    removeEmojiReaction(
+    async removeEmojiReaction(
         messageId: number,
         emoji: string,
         by?: Pick<User, 'id' | 'username' | 'first_name'>,
     ) {
-        this.removeReaction(messageId, { type: 'emoji', emoji }, by);
+        const chat = await this.memory.getChat(this.chatInfo);
+        const msg = await dbGetMessageByTelegramId(chat.id, messageId);
+        if (!msg) return;
+
+        await dbRemoveReaction(msg.id, { type: 'emoji', emoji, by });
     }
 
-    addCustomReaction(
+    async addCustomReaction(
         messageId: number,
         customEmojiId: string,
         by?: Pick<User, 'id' | 'username' | 'first_name'>,
     ) {
-        this.upsertReaction(messageId, { type: 'custom', customEmojiId }, by);
+        const chat = await this.memory.getChat(this.chatInfo);
+        const msg = await dbGetMessageByTelegramId(chat.id, messageId);
+        if (!msg) return;
+
+        try {
+            await dbAddReaction(msg.id, { type: 'custom', customEmojiId, by });
+        } catch (error) {
+            logger.warn('Could not add custom reaction: ', error);
+        }
     }
 
-    removeCustomReaction(
+    async removeCustomReaction(
         messageId: number,
         customEmojiId: string,
         by?: Pick<User, 'id' | 'username' | 'first_name'>,
     ) {
-        this.removeReaction(messageId, { type: 'custom', customEmojiId }, by);
+        const chat = await this.memory.getChat(this.chatInfo);
+        const msg = await dbGetMessageByTelegramId(chat.id, messageId);
+        if (!msg) return;
+
+        await dbRemoveReaction(msg.id, { type: 'custom', customEmojiId, by });
     }
 
     setReactionCounts(
-        messageId: number,
-        counts: Array<
+        _messageId: number,
+        _counts: Array<
             | { type: 'emoji'; emoji: string; total: number }
             | { type: 'custom'; customEmojiId: string; total: number }
         >,
     ) {
-        const msg = this.getMessageById(messageId);
-        if (!msg) return;
-        if (!msg.reactions) msg.reactions = {};
-
-        for (const c of counts) {
-            const key = reactionKey(
-                (c.type === 'emoji'
-                    ? { type: 'emoji', emoji: c.emoji }
-                    : { type: 'custom', customEmojiId: c.customEmojiId }) as
-                        | { type: 'emoji'; emoji: string }
-                        | { type: 'custom'; customEmojiId: string },
-            );
-            const existing = msg.reactions[key];
-            if (!existing) {
-                msg.reactions[key] = {
-                    type: c.type,
-                    emoji: c.type === 'emoji' ? c.emoji : undefined,
-                    customEmojiId: c.type === 'custom'
-                        ? c.customEmojiId
-                        : undefined,
-                    by: [],
-                    count: c.total,
-                };
-            } else {
-                existing.count = c.total;
-                msg.reactions[key] = existing;
-            }
-        }
+        return;
     }
 
-    // TODO: Refactor this mess
-    private upsertReaction(
-        messageId: number,
-        reaction:
-            | { type: 'emoji'; emoji: string }
-            | { type: 'custom'; customEmojiId: string },
-        by?: Pick<User, 'id' | 'username' | 'first_name'>,
-    ) {
-        const msg = this.getMessageById(messageId);
-        if (!msg) return;
-        if (!msg.reactions) msg.reactions = {};
-
-        const key = reactionKey(reaction);
-        let rec = msg.reactions[key];
-        if (!rec) {
-            rec = msg.reactions[key] = {
-                type: reaction.type,
-                emoji: reaction.type === 'emoji' ? reaction.emoji : undefined,
-                customEmojiId: reaction.type === 'custom'
-                    ? reaction.customEmojiId
-                    : undefined,
-                by: [],
-                count: 0,
-            };
-        }
-
-        rec.count = Math.max(1, rec.count + 1);
-        if (by) {
-            const existingIdx = rec.by.findIndex((u) => u.id === by.id);
-            const userRec = {
-                id: by.id,
-                username: by.username,
-                name: by.first_name,
-            } as ReactionBy;
-            if (existingIdx === -1) rec.by.push(userRec);
-            else rec.by[existingIdx] = userRec;
-        }
+    async isOptedOut(userId: number) {
+        const chat = await this.memory.getChat(this.chatInfo);
+        return await dbIsOptedOut(chat.id, BigInt(userId));
     }
 
-    private removeReaction(
-        messageId: number,
-        reaction:
-            | { type: 'emoji'; emoji: string }
-            | { type: 'custom'; customEmojiId: string },
-        by?: Pick<User, 'id' | 'username' | 'first_name'>,
-    ) {
-        const msg = this.getMessageById(messageId);
-        if (!msg || !msg.reactions) return;
+    async addOptOutUser(user: OptOutUser) {
+        const chat = await this.memory.getChat(this.chatInfo);
+        await dbAddOptOut(chat.id, user);
+    }
 
-        const key = reactionKey(reaction);
-        const rec = msg.reactions[key];
-        if (!rec) return;
+    async removeOptOutUser(userId: number) {
+        const chat = await this.memory.getChat(this.chatInfo);
+        await dbRemoveOptOut(chat.id, BigInt(userId));
+    }
 
-        if (by) {
-            rec.by = rec.by.filter((u) => u.id !== by.id);
+    async setChatFields(fields: {
+        lastUse?: number;
+        hateMode?: boolean;
+        locale?: string;
+        chatModel?: string | null;
+        messagesToPass?: number | null;
+        randomReplyProbability?: number | null;
+        memory?: string | null;
+        notes?: string[];
+        lastNotes?: number;
+        lastMemory?: number;
+        character?: BotCharacter | null;
+    }) {
+        const chat = await this.memory.getChat(this.chatInfo);
+
+        await updateChat(chat.id, {
+            lastUse: typeof fields.lastUse === 'number'
+                ? new Date(fields.lastUse)
+                : undefined,
+            hateMode: fields.hateMode,
+            locale: fields.locale ?? undefined,
+            chatModel: fields.chatModel ?? undefined,
+            messagesToPass: fields.messagesToPass ?? undefined,
+            randomReplyProbability: fields.randomReplyProbability ?? undefined,
+            memory: fields.memory ?? undefined,
+            notes: fields.notes,
+            lastNotesMessageId: fields.lastNotes ?? undefined,
+            lastMemoryMessageId: fields.lastMemory ?? undefined,
+            character: fields.character as unknown as object | undefined,
+        });
+    }
+
+    async migrateFromChatId(fromChatId: number) {
+        const from = await getChatById(BigInt(fromChatId));
+        if (!from) {
+            return;
         }
 
-        if (rec.count > 0) rec.count -= 1;
-        if (rec.count <= 0 && rec.by.length === 0) {
-            delete msg.reactions[key];
-        } else {
-            msg.reactions[key] = rec;
-        }
+        await updateChat(this.chatId, {
+            notes: from.notes,
+            lastNotesMessageId: from.lastNotesMessageId,
+            lastMemoryMessageId: from.lastMemoryMessageId,
+            memory: from.memory,
+            lastUse: from.lastUse,
+            chatModel: from.chatModel,
+            character: from.character,
+            messagesToPass: from.messagesToPass,
+            randomReplyProbability: from.randomReplyProbability,
+            hateMode: from.hateMode,
+            locale: from.locale,
+            telegramInfo: from.telegramInfo,
+            historyStartAt: from.historyStartAt,
+        });
+    }
+
+    async updateEditedMessageText(telegramId: number, text: string) {
+        const chat = await this.memory.getChat(this.chatInfo);
+        await dbUpdateMessageText(chat.id, telegramId, text);
     }
 }
 
-type NonFunctionPropertyNames<T> = {
-    // deno-lint-ignore ban-types
-    [K in keyof T]: T[K] extends Function ? never : K;
-}[keyof T];
-
-type NonFunctionProperties<T> = Pick<T, NonFunctionPropertyNames<T>>;
-
-export async function loadMemory(): Promise<Memory> {
-    let data;
-    try {
-        data = await Deno.readTextFile('memory.json');
-    } catch (error) {
-        logger.warn('reading memory: ', error);
-        return new Memory();
-    }
-
-    let parsedData: NonFunctionProperties<Memory>;
-    try {
-        parsedData = JSON.parse(data);
-    } catch (error) {
-        logger.warn('parsing memory: ', error);
-        return new Memory();
-    }
-
-    return new Memory(parsedData);
+export function loadMemory(): Memory {
+    return new Memory();
 }

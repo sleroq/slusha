@@ -16,14 +16,15 @@ export default function msgDelay(config: Config) {
             }
         }
 
-        // TODO: Make sure this will not cause any concurrency issues (how)
-
         // Wait for half a second before replying
         // to make sure user is finished typing
         setTimeout(async () => {
             // If user is sent something after this message, drop current one
 
-            const history = ctx.m.getHistory();
+            const chat = await ctx.m.getChat();
+            const history = await ctx.m.getHistory(
+                chat.messagesToPass ?? config.ai.messagesToPass,
+            );
 
             // Get last message from this user in chat
             const lastUserMessage = history.filter((msg) =>
@@ -47,7 +48,9 @@ export default function msgDelay(config: Config) {
                 return;
             }
 
-            if (ctx.m.getLastMessage().id !== lastUserMessage.id) {
+            const lastMsg = await ctx.m.getLastMessage();
+
+            if (lastMsg && lastMsg.id !== lastUserMessage.id) {
                 // If user's last message is followed by messages from other users
                 // then add info to which user to reply
                 ctx.info.userToReply = ctx.msg.from?.username ??

@@ -1,0 +1,125 @@
+// prisma/schema.prisma
+
+generator client {
+  // Prisma 6+: native ESM client generator for Deno
+  // See: https://www.prisma.io/docs/orm/prisma-client/deployment/edge/deploy-to-deno-deploy
+  provider = "prisma-client"
+  runtime  = "deno"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Chat {
+  id                     BigInt   @id // Telegram chat ID
+  type                   String   // "private", "group", "supergroup", "channel"
+  title                  String?  // For groups
+  firstName              String?  // For private chats
+  username               String?
+
+  notes                  String[] @default([])
+  lastNotesMessageId     Int?
+  lastMemoryMessageId    Int?
+  memory                 String?  @db.Text
+  lastUse                DateTime @default(now())
+  chatModel              String?
+  character              Json?
+  messagesToPass         Int?
+  randomReplyProbability Float?
+  hateMode               Boolean  @default(false)
+  locale                 String?
+
+  telegramInfo           Json
+
+  // When set, AI history should only use messages after this timestamp.
+  historyStartAt         DateTime?
+
+  messages               Message[]
+  members                Member[]
+  optOutUsers            OptOutUser[]
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model Message {
+  id                Int      @id @default(autoincrement())
+
+  telegramId         Int
+  chatId             BigInt
+  text               String   @db.Text
+  isMyself           Boolean
+  senderId           BigInt?
+  senderUsername     String?
+  senderFirstName    String?
+  date               DateTime
+  caption            String?  @db.Text
+
+  replyToTelegramId  Int?
+  replyToText        String?  @db.Text
+
+  telegramInfo       Json
+
+  chat               Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  reactions          Reaction[]
+
+  createdAt          DateTime @default(now())
+
+  @@unique([chatId, telegramId])
+  @@index([chatId, date])
+  @@index([chatId, senderId])
+}
+
+model Reaction {
+  id            Int      @id @default(autoincrement())
+
+  messageId     Int
+  message       Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  type          String
+  emoji         String?
+  customEmojiId String?
+
+  userId        BigInt?
+  userUsername  String?
+  userFirstName String?
+
+  createdAt     DateTime @default(now())
+
+  @@unique([messageId, type, emoji, customEmojiId, userId])
+  @@index([messageId])
+}
+
+model Member {
+  id           Int      @id @default(autoincrement())
+
+  telegramId   BigInt
+  chatId       BigInt
+  username     String?
+  firstName    String
+  description  String   @default("")
+  lastUse      DateTime @default(now())
+
+  telegramInfo Json
+
+  chat         Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, telegramId])
+  @@index([chatId, lastUse])
+}
+
+model OptOutUser {
+  id         Int    @id @default(autoincrement())
+
+  telegramId BigInt
+  chatId     BigInt
+  username   String?
+  firstName  String
+
+  chat       Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, telegramId])
+}

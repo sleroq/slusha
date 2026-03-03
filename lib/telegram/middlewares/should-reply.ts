@@ -15,8 +15,8 @@ export function shouldReply(config: {
     tendToReplyProbability: number;
     randomReplyProbability: number;
 }) {
-    return (ctx: SlushaContext, next: () => Promise<void>) => {
-        const msg = ctx.m.getLastMessage();
+    return async (ctx: SlushaContext, next: () => Promise<void>) => {
+        const msg = await ctx.m.getLastMessage();
 
         if (!msg) return;
 
@@ -31,13 +31,13 @@ export function shouldReply(config: {
             return;
         }
 
-        if (ctx.msg.chat.type === 'private') {
-            ctx.m.getChat().lastUse = Date.now();
+        if (ctx.msg?.chat.type === 'private') {
+            await ctx.m.setChatFields({ lastUse: Date.now() });
             return next();
         }
 
-        if (ctx.msg.reply_to_message?.from?.id === ctx.me.id) {
-            ctx.m.getChat().lastUse = Date.now();
+        if (ctx.msg?.reply_to_message?.from?.id === ctx.me.id) {
+            await ctx.m.setChatFields({ lastUse: Date.now() });
             return next();
         }
 
@@ -45,7 +45,8 @@ export function shouldReply(config: {
             return next();
         }
 
-        const characterNames = ctx.m.getChat().character?.names;
+        const chat = await ctx.m.getChat();
+        const characterNames = chat.character?.names;
         const names = config.names.concat(characterNames ?? []);
         const nameRegex = createNameMatcher(names);
 
@@ -54,7 +55,7 @@ export function shouldReply(config: {
             !(msg.info.forward_origin?.type === 'user' &&
                 msg.info.forward_origin.sender_user.id === ctx.me.id)
         ) {
-            ctx.m.getChat().lastUse = Date.now();
+            await ctx.m.setChatFields({ lastUse: Date.now() });
             logger.info("Replying because of mentioned bot's name");
             return next();
         }
@@ -75,7 +76,7 @@ export function shouldReply(config: {
             return next();
         }
 
-        const randomReplyProbability = ctx.m.getChat().randomReplyProbability ??
+        const randomReplyProbability = chat.randomReplyProbability ??
             config.randomReplyProbability;
 
         if (probability(randomReplyProbability)) {

@@ -1,13 +1,13 @@
 import Werror from '../werror.ts';
 import logger from '../logger.ts';
-import { Memory } from '../memory.ts';
 import { Bot } from 'grammy';
 import { SlushaContext } from '../telegram/setup-bot.ts';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 
+import { disconnectPrisma } from '../db/client.ts';
+
 export function wireShutdown(
     bot: Bot<SlushaContext>,
-    memory: Memory,
     sdk: NodeSDK,
 ) {
     async function gracefulShutdown() {
@@ -18,10 +18,9 @@ export function wireShutdown(
         }
 
         try {
-            await memory.save();
-            logger.info('Memory saved on exit');
+            await disconnectPrisma();
         } catch (error) {
-            throw new Werror(error, 'Saving memory on exit');
+            throw new Werror(error, 'Disconnecting prisma on exit');
         } finally {
             bot.stop();
             Deno.exit();

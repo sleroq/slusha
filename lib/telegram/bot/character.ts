@@ -34,7 +34,7 @@ bot.command('character', async (ctx) => {
     let keyboard = new InlineKeyboard()
         .switchInlineCurrent(ctx.t('search'), `@${ctx.chat.id} `);
 
-    const character = ctx.m.getChat().character;
+    const character = (await ctx.m.getChat()).character;
 
     const name = character?.name ?? ctx.t('slusha-name');
 
@@ -313,21 +313,21 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     }
 
     const chatId = parseInt(args[1]);
-    const chat = ctx.memory.chats[chatId];
-    if (isNaN(chatId) || chat === undefined) {
+    if (isNaN(chatId)) {
         return ctx.answerCallbackQuery(ctx.t('character-invalid-chat-id'));
     }
+
+    // Manually set chat by query id cause it's not available in ctx
+    ctx.m = new ChatMemory(
+        ctx.memory,
+        { id: chatId } as unknown as ChatMemory['chatInfo'],
+    );
+
+    const chat = await ctx.m.getChat();
 
     const userInChat = chat.members.find((member) => member.id === ctx.from.id);
     if (!userInChat) {
         return ctx.answerCallbackQuery(ctx.t('character-not-member'));
-    }
-
-    // Manually set chat by query id cause it's not available in ctx
-    ctx.m = new ChatMemory(ctx.memory, chat.info);
-
-    if (!chat) {
-        return ctx.answerCallbackQuery('Chat not found');
     }
 
     if (args[2] === 'default') {
@@ -366,7 +366,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
             logger.error('Could not notify character change: ', error);
         }
 
-        ctx.m.clear();
+        await ctx.m.clear();
     }
 
     const characterId = parseInt(args[2]);
@@ -531,7 +531,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         logger.error('Could not send message: ', error);
     }
 
-    ctx.m.clear();
+    await ctx.m.clear();
 
     return ctx.answerCallbackQuery(
         ctx.t('character-set-to', { name: character.name }),

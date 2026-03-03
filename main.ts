@@ -25,7 +25,7 @@ try {
     Deno.exit(1);
 }
 
-const memory = await loadMemory();
+const memory = loadMemory();
 logger.info('Memory loaded');
 
 const bot = await setupBot(config, memory);
@@ -48,5 +48,4 @@ logger.info('Bot started');
 
 const _stopSchedulers = startSchedulers({ memory, config, logger });
 
-// Save memory on exit
-wireShutdown(bot, memory, sdk);
+wireShutdown(bot, sdk);

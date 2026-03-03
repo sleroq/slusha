@@ -6,15 +6,7 @@ import { Config } from '../config.ts';
 export function startSchedulers(
     args: { memory: Memory; config: Config; logger: Logger },
 ) {
-    const { memory, config, logger } = args;
-
-    const saveInterval = setInterval(async () => {
-        try {
-            await memory.save();
-        } catch (error) {
-            logger.error('Could not save memory: ', error);
-        }
-    }, 60 * 1000);
+    const { config, logger } = args;
 
     const filesInterval = setInterval(async () => {
         try {
@@ -25,7 +17,6 @@ export function startSchedulers(
     }, 60 * 60 * 1000);
 
     return () => {
-        clearInterval(saveInterval);
         clearInterval(filesInterval);
     };
 }

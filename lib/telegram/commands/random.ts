@@ -13,7 +13,7 @@ export function registerRandom(
             .map((arg) => arg.trim())
             .filter((arg) => arg !== '');
 
-        const currentValue = ctx.m.getChat().randomReplyProbability ??
+        const currentValue = (await ctx.m.getChat()).randomReplyProbability ??
             config.randomReplyProbability;
 
         if (args.length === 1) {
@@ -32,7 +32,7 @@ export function registerRandom(
 
         const newValue = args[1];
         if (newValue === 'default') {
-            ctx.m.getChat().randomReplyProbability = undefined;
+            await ctx.m.setChatFields({ randomReplyProbability: null });
             return ctx.reply(ctx.t('random-updated'));
         }
 
@@ -41,7 +41,7 @@ export function registerRandom(
             return ctx.reply(ctx.t('random-parse-error'));
         }
 
-        ctx.m.getChat().randomReplyProbability = probability;
+        await ctx.m.setChatFields({ randomReplyProbability: probability });
         return ctx.reply(ctx.t('random-set', { probability }));
     });
 }
