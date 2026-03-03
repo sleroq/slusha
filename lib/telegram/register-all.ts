@@ -30,7 +30,6 @@ export default function registerAll(bot: Bot<SlushaContext>, config: Config) {
 
     registerLateCommands(bot, config);
 
-    bot.use(msgDelay(config));
     bot.use(notes(config, bot.botInfo.id));
 
     bot.on(
@@ -44,6 +43,8 @@ export default function registerAll(bot: Bot<SlushaContext>, config: Config) {
             randomReplyProbability: config.randomReplyProbability,
         }),
     );
+
+    bot.use(msgDelay(config));
 
     bot.use(shortBurstLimiter());
     bot.use(rollingLimiter());
