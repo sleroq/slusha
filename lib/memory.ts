@@ -278,19 +278,38 @@ export class Memory {
     async migrateChat(from: number, to: number, toInfo: TgChat) {
         if (from === to) return;
 
-        const oldChat = await this.getChatById(from);
-        if (!oldChat) {
-            await this.ensureChat(toInfo);
-            return;
-        }
-
-        await this.ensureChat(toInfo);
-        await this.db.delete(chats).where(eq(chats.id, to));
-
         await this.db.transaction(async (tx: Tx) => {
-            await tx.update(chats).set({ id: to, info: JSON.stringify(toInfo) }).where(
-                eq(chats.id, from),
-            );
+            const fromChat = await tx.query.chats.findFirst({ where: eq(chats.id, from) });
+            if (!fromChat) {
+                await tx
+                    .insert(chats)
+                    .values({
+                        id: to,
+                        info: JSON.stringify(toInfo),
+                        lastUse: Date.now(),
+                        lastMemory: 0,
+                        lastNotes: 0,
+                    })
+                    .onConflictDoNothing();
+                return;
+            }
+
+            await tx.delete(messageReactionUsers).where(eq(messageReactionUsers.chatId, to));
+            await tx.delete(chats).where(eq(chats.id, to));
+
+            await tx.insert(chats).values({
+                id: to,
+                info: JSON.stringify(toInfo),
+                lastUse: fromChat.lastUse,
+                lastNotes: fromChat.lastNotes,
+                lastMemory: fromChat.lastMemory,
+                memory: fromChat.memory,
+                chatModel: fromChat.chatModel,
+                messagesToPass: fromChat.messagesToPass,
+                randomReplyProbability: fromChat.randomReplyProbability,
+                hateMode: fromChat.hateMode,
+                locale: fromChat.locale,
+            });
 
             await tx.update(chatNotes).set({ chatId: to }).where(
                 eq(chatNotes.chatId, from),
@@ -313,6 +332,8 @@ export class Memory {
             await tx.update(chatCharacters).set({ chatId: to }).where(
                 eq(chatCharacters.chatId, from),
             );
+
+            await tx.delete(chats).where(eq(chats.id, from));
         });
     }
 
