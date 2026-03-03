@@ -34,7 +34,4 @@ COPY --from=builder --chown=nonroot:nonroot /app/slusha ./slusha
 COPY --from=builder --chown=nonroot:nonroot /app/locales ./locales
 COPY --from=builder --chown=nonroot:nonroot /app/drizzle ./drizzle
 COPY --from=builder --chown=nonroot:nonroot /app/slusha.config.js ./slusha.config.js
-COPY --from=builder --chown=nonroot:nonroot /app/tmp ./tmp
-COPY --from=builder --chown=nonroot:nonroot /app/log ./log
-
 CMD ["/home/nonroot/app/slusha"]
