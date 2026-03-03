@@ -17,8 +17,9 @@ export function shouldReply(config: {
 }) {
     return (ctx: SlushaContext, next: () => Promise<void>) => {
         const msg = ctx.m.getLastMessage();
+        const currentMessage = ctx.msg;
 
-        if (!msg) return;
+        if (!msg || !currentMessage) return;
 
         if (
             !msg.text && !msgTypeSupported(msg.info) &&
@@ -31,12 +32,12 @@ export function shouldReply(config: {
             return;
         }
 
-        if (ctx.msg.chat.type === 'private') {
+        if (currentMessage.chat.type === 'private') {
             ctx.m.getChat().lastUse = Date.now();
             return next();
         }
 
-        if (ctx.msg.reply_to_message?.from?.id === ctx.me.id) {
+        if (currentMessage.reply_to_message?.from?.id === ctx.me.id) {
             ctx.m.getChat().lastUse = Date.now();
             return next();
         }

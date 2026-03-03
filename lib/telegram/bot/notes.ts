@@ -1,6 +1,6 @@
 import { Composer } from 'grammy';
-import { google } from 'npm:@ai-sdk/google';
-import { generateText, ModelMessage } from 'npm:ai';
+import { google } from '@ai-sdk/google';
+import { generateText, ModelMessage } from 'ai';
 import { Config, safetySettings } from '../../config.ts';
 import logger from '../../logger.ts';
 import { SlushaContext } from '../setup-bot.ts';
