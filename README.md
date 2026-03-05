@@ -49,7 +49,6 @@ Smartest girl in telegram.
 
 1. `cp scripts/env.bash.example scripts/env.bash`
 2. set up environment variables
-3. update slusha.config.js to your liking
 
 ## Start:
 
