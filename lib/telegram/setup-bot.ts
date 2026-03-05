@@ -79,13 +79,16 @@ export default async function setupBot(config: Config, memory: Memory) {
         return [chat, user].filter((con) => con !== undefined);
     }));
 
-    bot.use((ctx, next) => {
+    bot.use(async (ctx, next) => {
         // Init custom context
         ctx.memory = memory;
+        let aiConfig = config.ai;
         if (ctx.chat) {
             ctx.m = new ChatMemory(memory, ctx.chat);
+            const effective = await ctx.m.getEffectiveConfig(config);
+            aiConfig = effective.ai;
         }
-        ctx.info = { isRandom: false, config: config.ai };
+        ctx.info = { isRandom: false, config: aiConfig };
 
         return next();
     });

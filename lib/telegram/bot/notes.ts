@@ -12,18 +12,20 @@ export default function notes(config: Config, botId: number) {
     // if bot was used in last 3 days
     bot.on('message', (ctx, next) => {
         async function handleNotes() {
-            const frequency = config.ai.notesFrequency;
+            const effectiveConfig = await ctx.m.getEffectiveConfig(config);
+            const frequency = effectiveConfig.ai.notesFrequency;
             const chat = await ctx.m.getChat();
             const history = await ctx.m.getHistory();
 
             if (
                 chat.lastUse <
-                    Date.now() - config.chatLastUseNotes * 24 * 60 * 60 * 1000
+                    Date.now() -
+                        effectiveConfig.chatLastUseNotes * 24 * 60 * 60 * 1000
             ) {
                 return;
             }
 
-            if (history.length < config.ai.notesFrequency / 2) {
+            if (history.length < effectiveConfig.ai.notesFrequency / 2) {
                 return;
             }
 
@@ -48,8 +50,8 @@ export default function notes(config: Config, botId: number) {
                     history,
                     {
                         messagesLimit: frequency,
-                        symbolLimit: config.ai.messageMaxLength / 3,
-                        bytesLimit: config.ai.bytesLimit,
+                        symbolLimit: effectiveConfig.ai.messageMaxLength / 3,
+                        bytesLimit: effectiveConfig.ai.bytesLimit,
                         characterName,
                     },
                 );
@@ -58,8 +60,8 @@ export default function notes(config: Config, botId: number) {
                 return;
             }
 
-            const model = config.ai.notesModel ?? config.ai.model;
-            const prompt = config.ai.notesPrompt;
+            const model = effectiveConfig.ai.notesModel ?? effectiveConfig.ai.model;
+            const prompt = effectiveConfig.ai.notesPrompt;
 
             const messages: ModelMessage[] = [
                 {
@@ -69,7 +71,7 @@ export default function notes(config: Config, botId: number) {
                 ...context,
                 {
                     role: 'user',
-                    content: config.ai.notesPrompt,
+                    content: effectiveConfig.ai.notesPrompt,
                 },
             ];
 
@@ -86,9 +88,9 @@ export default function notes(config: Config, botId: number) {
                     model: google(model),
                     providerOptions: { google: { safetySettings } },
                     messages,
-                    temperature: config.ai.temperature,
-                    topK: config.ai.topK,
-                    topP: config.ai.topP,
+                    temperature: effectiveConfig.ai.temperature,
+                    topK: effectiveConfig.ai.topK,
+                    topP: effectiveConfig.ai.topP,
                     experimental_telemetry: {
                         isEnabled: true,
                         functionId: 'generate-notes',
@@ -132,7 +134,7 @@ export default function notes(config: Config, botId: number) {
                 .join('\n');
 
             await ctx.m.addNote(summaryText);
-            await ctx.m.removeOldNotes(config.maxNotesToStore);
+            await ctx.m.removeOldNotes(effectiveConfig.maxNotesToStore);
         }
 
         (async () => {
@@ -148,18 +150,20 @@ export default function notes(config: Config, botId: number) {
 
     bot.on('message', (ctx, next) => {
         async function handleMemory() {
-            const frequency = config.ai.memoryFrequency;
+            const effectiveConfig = await ctx.m.getEffectiveConfig(config);
+            const frequency = effectiveConfig.ai.memoryFrequency;
             const chat = await ctx.m.getChat();
             const history = await ctx.m.getHistory();
 
             if (
                 chat.lastUse <
-                    Date.now() - config.chatLastUseNotes * 24 * 60 * 60 * 1000
+                    Date.now() -
+                        effectiveConfig.chatLastUseNotes * 24 * 60 * 60 * 1000
             ) {
                 return;
             }
 
-            if (history.length < config.ai.memoryFrequency / 2) {
+            if (history.length < effectiveConfig.ai.memoryFrequency / 2) {
                 return;
             }
 
@@ -185,8 +189,8 @@ export default function notes(config: Config, botId: number) {
                     savedHistory,
                     {
                         messagesLimit: frequency,
-                        symbolLimit: config.ai.messageMaxLength / 3,
-                        bytesLimit: config.ai.bytesLimit,
+                        symbolLimit: effectiveConfig.ai.messageMaxLength / 3,
+                        bytesLimit: effectiveConfig.ai.bytesLimit,
                         characterName,
                     },
                 );
@@ -205,13 +209,13 @@ export default function notes(config: Config, botId: number) {
             );
 
             if (ctx.chat.type === 'private') {
-                if (config.ai.privateChatPromptAddition) {
-                    prompt += config.ai.privateChatPromptAddition;
+                if (effectiveConfig.ai.privateChatPromptAddition) {
+                    prompt += effectiveConfig.ai.privateChatPromptAddition;
                 }
-            } else if (isComments && config.ai.commentsPromptAddition) {
-                prompt += config.ai.commentsPromptAddition;
-            } else if (config.ai.groupChatPromptAddition) {
-                prompt += config.ai.groupChatPromptAddition;
+            } else if (isComments && effectiveConfig.ai.commentsPromptAddition) {
+                prompt += effectiveConfig.ai.commentsPromptAddition;
+            } else if (effectiveConfig.ai.groupChatPromptAddition) {
+                prompt += effectiveConfig.ai.groupChatPromptAddition;
             }
 
             prompt += '\n\n';
@@ -221,7 +225,7 @@ export default function notes(config: Config, botId: number) {
             if (character) {
                 prompt += '### Character ###\n' + character.description;
             } else {
-                prompt += config.ai.prompt;
+                prompt += effectiveConfig.ai.prompt;
             }
 
             let chatInfoMsg = `Date and time right now: ${
@@ -251,17 +255,17 @@ export default function notes(config: Config, botId: number) {
 
             prompt += '\n\n' + chatInfoMsg;
 
-            let memPrompt = config.ai.memoryPrompt;
+            let memPrompt = effectiveConfig.ai.memoryPrompt;
             if (currentChat.memory) {
                 memPrompt += '\n\n' +
-                    config.ai.memoryPromptRepeat +
+                    effectiveConfig.ai.memoryPromptRepeat +
                     '\n' +
                     currentChat.memory;
             }
 
-            prompt += '\n\n' + config.ai.memoryPrompt;
+            prompt += '\n\n' + effectiveConfig.ai.memoryPrompt;
 
-            const model = config.ai.memoryModel ?? config.ai.model;
+            const model = effectiveConfig.ai.memoryModel ?? effectiveConfig.ai.model;
 
             const messages: ModelMessage[] = [
                 {
@@ -295,9 +299,9 @@ export default function notes(config: Config, botId: number) {
                         },
                     },
                     messages,
-                    temperature: config.ai.temperature,
-                    topK: config.ai.topK,
-                    topP: config.ai.topP,
+                    temperature: effectiveConfig.ai.temperature,
+                    topK: effectiveConfig.ai.topK,
+                    topP: effectiveConfig.ai.topP,
                     experimental_telemetry: {
                         isEnabled: true,
                         functionId: 'generate-memory',

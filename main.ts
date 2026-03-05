@@ -20,14 +20,15 @@ const sdk = startTelemetry();
 // (schemas and reaction utilities moved to dedicated modules)
 
 let config: Config;
+
+await migrateDb();
+
 try {
     config = await resolveConfig();
 } catch (error) {
     logger.error('Config error: ', error);
     Deno.exit(1);
 }
-
-await migrateDb();
 
 const memory = await loadMemory();
 logger.info('Memory loaded');

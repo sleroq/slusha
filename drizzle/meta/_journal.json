@@ -15,6 +15,13 @@
             "when": 1772592000000,
             "tag": "0001_memory_remaining",
             "breakpoints": true
+        },
+        {
+            "idx": 2,
+            "version": "7",
+            "when": 1772678400000,
+            "tag": "0002_db_config",
+            "breakpoints": true
         }
     ]
 }

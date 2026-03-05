@@ -45,18 +45,20 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
     bot.on('message', async (ctx) => {
         const messages: ModelMessage[] = [];
         const chatState = await ctx.m.getChat();
+        const effectiveConfig = await ctx.m.getEffectiveConfig(config);
 
-        const useJsonResponses = config.ai.useJsonResponses;
+        const useJsonResponses = effectiveConfig.ai.useJsonResponses;
 
         let prompt = '';
         if (useJsonResponses) {
-            prompt = (config.ai.prePrompt ?? '') + '\n\n';
+            prompt = (effectiveConfig.ai.prePrompt ?? '') + '\n\n';
         } else {
             const fallbackDumbPre =
                 'Отвечай одним сообщением простым текстом без какого-либо JSON.' +
                 '\nНе используй реакции. Пиши кратко и по делу.' +
                 '\nИспользуй Telegram markdown, но без заголовков.';
-            prompt = (config.ai.dumbPrePrompt ?? fallbackDumbPre) + '\n\n';
+            prompt = (effectiveConfig.ai.dumbPrePrompt ?? fallbackDumbPre) +
+                '\n\n';
         }
         const savedHistory = await ctx.m.getHistory();
 
@@ -67,17 +69,17 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
         );
 
         if (ctx.chat.type === 'private') {
-            if (config.ai.privateChatPromptAddition) {
-                prompt += config.ai.privateChatPromptAddition;
+            if (effectiveConfig.ai.privateChatPromptAddition) {
+                prompt += effectiveConfig.ai.privateChatPromptAddition;
             }
-        } else if (isComments && config.ai.commentsPromptAddition) {
-            prompt += config.ai.commentsPromptAddition;
-        } else if (config.ai.groupChatPromptAddition) {
-            prompt += config.ai.groupChatPromptAddition;
+        } else if (isComments && effectiveConfig.ai.commentsPromptAddition) {
+            prompt += effectiveConfig.ai.commentsPromptAddition;
+        } else if (effectiveConfig.ai.groupChatPromptAddition) {
+            prompt += effectiveConfig.ai.groupChatPromptAddition;
         }
 
-        if (chatState.hateMode && config.ai.hateModePrompt) {
-            prompt += '\n' + config.ai.hateModePrompt;
+        if (chatState.hateMode && effectiveConfig.ai.hateModePrompt) {
+            prompt += '\n' + effectiveConfig.ai.hateModePrompt;
         }
 
         prompt += '\n\n';
@@ -91,8 +93,9 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             prompt += '### Character ###\n' + character.description;
         } else {
             prompt += useJsonResponses
-                ? config.ai.prompt
-                : (config.ai.dumbPrompt ?? config.ai.prompt);
+                ? effectiveConfig.ai.prompt
+                :
+                    (effectiveConfig.ai.dumbPrompt ?? effectiveConfig.ai.prompt);
         }
 
         messages.push({
@@ -139,7 +142,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
         });
 
         const messagesToPass = chatState.messagesToPass ??
-            config.ai.messagesToPass;
+            effectiveConfig.ai.messagesToPass;
 
         let history: ModelMessage[] = [];
         try {
@@ -150,17 +153,17 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                 savedHistory,
                 {
                     messagesLimit: messagesToPass,
-                    bytesLimit: config.ai.bytesLimit,
-                    symbolLimit: config.ai.messageMaxLength,
+                    bytesLimit: effectiveConfig.ai.bytesLimit,
+                    symbolLimit: effectiveConfig.ai.messageMaxLength,
                     includeReactions: true,
-                    attachments: config.ai.includeAttachmentsInHistory,
+                    attachments: effectiveConfig.ai.includeAttachmentsInHistory,
                 },
             );
         } catch (error) {
             logger.error('Could not get history: ', error);
 
             if (!ctx.info.isRandom) {
-                await ctx.reply(getRandomNepon(config));
+                await ctx.reply(getRandomNepon(effectiveConfig));
             }
             return;
         }
@@ -168,8 +171,9 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
         messages.push(...history);
 
         let finalPrompt = useJsonResponses
-            ? config.ai.finalPrompt
-            : (config.ai.dumbFinalPrompt ?? 'Ответь простым текстом.');
+            ? effectiveConfig.ai.finalPrompt
+            :
+                (effectiveConfig.ai.dumbFinalPrompt ?? 'Ответь простым текстом.');
         if (ctx.info.userToReply) {
             finalPrompt += ` Ответь на сообщение от ${ctx.info.userToReply}.`;
         }
@@ -179,7 +183,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             content: finalPrompt,
         });
 
-        const model = chatState.chatModel ?? config.ai.model;
+        const model = chatState.chatModel ?? effectiveConfig.ai.model;
 
         const time = new Date().getTime();
 
@@ -203,9 +207,9 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                         },
                     },
                     schema: chatResponseSchema,
-                    temperature: config.ai.temperature,
-                    topK: config.ai.topK,
-                    topP: config.ai.topP,
+                    temperature: effectiveConfig.ai.temperature,
+                    topK: effectiveConfig.ai.topK,
+                    topP: effectiveConfig.ai.topP,
                     messages,
                     experimental_telemetry: {
                         isEnabled: true,
@@ -230,9 +234,9 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                         },
                     },
                     messages,
-                    temperature: config.ai.temperature,
-                    topK: config.ai.topK,
-                    topP: config.ai.topP,
+                    temperature: effectiveConfig.ai.temperature,
+                    topK: effectiveConfig.ai.topK,
+                    topP: effectiveConfig.ai.topP,
                     experimental_telemetry: {
                         isEnabled: true,
                         functionId: 'user-message-dumb',
@@ -266,7 +270,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                 }
             }
             if (!ctx.info.isRandom) {
-                await ctx.reply(getRandomNepon(config));
+                await ctx.reply(getRandomNepon(effectiveConfig));
             }
             return;
         }
@@ -406,7 +410,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             } catch (error) {
                 logger.error('Could not reply to user: ', error);
                 if (!ctx.info.isRandom) {
-                    await ctx.reply(getRandomNepon(config));
+                    await ctx.reply(getRandomNepon(effectiveConfig));
                 }
                 return;
             }

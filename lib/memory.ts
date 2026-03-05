@@ -3,6 +3,7 @@ import { Chat as TgChat, Message, User } from 'grammy_types';
 import { Character } from './charhub/api.ts';
 import { createDb, DbClient } from './db/client.ts';
 import {
+    chatConfigOverrides,
     chatCharacters,
     chatMembers,
     chatMessages,
@@ -14,6 +15,13 @@ import {
 } from './db/schema.ts';
 import logger from './logger.ts';
 import { ReplyMessage } from './telegram/helpers.ts';
+import {
+    ChatConfigOverride,
+    mergeWithChatOverride,
+    parseChatOverridePayload,
+    serializeChatOverride,
+    UserConfig,
+} from './config.ts';
 
 export interface ReplyTo {
     id: number;
@@ -203,6 +211,7 @@ export class Memory {
             messagesRows,
             characterRow,
             reactionsByMessage,
+            configOverrideRow,
         ] = await Promise.all([
             this.db
                 .select()
@@ -227,7 +236,14 @@ export class Memory {
                 where: eq(chatCharacters.chatId, chatId),
             }),
             this.getMessageReactions(chatId),
+            this.db.query.chatConfigOverrides.findFirst({
+                where: eq(chatConfigOverrides.chatId, chatId),
+            }),
         ]);
+
+        const configOverride = configOverrideRow
+            ? parseChatOverridePayload(configOverrideRow.payload)
+            : undefined;
 
         return {
             notes: notesRows.map((n: typeof chatNotes.$inferSelect) => n.text),
@@ -239,7 +255,7 @@ export class Memory {
             memory: chatRow.memory ?? undefined,
             lastUse: chatRow.lastUse,
             info: parseJson<TgChat>(chatRow.info),
-            chatModel: chatRow.chatModel ?? undefined,
+            chatModel: configOverride?.ai?.model ?? chatRow.chatModel ?? undefined,
             character: characterRow
                 ? {
                     ...parseJson<Character>(characterRow.payload),
@@ -259,8 +275,10 @@ export class Memory {
                 info: parseJson<User>(m.info),
                 lastUse: m.lastUse,
             })),
-            messagesToPass: chatRow.messagesToPass ?? undefined,
-            randomReplyProbability: chatRow.randomReplyProbability ?? undefined,
+            messagesToPass: configOverride?.ai?.messagesToPass ??
+                chatRow.messagesToPass ?? undefined,
+            randomReplyProbability: configOverride?.randomReplyProbability ??
+                chatRow.randomReplyProbability ?? undefined,
             hateMode: chatRow.hateMode ?? undefined,
             locale: chatRow.locale ?? undefined,
         };
@@ -393,6 +411,55 @@ export class ChatMemory {
             if (patch.hateMode !== undefined) this.cache.hateMode = patch.hateMode ?? undefined;
             if (patch.locale !== undefined) this.cache.locale = patch.locale ?? undefined;
         }
+    }
+
+    async getChatConfigOverride(): Promise<ChatConfigOverride | undefined> {
+        const row = await this.memory.db.query.chatConfigOverrides.findFirst({
+            where: eq(chatConfigOverrides.chatId, this.chatInfo.id),
+        });
+
+        if (!row) return undefined;
+        return parseChatOverridePayload(row.payload);
+    }
+
+    private isOverrideEmpty(value: ChatConfigOverride) {
+        const noAi = !value.ai || Object.keys(value.ai).length === 0;
+        const rest = Object.entries(value).filter(([key]) => key !== 'ai');
+        return noAi && rest.length === 0;
+    }
+
+    private async setChatConfigOverrideRaw(
+        value: ChatConfigOverride | undefined,
+        updatedBy?: number,
+    ) {
+        if (!value || this.isOverrideEmpty(value)) {
+            await this.memory.db.delete(chatConfigOverrides).where(
+                eq(chatConfigOverrides.chatId, this.chatInfo.id),
+            );
+            return;
+        }
+
+        await this.memory.db
+            .insert(chatConfigOverrides)
+            .values({
+                chatId: this.chatInfo.id,
+                payload: serializeChatOverride(value),
+                updatedBy,
+                updatedAt: Date.now(),
+            })
+            .onConflictDoUpdate({
+                target: [chatConfigOverrides.chatId],
+                set: {
+                    payload: serializeChatOverride(value),
+                    updatedBy,
+                    updatedAt: Date.now(),
+                },
+            });
+    }
+
+    async getEffectiveConfig(base: UserConfig) {
+        const override = await this.getChatConfigOverride();
+        return mergeWithChatOverride(base, override);
     }
 
     async getHistory() {
@@ -533,14 +600,58 @@ export class ChatMemory {
     }
 
     async setChatModel(value?: string) {
+        const current = (await this.getChatConfigOverride()) ?? {};
+        const nextAi = { ...(current.ai ?? {}) };
+
+        if (value === undefined) {
+            delete nextAi.model;
+        } else {
+            nextAi.model = value;
+        }
+
+        const next: ChatConfigOverride = { ...current };
+        if (Object.keys(nextAi).length === 0) {
+            delete next.ai;
+        } else {
+            next.ai = nextAi;
+        }
+
+        await this.setChatConfigOverrideRaw(next);
         await this.patchChat({ chatModel: value ?? null });
     }
 
     async setMessagesToPass(value?: number) {
+        const current = (await this.getChatConfigOverride()) ?? {};
+        const nextAi = { ...(current.ai ?? {}) };
+
+        if (value === undefined) {
+            delete nextAi.messagesToPass;
+        } else {
+            nextAi.messagesToPass = value;
+        }
+
+        const next: ChatConfigOverride = { ...current };
+        if (Object.keys(nextAi).length === 0) {
+            delete next.ai;
+        } else {
+            next.ai = nextAi;
+        }
+
+        await this.setChatConfigOverrideRaw(next);
         await this.patchChat({ messagesToPass: value ?? null });
     }
 
     async setRandomReplyProbability(value?: number) {
+        const current = (await this.getChatConfigOverride()) ?? {};
+        const next: ChatConfigOverride = { ...current };
+
+        if (value === undefined) {
+            delete next.randomReplyProbability;
+        } else {
+            next.randomReplyProbability = value;
+        }
+
+        await this.setChatConfigOverrideRaw(next);
         await this.patchChat({ randomReplyProbability: value ?? null });
     }
 
