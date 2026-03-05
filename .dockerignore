@@ -4,3 +4,5 @@
 !/deno.lock
 !/lib/
 !/locales/
+!/drizzle/
+!/slusha.config.js

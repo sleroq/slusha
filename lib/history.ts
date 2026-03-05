@@ -1,5 +1,5 @@
 import { Api, RawApi } from 'grammy';
-import { ModelMessage, UserContent } from 'npm:ai';
+import { ModelMessage, UserContent } from 'ai';
 import {
     chooseSize,
     downloadFile,

@@ -34,7 +34,7 @@ bot.command('character', async (ctx) => {
     let keyboard = new InlineKeyboard()
         .switchInlineCurrent(ctx.t('search'), `@${ctx.chat.id} `);
 
-    const character = ctx.m.getChat().character;
+    const character = (await ctx.m.getChat()).character;
 
     const name = character?.name ?? ctx.t('slusha-name');
 
@@ -313,7 +313,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     }
 
     const chatId = parseInt(args[1]);
-    const chat = ctx.memory.chats[chatId];
+    const chat = await ctx.memory.getChatById(chatId);
     if (isNaN(chatId) || chat === undefined) {
         return ctx.answerCallbackQuery(ctx.t('character-invalid-chat-id'));
     }
@@ -347,7 +347,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
                 );
         }
 
-        chat.character = undefined;
+        await ctx.m.setCharacter(undefined);
 
         try {
             await Promise.all([
@@ -366,7 +366,8 @@ bot.callbackQuery(/set.*/, async (ctx) => {
             logger.error('Could not notify character change: ', error);
         }
 
-        ctx.m.clear();
+        await ctx.m.clear();
+        return;
     }
 
     const characterId = parseInt(args[2]);
@@ -488,7 +489,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         return await ctx.reply(ctx.t('character-names-error'));
     }
 
-    chat.character = { ...character, names };
+    await ctx.m.setCharacter({ ...character, names });
 
     const keyboard = new InlineKeyboard()
         .text(ctx.t('character-return-slusha'), `set ${chatId} default`)
@@ -521,7 +522,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
             ctx.t('character-set-success', {
                 userName: ctx.from.first_name,
                 characterName: character.name,
-                names: chat.character.names.join(', '),
+                names: names.join(', '),
             }),
             {
                 reply_markup: keyboard2,
@@ -531,7 +532,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         logger.error('Could not send message: ', error);
     }
 
-    ctx.m.clear();
+    await ctx.m.clear();
 
     return ctx.answerCallbackQuery(
         ctx.t('character-set-to', { name: character.name }),

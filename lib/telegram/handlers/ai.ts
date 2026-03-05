@@ -44,6 +44,7 @@ function buildLanguageProtocol(defaultLocale: string): string {
 export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
     bot.on('message', async (ctx) => {
         const messages: ModelMessage[] = [];
+        const chatState = await ctx.m.getChat();
 
         const useJsonResponses = config.ai.useJsonResponses;
 
@@ -57,7 +58,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                 '\nИспользуй Telegram markdown, но без заголовков.';
             prompt = (config.ai.dumbPrePrompt ?? fallbackDumbPre) + '\n\n';
         }
-        const savedHistory = ctx.m.getHistory();
+        const savedHistory = await ctx.m.getHistory();
 
         // TODO: Improve this check
         const isComments = savedHistory.some((m) =>
@@ -75,17 +76,17 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             prompt += config.ai.groupChatPromptAddition;
         }
 
-        if (ctx.m.getChat().hateMode && config.ai.hateModePrompt) {
+        if (chatState.hateMode && config.ai.hateModePrompt) {
             prompt += '\n' + config.ai.hateModePrompt;
         }
 
         prompt += '\n\n';
 
-        const currentLocale = ctx.m.getChat().locale ??
+        const currentLocale = chatState.locale ??
             await ctx.i18n.getLocale();
         prompt += buildLanguageProtocol(currentLocale) + '\n\n';
 
-        const character = ctx.m.getChat().character;
+        const character = chatState.character;
         if (character) {
             prompt += '### Character ###\n' + character.description;
         } else {
@@ -105,7 +106,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             chatInfoMsg +=
                 `\nЛичный чат с ${ctx.from.first_name} (@${ctx.from.username})`;
         } else {
-            const activeMembers = ctx.m.getActiveMembers();
+            const activeMembers = await ctx.m.getActiveMembers();
             if (activeMembers.length > 0) {
                 const prettyMembersList = activeMembers.map((m) => {
                     let text = `- ${m.first_name}`;
@@ -121,15 +122,15 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
         }
 
         // If we have notes, add them to messages
-        if (ctx.m.getChat().notes.length > 0) {
+        if (chatState.notes.length > 0) {
             chatInfoMsg += `\n\nChat notes:\n${
-                ctx.m.getChat().notes.join('\n')
+                chatState.notes.join('\n')
             }`;
         }
 
-        if (ctx.m.getChat().memory) {
+        if (chatState.memory) {
             chatInfoMsg +=
-                `\n\nMY OWN PERSONAL NOTES AND MEMORY:\n${ctx.m.getChat().memory}`;
+                `\n\nMY OWN PERSONAL NOTES AND MEMORY:\n${chatState.memory}`;
         }
 
         messages.push({
@@ -137,7 +138,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             content: chatInfoMsg,
         });
 
-        const messagesToPass = ctx.m.getChat().messagesToPass ??
+        const messagesToPass = chatState.messagesToPass ??
             config.ai.messagesToPass;
 
         let history: ModelMessage[] = [];
@@ -178,7 +179,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             content: finalPrompt,
         });
 
-        const model = ctx.m.getChat().chatModel ?? config.ai.model;
+        const model = chatState.chatModel ?? config.ai.model;
 
         const time = new Date().getTime();
 
@@ -334,7 +335,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                                 targetId,
                                 [{ type: 'emoji', emoji: canon }],
                             );
-                            ctx.m.addEmojiReaction(targetId, canon, {
+                            await ctx.m.addEmojiReaction(targetId, canon, {
                                 id: bot.botInfo.id,
                                 username: bot.botInfo.username,
                                 first_name: bot.botInfo.first_name ?? 'Slusha',
@@ -423,7 +424,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                 };
             }
 
-            ctx.m.addMessage({
+            await ctx.m.addMessage({
                 id: replyInfo.message_id,
                 text: replyText,
                 isMyself: true,

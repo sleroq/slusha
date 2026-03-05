@@ -13,8 +13,9 @@ export function registerRandom(
             .map((arg) => arg.trim())
             .filter((arg) => arg !== '');
 
-        const currentValue = ctx.m.getChat().randomReplyProbability ??
-            config.randomReplyProbability;
+        const currentValue =
+            (await ctx.m.getChat()).randomReplyProbability ??
+                config.randomReplyProbability;
 
         if (args.length === 1) {
             return replyWithMarkdown(
@@ -32,7 +33,7 @@ export function registerRandom(
 
         const newValue = args[1];
         if (newValue === 'default') {
-            ctx.m.getChat().randomReplyProbability = undefined;
+            await ctx.m.setRandomReplyProbability(undefined);
             return ctx.reply(ctx.t('random-updated'));
         }
 
@@ -41,7 +42,7 @@ export function registerRandom(
             return ctx.reply(ctx.t('random-parse-error'));
         }
 
-        ctx.m.getChat().randomReplyProbability = probability;
+        await ctx.m.setRandomReplyProbability(probability);
         return ctx.reply(ctx.t('random-set', { probability }));
     });
 }

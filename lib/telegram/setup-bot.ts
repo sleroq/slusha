@@ -91,7 +91,7 @@ export default async function setupBot(config: Config, memory: Memory) {
     });
 
     // Reaction updates (added/removed/changed by users)
-    bot.on('message_reaction', (ctx, next) => {
+    bot.on('message_reaction', async (ctx, next) => {
         try {
             const mr = ctx.update.message_reaction;
             if (!mr) return next();
@@ -146,16 +146,16 @@ export default async function setupBot(config: Config, memory: Memory) {
                 : undefined;
 
             for (const e of emojiAdded) {
-                ctx.m.addEmojiReaction(messageId, e, by);
+                await ctx.m.addEmojiReaction(messageId, e, by);
             }
             for (const e of emojiRemoved) {
-                ctx.m.removeEmojiReaction(messageId, e, by);
+                await ctx.m.removeEmojiReaction(messageId, e, by);
             }
             for (const c of customAdded) {
-                ctx.m.addCustomReaction(messageId, c, by);
+                await ctx.m.addCustomReaction(messageId, c, by);
             }
             for (const c of customRemoved) {
-                ctx.m.removeCustomReaction(messageId, c, by);
+                await ctx.m.removeCustomReaction(messageId, c, by);
             }
         } catch (error) {
             logger.warn('Could not process message_reaction: ', error);
@@ -165,7 +165,7 @@ export default async function setupBot(config: Config, memory: Memory) {
     });
 
     // Channel reaction counts (anonymous) or forwarded channel posts in groups
-    bot.on('message_reaction_count', (ctx, next) => {
+    bot.on('message_reaction_count', async (ctx, next) => {
         try {
             const mrc = ctx.update.message_reaction_count;
             if (!mrc) return next();
@@ -208,7 +208,7 @@ export default async function setupBot(config: Config, memory: Memory) {
                 total: number;
             } => x !== undefined);
 
-            ctx.m.setReactionCounts(messageId, counts);
+            await ctx.m.setReactionCounts(messageId, counts);
         } catch (error) {
             logger.warn('Could not process message_reaction_count: ', error);
         }
@@ -216,7 +216,7 @@ export default async function setupBot(config: Config, memory: Memory) {
     });
 
     // TODO: Save other message types, like special events
-    bot.on('message', (ctx, next) => {
+    bot.on('message', async (ctx, next) => {
         // Filter out old messages (1 minute)
         if (ctx.msg.date - startDate.getTime() / 1000 < 1) {
             // console.log(
@@ -235,7 +235,7 @@ export default async function setupBot(config: Config, memory: Memory) {
 
         // Ignore opted out users and commands
         if (
-            ctx.m.getChat().optOutUsers.some((u) => u.id === ctx.from?.id) &&
+            (await ctx.m.getChat()).optOutUsers.some((u) => u.id === ctx.from?.id) &&
             !ctx.msg.text?.startsWith('/optin')
         ) {
             return;
@@ -260,7 +260,7 @@ export default async function setupBot(config: Config, memory: Memory) {
         }
 
         // Save every message to memory
-        ctx.m.addMessage({
+        await ctx.m.addMessage({
             id: ctx.msg.message_id,
             text: ctx.msg.text ?? ctx.msg.caption ?? '',
             replyTo,
@@ -269,40 +269,36 @@ export default async function setupBot(config: Config, memory: Memory) {
         });
 
         if (ctx.from) {
-            ctx.m.updateUser(ctx.from);
+            await ctx.m.updateUser(ctx.from);
         }
 
-        ctx.m.removeOldMessages(config.maxMessagesToStore);
+        await ctx.m.removeOldMessages(config.maxMessagesToStore);
 
         return next();
     });
 
-    bot.on(':left_chat_member', (ctx, next) => {
-        ctx.m.getChat().members = ctx.m.getChat().members.filter((m) =>
-            m.id !== ctx.from?.id
+    bot.on(':left_chat_member', async (ctx, next) => {
+        if (ctx.from?.id) {
+            await ctx.m.removeMember(ctx.from.id);
+        }
+
+        return next();
+    });
+
+    bot.on('edit:text', async (ctx, next) => {
+        await ctx.m.updateMessageText(
+            ctx.msg.message_id,
+            ctx.msg.text ?? ctx.msg.caption ?? '',
         );
 
         return next();
     });
 
-    bot.on('edit:text', (ctx, next) => {
-        const history = ctx.m.getChat().history;
-
-        for (const msg of history) {
-            if (msg.id === ctx.msg.message_id) {
-                msg.text = ctx.msg.text ?? ctx.msg.caption ?? '';
-            }
-        }
-
-        return next();
-    });
-
-    bot.on(':migrate_from_chat_id', (ctx, next) => {
+    bot.on(':migrate_from_chat_id', async (ctx, next) => {
         const from = ctx.msg.migrate_from_chat_id;
         const to = ctx.chat.id;
 
-        ctx.memory.chats[to] = ctx.memory.chats[from];
-        delete ctx.memory.chats[from];
+        await ctx.memory.migrateChat(from, to, ctx.chat);
 
         logger.debug(
             `Successfully migrated "${ctx.chat.title}" from ${from} to ${to}`,

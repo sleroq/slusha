@@ -27,29 +27,37 @@ bot.command('optout', (ctx) => {
 
     let message = ctx.t('opt-out-confirm');
 
-    const optOutUsers = ctx.m.getChat().optOutUsers;
+    const run = async () => {
+        const from = ctx.from;
+        if (!from) return;
+        const chat = await ctx.m.getChat();
+        const optOutUsers = chat.optOutUsers;
 
-    if (!optOutUsers.find((u) => u.id === ctx.from?.id)) {
-        optOutUsers.push({
-            id: ctx.from.id,
-            first_name: ctx.from.first_name,
-            username: ctx.from.username,
+        if (!optOutUsers.find((u) => u.id === from.id)) {
+            await ctx.m.addOptOutUser({
+                id: from.id,
+                first_name: from.first_name,
+                username: from.username,
+            });
+        }
+
+        const nextUsers = (await ctx.m.getChat()).optOutUsers;
+        if (nextUsers.length > 1) {
+            message += formatOptOutUsers(nextUsers, ctx);
+        }
+
+        return replyWithHTML(ctx, message, {
+            reply_markup: new InlineKeyboard().text(
+                ctx.t('opt-out-button-return'),
+                `opt-in ${from.id}`,
+            ),
+            link_preview_options: {
+                is_disabled: true,
+            },
         });
-    }
+    };
 
-    if (optOutUsers.length > 1) {
-        message += formatOptOutUsers(optOutUsers, ctx);
-    }
-
-    return replyWithHTML(ctx, message, {
-        reply_markup: new InlineKeyboard().text(
-            ctx.t('opt-out-button-return'),
-            `opt-in ${ctx.from.id}`,
-        ),
-        link_preview_options: {
-            is_disabled: true,
-        },
-    });
+    return run();
 });
 
 bot.callbackQuery(/opt-in.*/, (ctx) => {
@@ -70,17 +78,16 @@ bot.command('optin', (ctx) => {
 });
 
 async function optIn(ctx: SlushaContext, id: number, reply: boolean) {
-    const wasOptedIn = ctx.m.getChat().optOutUsers.some((u) => u.id === id);
+    const wasOptedIn = (await ctx.m.getChat()).optOutUsers.some((u) => u.id === id);
     let message = ctx.t('opt-out-status', {
         verb: wasOptedIn ? ctx.t('again') : ctx.t('already'),
     });
 
-    ctx.m.getChat().optOutUsers = ctx.m.getChat().optOutUsers.filter((u) =>
-        u.id !== id
-    );
+    await ctx.m.removeOptOutUser(id);
 
-    if (ctx.m.getChat().optOutUsers.length > 1) {
-        message += formatOptOutUsers(ctx.m.getChat().optOutUsers, ctx);
+    const nextUsers = (await ctx.m.getChat()).optOutUsers;
+    if (nextUsers.length > 1) {
+        message += formatOptOutUsers(nextUsers, ctx);
     }
 
     if (reply) {

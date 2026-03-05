@@ -6,9 +6,11 @@ export function registerSummary(
     composer: Composer<SlushaContext>,
     config: Config,
 ) {
-    composer.command('summary', (ctx) => {
-        ctx.m.getChat().lastUse = Date.now();
-        const notes = ctx.m.getChat().notes.slice(-config.maxNotesToStore - 2);
+    composer.command('summary', async (ctx) => {
+        await ctx.m.setLastUse(Date.now());
+        const notes = (await ctx.m.getChat()).notes.slice(
+            -config.maxNotesToStore - 2,
+        );
 
         if (notes.length === 0) {
             return ctx.reply(ctx.t('notes-too-few-messages'));

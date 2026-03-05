@@ -1,36 +1,37 @@
 FROM denoland/deno:latest AS builder
 
-ENV DENO_DIR=/app/.deno_cache
-
 WORKDIR /app
 
-COPY deno.json deno.lock ./
-
-COPY . .
+COPY deno.json deno.lock main.ts ./
+COPY lib ./lib
+COPY locales ./locales
+COPY drizzle ./drizzle
+COPY slusha.config.js ./slusha.config.js
 
 RUN deno cache --allow-import --allow-scripts main.ts
 
-FROM denoland/deno:latest
+RUN mkdir -p ./tmp ./log && \
+    deno compile \
+    --allow-env \
+    --allow-net \
+    --allow-read=. \
+    --allow-import \
+    --allow-write \
+    --allow-sys \
+    --allow-ffi \
+    --unstable-detect-cjs \
+    -o /app/slusha \
+    main.ts
 
-ENV DENO_DIR=/app/.deno_cache
+FROM gcr.io/distroless/cc-debian12:nonroot
+
 ENV DENO_NO_UPDATE_CHECK=1
 ENV DENO_NO_PROMPT=1
 
-WORKDIR /app
+WORKDIR /home/nonroot/app
 
-COPY --from=builder --chown=deno:deno /app .
-
-RUN mkdir -p ./tmp ./log && \
-    chown -R deno:deno ./tmp ./log
-
-USER deno
-
-CMD ["deno", "run", \
-     "--allow-env", \
-     "--allow-net", \
-     "--allow-read=.", \
-     "--allow-import", \
-     "--allow-write", \
-     "--allow-sys", \
-     "--unstable-detect-cjs", \
-     "main.ts"] 
+COPY --from=builder --chown=nonroot:nonroot /app/slusha ./slusha
+COPY --from=builder --chown=nonroot:nonroot /app/locales ./locales
+COPY --from=builder --chown=nonroot:nonroot /app/drizzle ./drizzle
+COPY --from=builder --chown=nonroot:nonroot /app/slusha.config.js ./slusha.config.js
+CMD ["/home/nonroot/app/slusha"]

@@ -11,7 +11,7 @@ export function createI18n() {
 export function applyLocaleFromMemory() {
     return async (ctx: SlushaContext, next: () => Promise<void>) => {
         try {
-            const memLocale = ctx.m?.getChat().locale;
+            const memLocale = ctx.m ? (await ctx.m.getChat()).locale : undefined;
             if (memLocale) {
                 await ctx.i18n.useLocale(memLocale);
             }

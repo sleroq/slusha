@@ -1,6 +1,6 @@
 import { Composer } from 'grammy';
-import { google } from 'npm:@ai-sdk/google';
-import { generateText, ModelMessage } from 'npm:ai';
+import { google } from '@ai-sdk/google';
+import { generateText, ModelMessage } from 'ai';
 import { Config, safetySettings } from '../../config.ts';
 import logger from '../../logger.ts';
 import { SlushaContext } from '../setup-bot.ts';
@@ -13,29 +13,31 @@ export default function notes(config: Config, botId: number) {
     bot.on('message', (ctx, next) => {
         async function handleNotes() {
             const frequency = config.ai.notesFrequency;
+            const chat = await ctx.m.getChat();
+            const history = await ctx.m.getHistory();
 
             if (
-                ctx.m.getChat().lastUse <
+                chat.lastUse <
                     Date.now() - config.chatLastUseNotes * 24 * 60 * 60 * 1000
             ) {
                 return;
             }
 
-            if (ctx.m.getHistory().length < config.ai.notesFrequency / 2) {
+            if (history.length < config.ai.notesFrequency / 2) {
                 return;
             }
 
             if (
-                ctx.m.getChat().lastNotes &&
-                ctx.msg.message_id - ctx.m.getChat().lastNotes < frequency
+                chat.lastNotes &&
+                ctx.msg.message_id - chat.lastNotes < frequency
             ) {
                 return;
             }
 
             // Set last notes to prevent retries
-            ctx.m.getChat().lastNotes = ctx.msg.message_id;
+            await ctx.m.setLastNotesMessageId(ctx.msg.message_id);
 
-            const characterName = ctx.m.getChat().character?.name;
+            const characterName = chat.character?.name;
 
             let context: ModelMessage[] = [];
             try {
@@ -43,7 +45,7 @@ export default function notes(config: Config, botId: number) {
                     { token: config.botToken, id: botId },
                     ctx.api,
                     logger,
-                    ctx.m.getHistory(),
+                    history,
                     {
                         messagesLimit: frequency,
                         symbolLimit: config.ai.messageMaxLength / 3,
@@ -129,9 +131,8 @@ export default function notes(config: Config, botId: number) {
                 })
                 .join('\n');
 
-            ctx.m.getChat().notes.push(summaryText);
-
-            ctx.m.removeOldNotes(config.maxNotesToStore);
+            await ctx.m.addNote(summaryText);
+            await ctx.m.removeOldNotes(config.maxNotesToStore);
         }
 
         (async () => {
@@ -148,30 +149,32 @@ export default function notes(config: Config, botId: number) {
     bot.on('message', (ctx, next) => {
         async function handleMemory() {
             const frequency = config.ai.memoryFrequency;
+            const chat = await ctx.m.getChat();
+            const history = await ctx.m.getHistory();
 
             if (
-                ctx.m.getChat().lastUse <
+                chat.lastUse <
                     Date.now() - config.chatLastUseNotes * 24 * 60 * 60 * 1000
             ) {
                 return;
             }
 
-            if (ctx.m.getHistory().length < config.ai.memoryFrequency / 2) {
+            if (history.length < config.ai.memoryFrequency / 2) {
                 return;
             }
 
             if (
-                ctx.m.getChat().lastMemory &&
-                ctx.msg.message_id - ctx.m.getChat().lastMemory < frequency
+                chat.lastMemory &&
+                ctx.msg.message_id - chat.lastMemory < frequency
             ) {
                 return;
             }
 
             // Set last memory to prevent retries
-            ctx.m.getChat().lastMemory = ctx.msg.message_id;
+            await ctx.m.setLastMemoryMessageId(ctx.msg.message_id);
 
-            const characterName = ctx.m.getChat().character?.name;
-            const savedHistory = ctx.m.getHistory();
+            const characterName = chat.character?.name;
+            const savedHistory = history;
 
             let context: ModelMessage[] = [];
             try {
@@ -213,7 +216,8 @@ export default function notes(config: Config, botId: number) {
 
             prompt += '\n\n';
 
-            const character = ctx.m.getChat().character;
+            const currentChat = await ctx.m.getChat();
+            const character = currentChat.character;
             if (character) {
                 prompt += '### Character ###\n' + character.description;
             } else {
@@ -228,7 +232,7 @@ export default function notes(config: Config, botId: number) {
                 chatInfoMsg +=
                     `\nЛичный чат с ${ctx.from.first_name} (@${ctx.from.username})`;
             } else {
-                const activeMembers = ctx.m.getActiveMembers();
+                const activeMembers = await ctx.m.getActiveMembers();
                 if (activeMembers.length > 0) {
                     const prettyMembersList = activeMembers
                         .map((m) => {
@@ -248,11 +252,11 @@ export default function notes(config: Config, botId: number) {
             prompt += '\n\n' + chatInfoMsg;
 
             let memPrompt = config.ai.memoryPrompt;
-            if (ctx.m.getChat().memory) {
+            if (currentChat.memory) {
                 memPrompt += '\n\n' +
                     config.ai.memoryPromptRepeat +
                     '\n' +
-                    ctx.m.getChat().memory;
+                    currentChat.memory;
             }
 
             prompt += '\n\n' + config.ai.memoryPrompt;
@@ -325,7 +329,7 @@ export default function notes(config: Config, botId: number) {
                 return;
             }
 
-            ctx.m.getChat().memory = response.text;
+            await ctx.m.setMemory(response.text);
         }
 
         (async () => {
