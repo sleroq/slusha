@@ -48,9 +48,42 @@
         <details class="quick-details rounded-md border p-3">
             <summary class="cursor-pointer font-medium">Model</summary>
             <div class="mt-4 grid gap-3 md:grid-cols-2">
-                <div class="space-y-2"><Label for="g-ai-model">ai.model</Label><Input id="g-ai-model" bind:value={config.ai.model} /></div>
-                <div class="space-y-2"><Label for="g-ai-notes-model">ai.notesModel</Label><Input id="g-ai-notes-model" bind:value={config.ai.notesModel} /></div>
-                <div class="space-y-2"><Label for="g-ai-memory-model">ai.memoryModel</Label><Input id="g-ai-memory-model" bind:value={config.ai.memoryModel} /></div>
+                <div class="space-y-2">
+                    <Label for="g-ai-model">ai.model</Label>
+                    <select
+                        id="g-ai-model"
+                        class="h-10 w-full rounded-md border bg-transparent px-3 text-sm"
+                        bind:value={config.ai.model}
+                    >
+                        {#each availableModels as model (model)}
+                            <option value={model}>{model}</option>
+                        {/each}
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <Label for="g-ai-notes-model">ai.notesModel</Label>
+                    <select
+                        id="g-ai-notes-model"
+                        class="h-10 w-full rounded-md border bg-transparent px-3 text-sm"
+                        bind:value={config.ai.notesModel}
+                    >
+                        {#each availableModels as model (model)}
+                            <option value={model}>{model}</option>
+                        {/each}
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <Label for="g-ai-memory-model">ai.memoryModel</Label>
+                    <select
+                        id="g-ai-memory-model"
+                        class="h-10 w-full rounded-md border bg-transparent px-3 text-sm"
+                        bind:value={config.ai.memoryModel}
+                    >
+                        {#each availableModels as model (model)}
+                            <option value={model}>{model}</option>
+                        {/each}
+                    </select>
+                </div>
                 <div class="space-y-2"><Label for="g-ai-temp">ai.temperature</Label><Input id="g-ai-temp" type="number" bind:value={config.ai.temperature} /></div>
                 <div class="space-y-2"><Label for="g-ai-topk">ai.topK</Label><Input id="g-ai-topk" type="number" bind:value={config.ai.topK} /></div>
                 <div class="space-y-2"><Label for="g-ai-topp">ai.topP</Label><Input id="g-ai-topp" type="number" bind:value={config.ai.topP} /></div>
