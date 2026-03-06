@@ -61,7 +61,29 @@ run(bot, {
         // @ts-expect-error drop_pending_updates is supported by grammY runner
         drop_pending_updates: true,
         fetch: {
-            allowed_updates: [] as const, // TODO: Add reactions here, but make sure to preserve all default event types
+            allowed_updates: [
+                'message',
+                'edited_message',
+                'channel_post',
+                'edited_channel_post',
+                'business_connection',
+                'business_message',
+                'edited_business_message',
+                'deleted_business_messages',
+                'inline_query',
+                'chosen_inline_result',
+                'callback_query',
+                'shipping_query',
+                'pre_checkout_query',
+                'poll',
+                'poll_answer',
+                'my_chat_member',
+                'chat_join_request',
+                'chat_boost',
+                'removed_chat_boost',
+                'message_reaction',
+                'message_reaction_count',
+            ] as const,
         },
     },
 });
