@@ -283,6 +283,18 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     }),
                 },
             });
+            const recoveredOutput = tryRecoverChatOutput(response.text);
+            if (recoveredOutput) {
+                logger.warn(
+                    'Plain-text generation returned JSON payload; recovered structured entries',
+                    {
+                        modelRef,
+                        chatId: ctx.chat.id,
+                    },
+                );
+                return recoveredOutput;
+            }
+
             return [{ text: response.text }];
         };
 
