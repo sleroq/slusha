@@ -40,69 +40,96 @@ const memoryPromptRepeat = `
 Here is your last notes. Treat them with respect to avoid loosing important context, but rewrite them and remove/update outdated and contradictory information, especially not in line with the system prompt at the beginning:
 `.trim();
 
-/**
- * This file is used to configure Slusha
- *
- * You can use it to configure bot's name, replies, etc.
- *
- * You can also use it to configure rate-limiting
- *
- * See https://github.com/vedza/slusha/blob/main/lib/config.ts for more info
- *
- * @type {import('./lib/config.ts').UserConfig}
- */
-export default {
+const commentsPromptAddition = `
+- You're in a comments section of telegram channel with multiple users discussing channel posts and topics
+`.trim() + '\n\n';
+
+const hateModePrompt = `
+- You are a real hater in this chat
+`;
+
+const googleSafetySettings = [
+    {
+        category: 'HARM_CATEGORY_HARASSMENT',
+        threshold: 'BLOCK_NONE',
+    },
+    {
+        category: 'HARM_CATEGORY_HATE_SPEECH',
+        threshold: 'BLOCK_NONE',
+    },
+    {
+        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+        threshold: 'BLOCK_NONE',
+    },
+    {
+        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+        threshold: 'BLOCK_NONE',
+    },
+];
+
+const defaultConfig = {
     startMessage: 'Привет! Я Слюша, бот-гений.',
-
     ai: {
-        model: 'gemini-2.5-flash-lite',
-        // Toggle: JSON array responses vs. plain text single-message responses
+        model: 'gemini-3.1-flash-lite-preview',
         useJsonResponses: true,
-
-        // notesModel is used for /summary command
-        notesModel: 'gemini-2.0-flash-lite',
-        // memoryModel: 'gemini-2.0-flash',
-        memoryModel: 'gemini-2.0-flash-thinking-exp-01-21',
-        // prePromt is used with chub.ai prompts and with default prompt
+        notesModel: 'gemini-3.1-flash-lite-preview',
+        memoryModel: 'gemini-3.1-flash-lite-preview',
         prePrompt,
-        // Alternative prePrompt for dumb models without JSON or reactions
         dumbPrePrompt: `
 Коротко отвечай простым текстом одним сообщением. Не используй JSON.
 Не ставь реакции и не описывай действия. Используй Telegram markdown без заголовков.
-Язык по умолчанию — русский. Будь лаконичной и естественной.
+Пиши на языке чата по умолчанию. Будь лаконичной и естественной.
 `.trim(),
-        // prompt is default character, can be replaced with chub.ai prompts
         prompt,
-        // Optional simplified character prompt for dumb models
         dumbPrompt: `
 Ты — Слюша: 19‑летняя умная русская девчонка, спокоен стиль, зумерский сленг.
 Пиши коротко, по делу, без лишней вежливости. Можно сарказм.
 `.trim() + '\n\n',
-        // privateChatPromptAddition is used after prePrompt with any character, but in private chats only
         privateChatPromptAddition,
         groupChatPromptAddition,
+        commentsPromptAddition,
+        hateModePrompt,
         notesPrompt,
         memoryPrompt,
         memoryPromptRepeat,
         finalPrompt,
-        // Final prompt for dumb models (plain text)
         dumbFinalPrompt: 'Ответь одним коротким сообщением простым текстом.',
-
-        temperature: 0.9,
-        topK: 80,
-        topP: 0.95,
-
-        messagesToPass: 14,
+        temperature: 0.55,
+        topK: 32,
+        topP: 0.85,
+        messagesToPass: 10,
         notesFrequency: 190,
         memoryFrequency: 150,
         messageMaxLength: 4096,
-        // Include user message attachments (images, videos, voice, etc.) in history
         includeAttachmentsInHistory: true,
-
-        // Prompt limit in bytes (forced by api provider)
         bytesLimit: 20971520,
+        google: {
+            safetySettings: googleSafetySettings,
+            structuredOutputs: true,
+        },
+        openrouter: {
+            usageInclude: false,
+        },
+        generation: {
+            chat: {
+                maxOutputTokens: 512,
+                thinking: {
+                    thinkingLevel: 'low',
+                },
+            },
+            notes: {},
+            memory: {
+                thinking: {
+                    thinkingLevel: 'medium',
+                },
+            },
+            character: {
+                thinking: {
+                    thinkingLevel: 'low',
+                },
+            },
+        },
     },
-
     names: [
         'слюша',
         'шлюша',
@@ -120,14 +147,11 @@ export default {
         'слюшаня',
         '@slchat_bot',
     ],
-
     tendToReply: [
         'лучшая девочка',
         'лучший бот',
     ],
-
     tendToReplyProbability: 50,
-
     nepons: [
         'непон..',
         'нехочу отвечать щас чето',
@@ -135,9 +159,7 @@ export default {
         'Чета непон жесткий, попробуй позже',
         'откисаю, попробуй позже',
     ],
-
-    randomReplyProbability: 2,
-
+    randomReplyProbability: 1,
     tendToIgnore: [
         /^ор+/i,
         /^ору+/i,
@@ -153,6 +175,7 @@ export default {
         /^гуд\b/i,
         /норм.*/i,
         /^ok$/igm,
+        /^ok$/igm,
         /кек/i,
         /ок/i,
         /^лан$/gm,
@@ -165,29 +188,25 @@ export default {
         /реально$/gmi,
         /\/q.*/,
     ],
-
     tendToIgnoreProbability: 90,
-
     filesMaxAge: 72,
-
     adminIds: [
         308552322,
         855109381,
-        783255786,	
+        783255786,
         585847096,
+        5371117573,
+        210860903,
     ],
-
+    trustedIds: [],
+    availableModels: [
+        'gemini-3.1-flash-lite-preview',
+    ],
     maxNotesToStore: 3,
     maxMessagesToStore: 200,
-
-    // Chats which don't use AI for more than chatLastUseNotes days
-    // will not get updated summary every 50 messages
     chatLastUseNotes: 2,
-
     chatLastUseMemory: 2,
+    responseDelay: 1,
+};
 
-    // Time in seconds after which bot will start typing
-    // to prevent from replying on every message in media group
-    // or give user time to finish prompt consisting of multiple messages
-    responseDelay: 2,
-}
+export default defaultConfig;
