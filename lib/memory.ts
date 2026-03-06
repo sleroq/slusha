@@ -270,8 +270,7 @@ export class Memory {
             memory: chatRow.memory ?? undefined,
             lastUse: chatRow.lastUse,
             info: parseJson<TgChat>(chatRow.info),
-            chatModel: configOverride?.ai?.model ?? chatRow.chatModel ??
-                undefined,
+            chatModel: configOverride?.ai?.model,
             character: characterRow
                 ? {
                     ...parseJson<Character>(characterRow.payload),
@@ -293,10 +292,8 @@ export class Memory {
                 info: parseJson<User>(m.info),
                 lastUse: m.lastUse,
             })),
-            messagesToPass: configOverride?.ai?.messagesToPass ??
-                chatRow.messagesToPass ?? undefined,
-            randomReplyProbability: configOverride?.randomReplyProbability ??
-                chatRow.randomReplyProbability ?? undefined,
+            messagesToPass: configOverride?.ai?.messagesToPass,
+            randomReplyProbability: configOverride?.randomReplyProbability,
             hateMode: chatRow.hateMode ?? undefined,
             locale: chatRow.locale ?? undefined,
         };
@@ -344,9 +341,6 @@ export class Memory {
                 lastNotes: fromChat.lastNotes,
                 lastMemory: fromChat.lastMemory,
                 memory: fromChat.memory,
-                chatModel: fromChat.chatModel,
-                messagesToPass: fromChat.messagesToPass,
-                randomReplyProbability: fromChat.randomReplyProbability,
                 hateMode: fromChat.hateMode,
                 locale: fromChat.locale,
             });
@@ -372,13 +366,12 @@ export class Memory {
             await tx.update(chatCharacters).set({ chatId: to }).where(
                 eq(chatCharacters.chatId, from),
             );
+            await tx.update(chatConfigOverrides).set({ chatId: to }).where(
+                eq(chatConfigOverrides.chatId, from),
+            );
 
             await tx.delete(chats).where(eq(chats.id, from));
         });
-    }
-
-    async save() {
-        // DB is source of truth now.
     }
 }
 
@@ -388,19 +381,14 @@ export class Memory {
 export class ChatMemory {
     memory: Memory;
     chatInfo: TgChat;
-    private cache?: Chat;
 
     constructor(memory: Memory, chat: TgChat) {
         this.memory = memory;
         this.chatInfo = chat;
     }
 
-    async getChat() {
-        if (!this.cache) {
-            this.cache = await this.memory.getChat(this.chatInfo);
-        }
-
-        return this.cache;
+    getChat() {
+        return this.memory.getChat(this.chatInfo);
     }
 
     private async patchChat(
@@ -409,9 +397,6 @@ export class ChatMemory {
             lastNotes: number;
             lastMemory: number;
             memory: string | null;
-            chatModel: string | null;
-            messagesToPass: number | null;
-            randomReplyProbability: number | null;
             hateMode: boolean | null;
             locale: string | null;
         }>,
@@ -419,35 +404,6 @@ export class ChatMemory {
         await this.memory.db.update(chats).set(patch).where(
             eq(chats.id, this.chatInfo.id),
         );
-        if (this.cache) {
-            if (patch.lastUse !== undefined) this.cache.lastUse = patch.lastUse;
-            if (patch.lastNotes !== undefined) {
-                this.cache.lastNotes = patch.lastNotes;
-            }
-            if (patch.lastMemory !== undefined) {
-                this.cache.lastMemory = patch.lastMemory;
-            }
-            if (patch.memory !== undefined) {
-                this.cache.memory = patch.memory ?? undefined;
-            }
-            if (patch.chatModel !== undefined) {
-                this.cache.chatModel = patch.chatModel ?? undefined;
-            }
-            if (patch.messagesToPass !== undefined) {
-                this.cache.messagesToPass = patch.messagesToPass ?? undefined;
-            }
-            if (patch.randomReplyProbability !== undefined) {
-                this.cache.randomReplyProbability =
-                    patch.randomReplyProbability ??
-                        undefined;
-            }
-            if (patch.hateMode !== undefined) {
-                this.cache.hateMode = patch.hateMode ?? undefined;
-            }
-            if (patch.locale !== undefined) {
-                this.cache.locale = patch.locale ?? undefined;
-            }
-        }
     }
 
     async getChatConfigOverride(): Promise<ChatConfigOverride | undefined> {
@@ -537,11 +493,6 @@ export class ChatMemory {
                 eq(chats.id, this.chatInfo.id),
             );
         });
-
-        if (this.cache) {
-            this.cache.history = [];
-            this.cache.lastNotes = 0;
-        }
     }
 
     async getLastMessage() {
@@ -579,12 +530,6 @@ export class ChatMemory {
                     info: JSON.stringify(message.info),
                 },
             });
-
-        if (this.cache) {
-            const i = this.cache.history.findIndex((m) => m.id === message.id);
-            if (i === -1) this.cache.history.push(message);
-            else this.cache.history[i] = message;
-        }
     }
 
     async removeOldMessages(maxLength: number) {
@@ -608,12 +553,6 @@ export class ChatMemory {
                 inArray(chatMessages.messageId, toDelete),
             ));
         });
-
-        if (this.cache) {
-            this.cache.history = this.cache.history.slice(
-                this.cache.history.length - maxLength,
-            );
-        }
     }
 
     async removeOldNotes(maxLength: number) {
@@ -637,10 +576,6 @@ export class ChatMemory {
                 })));
             }
         });
-
-        if (this.cache) {
-            this.cache.notes = notes;
-        }
     }
 
     async addNote(note: string) {
@@ -669,10 +604,6 @@ export class ChatMemory {
         await this.memory.db.delete(chatNotes).where(
             eq(chatNotes.chatId, this.chatInfo.id),
         );
-
-        if (this.cache) {
-            this.cache.notes = [];
-        }
     }
 
     async setChatModel(value?: string) {
@@ -693,7 +624,6 @@ export class ChatMemory {
         }
 
         await this.setChatConfigOverrideRaw(next);
-        await this.patchChat({ chatModel: value ?? null });
     }
 
     async setMessagesToPass(value?: number) {
@@ -714,7 +644,6 @@ export class ChatMemory {
         }
 
         await this.setChatConfigOverrideRaw(next);
-        await this.patchChat({ messagesToPass: value ?? null });
     }
 
     async setRandomReplyProbability(value?: number) {
@@ -728,7 +657,6 @@ export class ChatMemory {
         }
 
         await this.setChatConfigOverrideRaw(next);
-        await this.patchChat({ randomReplyProbability: value ?? null });
     }
 
     async setHateMode(value: boolean) {
@@ -744,7 +672,6 @@ export class ChatMemory {
             await this.memory.db.delete(chatCharacters).where(
                 eq(chatCharacters.chatId, this.chatInfo.id),
             );
-            if (this.cache) this.cache.character = undefined;
             return;
         }
 
@@ -762,8 +689,6 @@ export class ChatMemory {
                     names: JSON.stringify(character.names),
                 },
             });
-
-        if (this.cache) this.cache.character = character;
     }
 
     async updateUser(user: User) {
@@ -797,12 +722,6 @@ export class ChatMemory {
                     lastUse: member.lastUse,
                 },
             });
-
-        if (this.cache) {
-            const idx = this.cache.members.findIndex((m) => m.id === member.id);
-            if (idx === -1) this.cache.members.push(member);
-            else this.cache.members[idx] = member;
-        }
     }
 
     async removeMember(userId: number) {
@@ -810,12 +729,6 @@ export class ChatMemory {
             eq(chatMembers.chatId, this.chatInfo.id),
             eq(chatMembers.userId, userId),
         ));
-
-        if (this.cache) {
-            this.cache.members = this.cache.members.filter((m) =>
-                m.id !== userId
-            );
-        }
     }
 
     async updateMessageText(messageId: number, text: string) {
@@ -826,11 +739,6 @@ export class ChatMemory {
                 eq(chatMessages.chatId, this.chatInfo.id),
                 eq(chatMessages.messageId, messageId),
             ));
-
-        if (this.cache) {
-            const msg = this.cache.history.find((m) => m.id === messageId);
-            if (msg) msg.text = text;
-        }
     }
 
     /**
@@ -862,14 +770,6 @@ export class ChatMemory {
                     firstName: user.first_name,
                 },
             });
-
-        if (this.cache) {
-            const idx = this.cache.optOutUsers.findIndex((u) =>
-                u.id === user.id
-            );
-            if (idx === -1) this.cache.optOutUsers.push(user);
-            else this.cache.optOutUsers[idx] = user;
-        }
     }
 
     async removeOptOutUser(userId: number) {
@@ -877,12 +777,6 @@ export class ChatMemory {
             eq(chatOptOutUsers.chatId, this.chatInfo.id),
             eq(chatOptOutUsers.userId, userId),
         ));
-
-        if (this.cache) {
-            this.cache.optOutUsers = this.cache.optOutUsers.filter((u) =>
-                u.id !== userId
-            );
-        }
     }
 
     async getMessageById(messageId: number) {
@@ -903,37 +797,6 @@ export class ChatMemory {
         by?: Pick<User, 'id' | 'username' | 'first_name'>,
     ) {
         await this.removeReaction(messageId, { type: 'emoji', emoji }, by);
-    }
-
-    async addCustomReaction(
-        messageId: number,
-        customEmojiId: string,
-        by?: Pick<User, 'id' | 'username' | 'first_name'>,
-    ) {
-        await this.upsertReaction(
-            messageId,
-            { type: 'custom', customEmojiId },
-            by,
-        );
-    }
-
-    async removeCustomReaction(
-        messageId: number,
-        customEmojiId: string,
-        by?: Pick<User, 'id' | 'username' | 'first_name'>,
-    ) {
-        await this.removeReaction(
-            messageId,
-            { type: 'custom', customEmojiId },
-            by,
-        );
-    }
-
-    async setReactionCounts(
-        messageId: number,
-        counts: ReactionCountEntry[],
-    ) {
-        await this.replaceReactionCounts(messageId, counts);
     }
 
     async applyReactionDelta(
