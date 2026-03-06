@@ -28,7 +28,7 @@ import {
 } from './config-policy.ts';
 import { verifyTelegramInitData } from './auth.ts';
 import logger from '../logger.ts';
-import { ChatMemory, Memory } from '../memory.ts';
+import { type BotCharacter, ChatMemory, Memory } from '../memory.ts';
 import { chatMembers, chats } from '../db/schema.ts';
 
 interface RuntimeConfigAccess {
@@ -47,6 +47,36 @@ interface AvailableChat {
     title: string;
     username?: string;
     type: TgChat['type'];
+}
+
+interface CurrentCharacterPayload {
+    name: string;
+    names: string[];
+    description: string;
+    scenario: string;
+    systemPrompt: string;
+    postHistoryInstructions: string;
+    firstMessage: string;
+    messageExample: string;
+}
+
+function projectCurrentCharacter(
+    character?: BotCharacter,
+): CurrentCharacterPayload | undefined {
+    if (!character) {
+        return undefined;
+    }
+
+    return {
+        name: character.name,
+        names: character.names,
+        description: character.description,
+        scenario: character.scenario,
+        systemPrompt: character.system_prompt,
+        postHistoryInstructions: character.post_history_instructions,
+        firstMessage: character.first_mes,
+        messageExample: character.mes_example,
+    };
 }
 
 function readChatSummary(chatId: number, infoRaw: string): AvailableChat {
@@ -268,6 +298,7 @@ export function startWebServer(options: StartWebServerOptions) {
 
                 let chatOverridePayload: unknown = undefined;
                 let effectiveConfigPayload: unknown = undefined;
+                let currentCharacter: unknown = undefined;
                 let canEditChat = false;
 
                 if (chatId !== undefined && Number.isFinite(chatId)) {
@@ -279,6 +310,10 @@ export function startWebServer(options: StartWebServerOptions) {
                     if (canEditChat) {
                         const chat = await options.bot.api.getChat(chatId);
                         const chatMemory = new ChatMemory(options.memory, chat);
+                        const currentChat = await chatMemory.getChat();
+                        currentCharacter = projectCurrentCharacter(
+                            currentChat.character,
+                        );
                         const chatOverride = await chatMemory
                             .getChatConfigOverride();
                         chatOverridePayload = chatOverride
@@ -321,6 +356,7 @@ export function startWebServer(options: StartWebServerOptions) {
                     globalPayload,
                     chatOverridePayload,
                     effectiveConfigPayload,
+                    currentCharacter,
                 });
             }
 

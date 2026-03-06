@@ -9,8 +9,10 @@ import {
   chatTextFromConfig,
   type ConfigRole,
   type ConfigScope,
+  type CurrentCharacterPayload,
   defaultGlobalConfig,
   fromUnknownChatOverride,
+  fromUnknownCurrentCharacter,
   fromUnknownGlobal,
   type GlobalFormText,
   globalTextFromConfig,
@@ -50,6 +52,7 @@ export class ConfigController {
   categories = $state<string[]>([]);
   availableModels = $state<string[]>([]);
   availableChats = $state<AvailableChat[]>([]);
+  currentCharacter = $state<CurrentCharacterPayload | undefined>(undefined);
 
   globalConfig = $state(defaultGlobalConfig());
   globalText = $state<GlobalFormText>({
@@ -143,6 +146,7 @@ export class ConfigController {
       baseConfig,
     );
     this.chatText = chatTextFromConfig(this.chatOverrideConfig);
+    this.currentCharacter = fromUnknownCurrentCharacter(data.currentCharacter);
 
     if (!this.canViewGlobal && this.scope === "global") {
       this.scope = "chat";

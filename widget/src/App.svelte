@@ -96,6 +96,7 @@
             bind:config={controller.chatOverrideConfig}
             bind:text={controller.chatText}
             availableModels={controller.availableModels}
+            currentCharacter={controller.currentCharacter}
             canConfigureTrustedSettings={controller.canConfigureTrustedSettings}
             canSave={controller.canSaveChat}
             onSave={saveChatWithFeedback}

@@ -19,6 +19,18 @@ export interface BootstrapResponse {
   globalPayload?: unknown;
   chatOverridePayload?: unknown;
   effectiveConfigPayload?: unknown;
+  currentCharacter?: unknown;
+}
+
+export interface CurrentCharacterPayload {
+  name: string;
+  names: string[];
+  description: string;
+  scenario: string;
+  systemPrompt: string;
+  postHistoryInstructions: string;
+  firstMessage: string;
+  messageExample: string;
 }
 
 export interface SerializedRegex {
@@ -368,6 +380,39 @@ export function fromUnknownChatOverride(
       global.randomReplyProbability,
     nepons: obj.nepons ?? global.nepons,
     responseDelay: obj.responseDelay ?? global.responseDelay,
+  };
+}
+
+export function fromUnknownCurrentCharacter(
+  payload: unknown,
+): CurrentCharacterPayload | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+
+  const obj = payload as Record<string, unknown>;
+  if (typeof obj.name !== "string") {
+    return undefined;
+  }
+
+  const names = Array.isArray(obj.names)
+    ? obj.names.filter((item): item is string => typeof item === "string")
+    : [];
+
+  return {
+    name: obj.name,
+    names,
+    description: typeof obj.description === "string" ? obj.description : "",
+    scenario: typeof obj.scenario === "string" ? obj.scenario : "",
+    systemPrompt: typeof obj.systemPrompt === "string" ? obj.systemPrompt : "",
+    postHistoryInstructions:
+      typeof obj.postHistoryInstructions === "string"
+        ? obj.postHistoryInstructions
+        : "",
+    firstMessage: typeof obj.firstMessage === "string" ? obj.firstMessage : "",
+    messageExample: typeof obj.messageExample === "string"
+      ? obj.messageExample
+      : "",
   };
 }
 

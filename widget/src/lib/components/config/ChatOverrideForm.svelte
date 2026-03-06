@@ -5,12 +5,17 @@
     import { Label } from '$lib/components/ui/label';
     import { Switch } from '$lib/components/ui/switch';
     import { Textarea } from '$lib/components/ui/textarea';
-    import type { ChatFormText, ResolvedChatOverridePayload } from '$lib/config/model';
+    import type {
+        ChatFormText,
+        CurrentCharacterPayload,
+        ResolvedChatOverridePayload,
+    } from '$lib/config/model';
 
     interface Props {
         config: ResolvedChatOverridePayload;
         text: ChatFormText;
         availableModels: string[];
+        currentCharacter?: CurrentCharacterPayload;
         canConfigureTrustedSettings: boolean;
         canSave: boolean;
         onSave: () => void;
@@ -20,6 +25,7 @@
         config = $bindable(),
         text = $bindable(),
         availableModels = [],
+        currentCharacter,
         canConfigureTrustedSettings,
         canSave,
         onSave,
@@ -32,6 +38,45 @@
         <CardDescription>Role-based chat settings with safe defaults.</CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
+        <details class="quick-details rounded-md border p-3" open={Boolean(currentCharacter)}>
+            <summary class="cursor-pointer font-medium">Current Character</summary>
+            <div class="mt-4 space-y-4">
+                {#if currentCharacter}
+                    <p class="text-xs text-muted-foreground">Character prompts shown here are chat character prompts. Native Slusha prompts are intentionally excluded.</p>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <div class="space-y-2"><Label>Name</Label><p class="rounded-md border px-3 py-2 text-sm">{currentCharacter.name}</p></div>
+                        <div class="space-y-2"><Label>Names</Label><p class="rounded-md border px-3 py-2 text-sm">{currentCharacter.names.length > 0 ? currentCharacter.names.join(', ') : 'No aliases generated'}</p></div>
+                    </div>
+
+                    {#if currentCharacter.description.trim().length > 0}
+                        <div class="space-y-2"><Label>Description</Label><p class="max-h-60 overflow-auto whitespace-pre-wrap rounded-md border px-3 py-2 text-sm">{currentCharacter.description}</p></div>
+                    {/if}
+
+                    {#if currentCharacter.scenario.trim().length > 0}
+                        <div class="space-y-2"><Label>scenario</Label><p class="max-h-48 overflow-auto whitespace-pre-wrap rounded-md border px-3 py-2 text-sm">{currentCharacter.scenario}</p></div>
+                    {/if}
+
+                    {#if currentCharacter.systemPrompt.trim().length > 0}
+                        <div class="space-y-2"><Label>system_prompt</Label><p class="max-h-60 overflow-auto whitespace-pre-wrap rounded-md border px-3 py-2 text-sm">{currentCharacter.systemPrompt}</p></div>
+                    {/if}
+
+                    {#if currentCharacter.postHistoryInstructions.trim().length > 0}
+                        <div class="space-y-2"><Label>post_history_instructions</Label><p class="max-h-48 overflow-auto whitespace-pre-wrap rounded-md border px-3 py-2 text-sm">{currentCharacter.postHistoryInstructions}</p></div>
+                    {/if}
+
+                    {#if currentCharacter.firstMessage.trim().length > 0}
+                        <div class="space-y-2"><Label>first_mes</Label><p class="max-h-48 overflow-auto whitespace-pre-wrap rounded-md border px-3 py-2 text-sm">{currentCharacter.firstMessage}</p></div>
+                    {/if}
+
+                    {#if currentCharacter.messageExample.trim().length > 0}
+                        <div class="space-y-2"><Label>mes_example</Label><p class="max-h-48 overflow-auto whitespace-pre-wrap rounded-md border px-3 py-2 text-sm">{currentCharacter.messageExample}</p></div>
+                    {/if}
+                {:else}
+                    <p class="text-sm text-muted-foreground">No character is currently set for this chat.</p>
+                {/if}
+            </div>
+        </details>
+
         <details open class="quick-details rounded-md border p-3">
             <summary class="cursor-pointer font-medium">General</summary>
             <div class="mt-4 space-y-6">
