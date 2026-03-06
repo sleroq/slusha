@@ -32,7 +32,7 @@
         <CardDescription>Role-based chat settings with safe defaults.</CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
-        <details open class="rounded-md border p-3">
+        <details open class="quick-details rounded-md border p-3">
             <summary class="cursor-pointer font-medium">General</summary>
             <div class="mt-4 space-y-6">
                 <div class="grid gap-3 md:grid-cols-2">
@@ -52,7 +52,7 @@
         </details>
 
         {#if canConfigureTrustedSettings}
-            <details class="rounded-md border p-3">
+            <details class="quick-details rounded-md border p-3">
                 <summary class="cursor-pointer font-medium">Model</summary>
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
                     <div class="space-y-2">
@@ -73,7 +73,7 @@
                 </div>
             </details>
 
-            <details class="rounded-md border p-3">
+            <details class="quick-details rounded-md border p-3">
                 <summary class="cursor-pointer font-medium">Prompts</summary>
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
                     <div class="space-y-2 md:col-span-2"><Label for="c-ai-prompt">ai.prompt</Label><Textarea id="c-ai-prompt" rows={4} bind:value={config.ai.prompt} /></div>
@@ -85,7 +85,7 @@
                 </div>
             </details>
 
-            <details class="rounded-md border p-3">
+            <details class="quick-details rounded-md border p-3">
                 <summary class="cursor-pointer font-medium">Advanced</summary>
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
                     <div class="space-y-2"><Label for="c-ai-msgs">ai.messagesToPass</Label><Input id="c-ai-msgs" type="number" bind:value={config.ai.messagesToPass} /></div>

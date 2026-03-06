@@ -24,7 +24,7 @@
         <CardDescription>Admin-only settings and internal prompts.</CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
-        <details open class="rounded-md border p-3">
+        <details open class="quick-details rounded-md border p-3">
             <summary class="cursor-pointer font-medium">General</summary>
             <div class="mt-4 space-y-6">
                 <div class="grid gap-3 md:grid-cols-2">
@@ -45,7 +45,7 @@
             </div>
         </details>
 
-        <details class="rounded-md border p-3">
+        <details class="quick-details rounded-md border p-3">
             <summary class="cursor-pointer font-medium">Model</summary>
             <div class="mt-4 grid gap-3 md:grid-cols-2">
                 <div class="space-y-2"><Label for="g-ai-model">ai.model</Label><Input id="g-ai-model" bind:value={config.ai.model} /></div>
@@ -57,7 +57,7 @@
             </div>
         </details>
 
-        <details class="rounded-md border p-3">
+        <details class="quick-details rounded-md border p-3">
             <summary class="cursor-pointer font-medium">Prompts</summary>
             <div class="mt-4 grid gap-3 md:grid-cols-2">
                 <div class="space-y-2 md:col-span-2"><Label for="g-ai-preprompt">ai.prePrompt</Label><Textarea id="g-ai-preprompt" rows={4} bind:value={config.ai.prePrompt} /></div>
@@ -76,7 +76,7 @@
             </div>
         </details>
 
-        <details class="rounded-md border p-3">
+        <details class="quick-details rounded-md border p-3">
             <summary class="cursor-pointer font-medium">Advanced</summary>
             <div class="mt-4 grid gap-3 md:grid-cols-2">
                 <div class="space-y-2"><Label for="g-max-notes">maxNotesToStore</Label><Input id="g-max-notes" type="number" bind:value={config.maxNotesToStore} /></div>
@@ -93,7 +93,7 @@
             </div>
         </details>
 
-        <details class="rounded-md border p-3">
+        <details class="quick-details rounded-md border p-3">
             <summary class="cursor-pointer font-medium">Admin</summary>
             <div class="mt-4 space-y-3">
                 <div class="space-y-2"><Label for="g-admin-ids">adminIds (one number per line)</Label><Textarea id="g-admin-ids" rows={4} bind:value={text.adminIds} /></div>

@@ -119,3 +119,32 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  details.quick-details > div {
+    max-height: 0;
+    margin-top: 0 !important;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-0.15rem);
+    transition:
+      max-height 180ms ease,
+      margin-top 180ms ease,
+      opacity 140ms ease,
+      transform 180ms ease;
+  }
+
+  details.quick-details[open] > div {
+    max-height: 120rem;
+    margin-top: 1rem !important;
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    details.quick-details > div {
+      transition: none;
+      transform: none;
+    }
+  }
+}
