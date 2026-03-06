@@ -48,11 +48,6 @@ export function registerConfig(
                 return ctx.reply(ctx.t('admin-only'));
             }
         } else if (ctx.chat.type !== 'private') {
-            const admins = await ctx.getChatAdministrators();
-            if (!admins.some((a) => a.user.id === ctx.from?.id)) {
-                return ctx.reply(ctx.t('context-admin-only'));
-            }
-
             const deepLink = ctx.me.username
                 ? mainMiniAppUrl(ctx.me.username, `config_${ctx.chat.id}`)
                 : undefined;
