@@ -135,6 +135,64 @@ interface ConstructMsgOptions {
     includeReactions?: boolean;
 }
 
+const messageMetadataFields = new Set<string>([
+    'message_id',
+    'message_thread_id',
+    'from',
+    'sender_chat',
+    'date',
+    'chat',
+    'is_topic_message',
+    'has_protected_content',
+    'reply_to_message',
+    'external_reply',
+    'quote',
+    'reply_to_story',
+    'via_bot',
+    'edit_date',
+    'has_media_spoiler',
+    'media_group_id',
+    'author_signature',
+    'text',
+    'entities',
+    'caption',
+    'caption_entities',
+    'link_preview_options',
+    'effect_id',
+    'show_caption_above_media',
+    'forward_origin',
+    'reply_markup',
+]);
+
+const supportedTextContentTypes = new Set<string>([
+    ...Array.from(supportedTypesMap.keys()).map(String),
+    ...jsonTypes.map(String),
+]);
+
+function getPresentMessageFields(msgInfo: Message): string[] {
+    const rawMsg = msgInfo as unknown as Record<string, unknown>;
+
+    return Object.keys(rawMsg).filter((key) => rawMsg[key] !== undefined);
+}
+
+function getPresentContentFields(msgInfo: Message): string[] {
+    return getPresentMessageFields(msgInfo).filter((field) =>
+        !messageMetadataFields.has(field)
+    );
+}
+
+function getSupportedContentFields(msgInfo: Message): string[] {
+    return getPresentContentFields(msgInfo).filter((field) =>
+        supportedTextContentTypes.has(field)
+    );
+}
+
+function getUnsupportedContentFields(msgInfo: Message): string[] {
+    return getPresentContentFields(msgInfo).filter((field) =>
+        !supportedTextContentTypes.has(field)
+    );
+}
+
 function getTimeString(date: Date): string {
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
@@ -182,7 +240,17 @@ async function constructMsg(
     }
 
     if (!text) {
-        throw new Error('Message is not supported');
+        const supportedFields = getSupportedContentFields(msg.info);
+        const unsupportedFields = getUnsupportedContentFields(msg.info);
+        throw new Error(
+            [
+                'Message is not supported',
+                `(message_id=${msg.id})`,
+                `(has_text=${Boolean(msg.text)})`,
+                `(supported_fields=${supportedFields.join(',') || 'none'})`,
+                `(unsupported_fields=${unsupportedFields.join(',') || 'none'})`,
+            ].join(' '),
+        );
     }
 
     const parts: UserContent = [];
@@ -373,8 +441,18 @@ export async function makeHistoryV2(
                 );
             } catch (error) {
                 logger.error(
-                    'Could not construct replied message: ',
-                    error,
+                    'Could not construct replied message',
+                    {
+                        error,
+                        messageId: msg.id,
+                        isMyself: msg.isMyself,
+                        hasText: Boolean(msg.text),
+                        textLength: msg.text?.length ?? 0,
+                        supportedFields: getSupportedContentFields(msg.info),
+                        unsupportedFields: getUnsupportedContentFields(
+                            msg.info,
+                        ),
+                    },
                 );
                 continue;
             }
@@ -457,7 +535,15 @@ export async function makeNotesHistory(
                 },
             );
         } catch (error) {
-            logger.error('Could not construct message: ', error);
+            logger.error('Could not construct message', {
+                error,
+                messageId: msg.id,
+                isMyself: msg.isMyself,
+                hasText: Boolean(msg.text),
+                textLength: msg.text?.length ?? 0,
+                supportedFields: getSupportedContentFields(msg.info),
+                unsupportedFields: getUnsupportedContentFields(msg.info),
+            });
             continue;
         }
 
