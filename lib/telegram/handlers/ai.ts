@@ -19,7 +19,7 @@ import {
     isReactEntry,
     isTextEntry,
 } from '../../ai/schema.ts';
-import { canonicalizeReaction } from '../reactions.ts';
+import { ALLOWED_REACTIONS, canonicalizeReaction } from '../reactions.ts';
 import { isMissingSendTextRightsError } from '../reply-rights.ts';
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { parseModelRef } from '../../ai/model-ref.ts';
@@ -90,8 +90,59 @@ function buildLanguageProtocol(defaultLocale: string): string {
 export default function registerAI(bot: Bot<SlushaContext>) {
     const sendChatActionsTool = tool({
         description:
-            'Return all Telegram actions in one call: text messages and optional reactions/reply targets.',
+            'Submit Telegram actions once per turn. Return an entries array where each entry has text and/or react, with optional reply_to (@username) and offset (0-based). Use Telegram markdown in text without headings. Prefer reply_to over @mentions in text. React only with allowed free Telegram reactions: ' +
+            ALLOWED_REACTIONS.join(', ') + '.',
         inputSchema: chatActionsToolInputSchema,
+        inputExamples: [
+            {
+                input: {
+                    entries: [
+                        {
+                            text: 'first *message* `code`',
+                            reply_to: '@username',
+                        },
+                        {
+                            text: 'second message',
+                            reply_to: '@username',
+                        },
+                        {
+                            react: '❤',
+                            offset: 2,
+                            reply_to: '@username',
+                        },
+                    ],
+                },
+            },
+            {
+                input: {
+                    entries: [
+                        {
+                            react: '❤',
+                            reply_to: '@username',
+                        },
+                    ],
+                },
+            },
+            {
+                input: {
+                    entries: [
+                        {
+                            text: 'lorem ipsum',
+                            reply_to: '@username',
+                        },
+                    ],
+                },
+            },
+            {
+                input: {
+                    entries: [
+                        {
+                            text: '',
+                        },
+                    ],
+                },
+            },
+        ],
     });
 
     bot.on('message', async (ctx) => {
