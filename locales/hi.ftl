@@ -143,3 +143,9 @@ nepon-2 = अभी कुछ उत्तर नहीं देना
 nepon-3 = सोचूंगा, बाद में बताता हूं
 nepon-4 = कुछ पता नहीं, बाद में ट्राई करना
 nepon-5 = आराम कर रहा हूं, बाद में मिलते हैं
+
+# Config widget
+config-open-widget = कॉन्फिग विजेट खोलो
+config-open-global = बॉट का ग्लोबल कॉन्फिग खोलो
+config-open-chat = इस चैट का कॉन्फिग खोलो
+config-widget-unavailable = कॉन्फिग विजेट अभी उपलब्ध नहीं है

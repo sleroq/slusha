@@ -1,0 +1,17 @@
+{
+  "nodeModulesDir": "auto",
+  "lint": {
+    "rules": {
+      "exclude": ["no-sloppy-imports", "no-window"]
+    }
+  },
+  "tasks": {
+    "dev": "deno run -A npm:vite",
+    "build": "deno run -A npm:vite build",
+    "preview": "deno run -A npm:vite preview",
+    "check": "deno check src/main.ts && deno run -A npm:svelte-check --tsconfig ./tsconfig.json",
+    "lint:deno": "deno lint",
+    "lint:eslint": "deno run -A npm:eslint \"src/**/*.{ts,svelte}\"",
+    "lint": "deno task lint:deno && deno task lint:eslint"
+  }
+}

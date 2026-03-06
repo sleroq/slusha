@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { Chat as TgChat, Message, User } from 'grammy_types';
 import { Character } from './charhub/api.ts';
-import { createDb, DbClient } from './db/client.ts';
+import { DbClient, ensureSqlitePragmas, getDb } from './db/client.ts';
 import {
     chatConfigOverrides,
     chatCharacters,
@@ -16,6 +16,7 @@ import {
 import logger from './logger.ts';
 import { ReplyMessage } from './telegram/helpers.ts';
 import {
+    chatConfigOverrideSchema,
     ChatConfigOverride,
     mergeWithChatOverride,
     parseChatOverridePayload,
@@ -43,6 +44,17 @@ export interface ReactionRecord {
     by: ReactionBy[];
     count: number;
 }
+
+export interface ReactionDelta {
+    emojiAdded: string[];
+    emojiRemoved: string[];
+    customAdded: string[];
+    customRemoved: string[];
+}
+
+export type ReactionCountEntry =
+    | { type: 'emoji'; emoji: string; total: number }
+    | { type: 'custom'; customEmojiId: string; total: number };
 
 export type MessageReactions = { [key: string]: ReactionRecord };
 
@@ -134,7 +146,7 @@ export class Memory {
     db: DbClient;
 
     constructor(db?: DbClient) {
-        this.db = db ?? createDb().db;
+        this.db = db ?? getDb();
     }
 
     private async ensureChat(tgChat: TgChat) {
@@ -457,6 +469,20 @@ export class ChatMemory {
             });
     }
 
+    async setChatConfigOverride(value: ChatConfigOverride | undefined, updatedBy?: number) {
+        if (value === undefined) {
+            await this.setChatConfigOverrideRaw(undefined, updatedBy);
+            return;
+        }
+
+        const parsed = chatConfigOverrideSchema.safeParse(value);
+        if (!parsed.success) {
+            throw new Error('Invalid chat config override payload: ' + parsed.error.message);
+        }
+
+        await this.setChatConfigOverrideRaw(parsed.data, updatedBy);
+    }
+
     async getEffectiveConfig(base: UserConfig) {
         const override = await this.getChatConfigOverride();
         return mergeWithChatOverride(base, override);
@@ -597,6 +623,14 @@ export class ChatMemory {
 
     async setMemory(value?: string) {
         await this.patchChat({ memory: value ?? null });
+    }
+
+    async clearNotes() {
+        await this.memory.db.delete(chatNotes).where(eq(chatNotes.chatId, this.chatInfo.id));
+
+        if (this.cache) {
+            this.cache.notes = [];
+        }
     }
 
     async setChatModel(value?: string) {
@@ -841,13 +875,55 @@ export class ChatMemory {
 
     async setReactionCounts(
         messageId: number,
-        counts: Array<
-            | { type: 'emoji'; emoji: string; total: number }
-            | { type: 'custom'; customEmojiId: string; total: number }
-        >,
+        counts: ReactionCountEntry[],
+    ) {
+        await this.replaceReactionCounts(messageId, counts);
+    }
+
+    async applyReactionDelta(
+        messageId: number,
+        delta: ReactionDelta,
+        by?: Pick<User, 'id' | 'username' | 'first_name'>,
+    ) {
+        for (const emoji of delta.emojiAdded) {
+            await this.upsertReaction(messageId, { type: 'emoji', emoji }, by);
+        }
+        for (const emoji of delta.emojiRemoved) {
+            await this.removeReaction(messageId, { type: 'emoji', emoji }, by);
+        }
+        for (const customEmojiId of delta.customAdded) {
+            await this.upsertReaction(messageId, { type: 'custom', customEmojiId }, by);
+        }
+        for (const customEmojiId of delta.customRemoved) {
+            await this.removeReaction(messageId, { type: 'custom', customEmojiId }, by);
+        }
+    }
+
+    async replaceReactionCounts(
+        messageId: number,
+        counts: ReactionCountEntry[],
     ) {
         const msg = await this.getMessageById(messageId);
         if (!msg) return;
+
+        const nextKeys = new Set(counts.map((c) =>
+            reactionKey(
+                c.type === 'emoji'
+                    ? { type: 'emoji', emoji: c.emoji }
+                    : { type: 'custom', customEmojiId: c.customEmojiId },
+            )
+        ));
+
+        const existingRows = await this.memory.db
+            .select({ reactionKey: messageReactions.reactionKey })
+            .from(messageReactions)
+            .where(and(
+                eq(messageReactions.chatId, this.chatInfo.id),
+                eq(messageReactions.messageId, messageId),
+            ));
+        const staleKeys = existingRows
+            .map((row) => row.reactionKey)
+            .filter((key) => !nextKeys.has(key));
 
         for (const c of counts) {
             const key = reactionKey(
@@ -891,6 +967,25 @@ export class ChatMemory {
             } else {
                 existing.count = c.total;
                 msg.reactions[key] = existing;
+            }
+        }
+
+        if (staleKeys.length > 0) {
+            await this.memory.db.delete(messageReactionUsers).where(and(
+                eq(messageReactionUsers.chatId, this.chatInfo.id),
+                eq(messageReactionUsers.messageId, messageId),
+                inArray(messageReactionUsers.reactionKey, staleKeys),
+            ));
+            await this.memory.db.delete(messageReactions).where(and(
+                eq(messageReactions.chatId, this.chatInfo.id),
+                eq(messageReactions.messageId, messageId),
+                inArray(messageReactions.reactionKey, staleKeys),
+            ));
+
+            if (msg.reactions) {
+                for (const key of staleKeys) {
+                    delete msg.reactions[key];
+                }
             }
         }
     }
@@ -1032,6 +1127,7 @@ export class ChatMemory {
 
 export async function loadMemory(): Promise<Memory> {
     const memory = new Memory();
+    await ensureSqlitePragmas();
 
     try {
         // Ensure DB file is writable and connection is valid.

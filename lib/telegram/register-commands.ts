@@ -9,6 +9,7 @@ import { registerModel } from './commands/model.ts';
 import { registerRandom } from './commands/random.ts';
 import { registerSummary } from './commands/summary.ts';
 import registerHateMode from './commands/hatemode.ts';
+import { registerConfig } from './commands/config.ts';
 
 export function registerEarlyCommands(bot: Composer<SlushaContext>) {
     bot.use(start);
@@ -25,4 +26,5 @@ export function registerLateCommands(
     registerRandom(bot, config);
     registerSummary(bot, config);
     registerHateMode(bot);
+    registerConfig(bot, config);
 }

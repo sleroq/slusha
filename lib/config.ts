@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import defaultConfig from './default-config.ts';
-import { createDb } from './db/client.ts';
+import { DbClient, ensureSqlitePragmas, getDb } from './db/client.ts';
 import { globalConfig } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
 
@@ -10,17 +10,21 @@ function isValidRegex(val: unknown): val is RegExp {
     return false;
 }
 
-const configSchema = z.object({
+const boundedProbability = z.number().min(0).max(100);
+const boundedPositiveInt = (min: number, max: number) => z.number().int().min(min).max(max);
+const matcherSchema = z.union([z.string().max(256), z.custom<RegExp>(isValidRegex)]);
+
+export const configSchema = z.object({
     ai: z.object({
-        model: z.string(),
-        notesModel: z.string().optional(),
-        memoryModel: z.string().optional(),
-        temperature: z.number(),
-        topK: z.number(),
-        topP: z.number(),
-        prePrompt: z.string(),
-        prompt: z.string(),
-        dumbPrompt: z.string().optional(),
+        model: z.string().min(1).max(200),
+        notesModel: z.string().min(1).max(200).optional(),
+        memoryModel: z.string().min(1).max(200).optional(),
+        temperature: z.number().min(0).max(2),
+        topK: z.number().min(1).max(200),
+        topP: z.number().min(0).max(1),
+        prePrompt: z.string().max(20000),
+        prompt: z.string().max(20000),
+        dumbPrompt: z.string().max(10000).optional(),
         /**
          * When false, bot will not expect JSON array output and will
          * generate a single plain text message instead. Reactions are disabled.
@@ -29,55 +33,74 @@ const configSchema = z.object({
         /**
          * Optional alternative pre-prompt for dumb models that don't output JSON
          */
-        dumbPrePrompt: z.string().optional(),
-        privateChatPromptAddition: z.string().optional(),
-        groupChatPromptAddition: z.string().optional(),
-        commentsPromptAddition: z.string().optional(),
-        hateModePrompt: z.string().optional(),
+        dumbPrePrompt: z.string().max(10000).optional(),
+        privateChatPromptAddition: z.string().max(10000).optional(),
+        groupChatPromptAddition: z.string().max(10000).optional(),
+        commentsPromptAddition: z.string().max(10000).optional(),
+        hateModePrompt: z.string().max(10000).optional(),
         /**
          * Smart-mode final prompt (expects JSON array response)
          */
-        finalPrompt: z.string(),
+        finalPrompt: z.string().max(20000),
         /**
          * Optional alternative final prompt for dumb models (plain text)
          */
-        dumbFinalPrompt: z.string().optional(),
-        notesPrompt: z.string(),
-        memoryPrompt: z.string(),
-        memoryPromptRepeat: z.string(),
-        messagesToPass: z.number().default(5),
-        notesFrequency: z.number().default(150),
-        memoryFrequency: z.number().default(50),
-        messageMaxLength: z.number().default(4096),
+        dumbFinalPrompt: z.string().max(10000).optional(),
+        notesPrompt: z.string().max(20000),
+        memoryPrompt: z.string().max(20000),
+        memoryPromptRepeat: z.string().max(20000),
+        messagesToPass: boundedPositiveInt(1, 100).default(5),
+        notesFrequency: boundedPositiveInt(1, 5000).default(150),
+        memoryFrequency: boundedPositiveInt(1, 5000).default(50),
+        messageMaxLength: boundedPositiveInt(200, 20000).default(4096),
         /**
          * Whether to include attachments (images, videos, voice, etc.)
          * from user messages when constructing model history
          */
         includeAttachmentsInHistory: z.boolean().default(true),
-        bytesLimit: z.number().default(20 * 1024 * 1024),
+        bytesLimit: boundedPositiveInt(1024, 100 * 1024 * 1024).default(20 * 1024 * 1024),
     }),
-    startMessage: z.string(),
-    names: z.array(z.union([z.string(), z.custom<RegExp>(isValidRegex)])),
-    tendToReply: z.array(z.union([z.string(), z.custom<RegExp>(isValidRegex)])),
-    tendToReplyProbability: z.number().default(50),
-    tendToIgnore: z.array(
-        z.union([z.string(), z.custom<RegExp>(isValidRegex)]),
-    ),
-    tendToIgnoreProbability: z.number().default(90),
-    randomReplyProbability: z.number().default(1),
-    nepons: z.array(z.string()),
-    filesMaxAge: z.number().default(72),
-    adminIds: z.array(z.number()).optional(),
-    maxNotesToStore: z.number().default(5),
-    maxMessagesToStore: z.number().default(100),
-    chatLastUseNotes: z.number().default(3),
-    chatLastUseMemory: z.number().default(2),
-    responseDelay: z.number().default(1),
+    startMessage: z.string().max(2000),
+    names: z.array(matcherSchema).max(256),
+    tendToReply: z.array(matcherSchema).max(256),
+    tendToReplyProbability: boundedProbability.default(50),
+    tendToIgnore: z.array(matcherSchema).max(256),
+    tendToIgnoreProbability: boundedProbability.default(90),
+    randomReplyProbability: boundedProbability.default(1),
+    nepons: z.array(z.string().max(500)).max(256),
+    filesMaxAge: boundedPositiveInt(1, 720).default(72),
+    adminIds: z.array(z.number().int()).max(256).optional(),
+    trustedIds: z.array(z.number().int()).max(10000).default([]),
+    availableModels: z.array(z.string().min(1).max(200)).min(1).max(256).default([
+        'gemini-3.1-flash-lite-preview',
+    ]),
+    maxNotesToStore: boundedPositiveInt(1, 200).default(5),
+    maxMessagesToStore: boundedPositiveInt(1, 2000).default(100),
+    chatLastUseNotes: boundedPositiveInt(1, 100).default(3),
+    chatLastUseMemory: boundedPositiveInt(1, 100).default(2),
+    responseDelay: z.number().min(0).max(120).default(1),
 });
 
-const chatConfigOverrideSchema = z.object({
-    ai: configSchema.shape.ai.partial().optional(),
-    startMessage: configSchema.shape.startMessage.optional(),
+const chatOverrideAiSchema = z.object({
+    model: configSchema.shape.ai.shape.model.optional(),
+    temperature: configSchema.shape.ai.shape.temperature.optional(),
+    topK: configSchema.shape.ai.shape.topK.optional(),
+    topP: configSchema.shape.ai.shape.topP.optional(),
+    prompt: configSchema.shape.ai.shape.prompt.optional(),
+    dumbPrompt: configSchema.shape.ai.shape.dumbPrompt.optional(),
+    privateChatPromptAddition: configSchema.shape.ai.shape.privateChatPromptAddition.optional(),
+    groupChatPromptAddition: configSchema.shape.ai.shape.groupChatPromptAddition.optional(),
+    commentsPromptAddition: configSchema.shape.ai.shape.commentsPromptAddition.optional(),
+    hateModePrompt: configSchema.shape.ai.shape.hateModePrompt.optional(),
+    useJsonResponses: configSchema.shape.ai.shape.useJsonResponses.optional(),
+    messagesToPass: configSchema.shape.ai.shape.messagesToPass.optional(),
+    messageMaxLength: configSchema.shape.ai.shape.messageMaxLength.optional(),
+    includeAttachmentsInHistory: configSchema.shape.ai.shape.includeAttachmentsInHistory.optional(),
+    bytesLimit: configSchema.shape.ai.shape.bytesLimit.optional(),
+});
+
+export const chatConfigOverrideSchema = z.object({
+    ai: chatOverrideAiSchema.optional(),
     names: configSchema.shape.names.optional(),
     tendToReply: configSchema.shape.tendToReply.optional(),
     tendToReplyProbability: configSchema.shape.tendToReplyProbability.optional(),
@@ -85,10 +108,6 @@ const chatConfigOverrideSchema = z.object({
     tendToIgnoreProbability: configSchema.shape.tendToIgnoreProbability.optional(),
     randomReplyProbability: configSchema.shape.randomReplyProbability.optional(),
     nepons: configSchema.shape.nepons.optional(),
-    maxNotesToStore: configSchema.shape.maxNotesToStore.optional(),
-    maxMessagesToStore: configSchema.shape.maxMessagesToStore.optional(),
-    chatLastUseNotes: configSchema.shape.chatLastUseNotes.optional(),
-    chatLastUseMemory: configSchema.shape.chatLastUseMemory.optional(),
     responseDelay: configSchema.shape.responseDelay.optional(),
 });
 
@@ -213,6 +232,97 @@ export function parseChatOverridePayload(payload: string): ChatConfigOverride {
     return parsed.data;
 }
 
+export async function getGlobalUserConfig(db: DbClient = getDb()): Promise<UserConfig> {
+    await ensureSqlitePragmas();
+
+    let row = await db.query.globalConfig.findFirst({
+        where: eq(globalConfig.id, 1),
+    });
+
+    if (!row) {
+        const parsedDefaults = configSchema.safeParse(defaultConfig);
+        if (!parsedDefaults.success) {
+            throw new Error(
+                'Invalid built-in default config: ' + parsedDefaults.error.message,
+            );
+        }
+
+        const now = Date.now();
+        await db.insert(globalConfig).values({
+            id: 1,
+            payload: serializeUserConfig(parsedDefaults.data),
+            updatedAt: now,
+        });
+
+        row = await db.query.globalConfig.findFirst({
+            where: eq(globalConfig.id, 1),
+        });
+    }
+
+    if (!row) {
+        throw new Error('Could not initialize global config');
+    }
+
+    return parseUserConfigPayload(row.payload);
+}
+
+export async function setGlobalUserConfig(
+    value: UserConfig,
+    updatedBy?: number,
+    db: DbClient = getDb(),
+): Promise<UserConfig> {
+    await ensureSqlitePragmas();
+
+    const parsed = configSchema.safeParse(value);
+    if (!parsed.success) {
+        throw new Error('Invalid global config payload: ' + parsed.error.message);
+    }
+
+    const normalizedModels = Array.from(new Set(parsed.data.availableModels.map((m) => m.trim())))
+        .filter((m) => m.length > 0);
+    if (normalizedModels.length === 0) {
+        throw new Error('availableModels must contain at least one model');
+    }
+
+    const modelsToCheck = [
+        parsed.data.ai.model,
+        parsed.data.ai.notesModel,
+        parsed.data.ai.memoryModel,
+    ].filter((item): item is string => typeof item === 'string' && item.length > 0);
+
+    for (const model of modelsToCheck) {
+        if (!normalizedModels.includes(model)) {
+            throw new Error(`Model "${model}" is not listed in availableModels`);
+        }
+    }
+
+    const nextValue: UserConfig = {
+        ...parsed.data,
+        availableModels: normalizedModels,
+    };
+
+    const now = Date.now();
+
+    await db
+        .insert(globalConfig)
+        .values({
+            id: 1,
+            payload: serializeUserConfig(nextValue),
+            updatedBy,
+            updatedAt: now,
+        })
+        .onConflictDoUpdate({
+            target: [globalConfig.id],
+            set: {
+                payload: serializeUserConfig(nextValue),
+                updatedBy,
+                updatedAt: now,
+            },
+        });
+
+    return nextValue;
+}
+
 export function mergeWithChatOverride(
     base: UserConfig,
     override?: ChatConfigOverride,
@@ -259,39 +369,9 @@ function resolveEnv() {
  * @returns Config
  * @throws Error if required environment variables are not set
  */
-export default async function resolveConfig(): Promise<Config> {
+export default async function resolveConfig(db?: DbClient): Promise<Config> {
     const env = resolveEnv();
-    const { db } = createDb();
-
-    let row = await db.query.globalConfig.findFirst({
-        where: eq(globalConfig.id, 1),
-    });
-
-    if (!row) {
-        const parsedDefaults = configSchema.safeParse(defaultConfig);
-        if (!parsedDefaults.success) {
-            throw new Error(
-                'Invalid built-in default config: ' + parsedDefaults.error.message,
-            );
-        }
-
-        const now = Date.now();
-        await db.insert(globalConfig).values({
-            id: 1,
-            payload: serializeUserConfig(parsedDefaults.data),
-            updatedAt: now,
-        });
-
-        row = await db.query.globalConfig.findFirst({
-            where: eq(globalConfig.id, 1),
-        });
-    }
-
-    if (!row) {
-        throw new Error('Could not initialize global config');
-    }
-
-    const userConfig = parseUserConfigPayload(row.payload);
+    const userConfig = await getGlobalUserConfig(db);
 
     return {
         ...userConfig,

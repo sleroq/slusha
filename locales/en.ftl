@@ -143,3 +143,9 @@ nepon-2 = don't wanna answer right now something
 nepon-3 = I'll think about it, maybe I'll tell you later
 nepon-4 = Something dunno hardcore, try later
 nepon-5 = Chilling, try later
+
+# Config widget
+config-open-widget = Open config widget
+config-open-global = Open global bot configuration
+config-open-chat = Open current chat configuration
+config-widget-unavailable = Config widget is unavailable right now
