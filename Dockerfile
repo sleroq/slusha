@@ -6,9 +6,10 @@ COPY deno.json deno.lock main.ts ./
 COPY lib ./lib
 COPY locales ./locales
 COPY drizzle ./drizzle
-COPY slusha.config.js ./slusha.config.js
+COPY widget ./widget
 
 RUN deno cache --allow-import --allow-scripts main.ts
+RUN deno task --config ./widget/deno.json build
 
 RUN mkdir -p ./tmp ./log && \
     deno compile \
@@ -33,5 +34,5 @@ WORKDIR /home/nonroot/app
 COPY --from=builder --chown=nonroot:nonroot /app/slusha ./slusha
 COPY --from=builder --chown=nonroot:nonroot /app/locales ./locales
 COPY --from=builder --chown=nonroot:nonroot /app/drizzle ./drizzle
-COPY --from=builder --chown=nonroot:nonroot /app/slusha.config.js ./slusha.config.js
+COPY --from=builder --chown=nonroot:nonroot /app/widget/dist ./widget/dist
 CMD ["/home/nonroot/app/slusha"]

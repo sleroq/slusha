@@ -1,6 +1,6 @@
 import _Werror from './lib/werror.ts';
 import logger from './lib/logger.ts';
-import resolveConfig, { Config } from './lib/config.ts';
+import resolveConfig, { Config, UserConfig } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
 import { run } from '@grammyjs/runner';
 import { loadMemory } from './lib/memory.ts';
@@ -14,25 +14,44 @@ import registerAll from './lib/telegram/register-all.ts';
 import { startTelemetry } from './lib/app/observability.ts';
 import { startSchedulers } from './lib/app/scheduler.ts';
 import { wireShutdown } from './lib/app/shutdown.ts';
+import { startWebServer } from './lib/web/server.ts';
 
 const sdk = startTelemetry();
 
 // (schemas and reaction utilities moved to dedicated modules)
 
 let config: Config;
-try {
-    config = await resolveConfig();
-} catch (error) {
-    logger.error('Config error: ', error);
-    Deno.exit(1);
-}
 
 await migrateDb();
 
 const memory = await loadMemory();
 logger.info('Memory loaded');
 
+try {
+    config = await resolveConfig(memory.db);
+} catch (error) {
+    logger.error('Config error: ', error);
+    Deno.exit(1);
+}
+
+const runtimeConfig = {
+    get: () => config,
+    applyUserConfig: (next: UserConfig) => {
+        const envPart = {
+            botToken: config.botToken,
+            aiToken: config.aiToken,
+        };
+        config = { ...next, ...envPart };
+    },
+};
+
 const bot = await setupBot(config, memory);
+
+startWebServer({
+    bot,
+    memory,
+    runtimeConfig,
+});
 
 // Register everything in correct order
 registerAll(bot, config);

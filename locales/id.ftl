@@ -143,3 +143,9 @@ nepon-2 = tidak mau jawab sekarang sesuatu
 nepon-3 = akan pikir, mungkin kasih tahu nanti
 nepon-4 = Sesuatu tidak tahu hardcore, coba nanti
 nepon-5 = Santai, coba nanti
+
+# Config widget
+config-open-widget = Buka widget konfigurasi
+config-open-global = Buka konfigurasi global bot
+config-open-chat = Buka konfigurasi chat saat ini
+config-widget-unavailable = Widget konfigurasi sedang tidak tersedia

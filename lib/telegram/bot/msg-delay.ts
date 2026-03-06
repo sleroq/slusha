@@ -1,13 +1,13 @@
 import logger from '../../logger.ts';
 import { SlushaContext } from '../setup-bot.ts';
-import { Config } from '../../config.ts';
+import { UserConfig } from '../../config.ts';
 import { Composer } from 'grammy';
 import { doTyping } from '../helpers.ts';
 
-export default function msgDelay(config: Config) {
+export default function msgDelay(config: UserConfig) {
     const bot = new Composer<SlushaContext>();
 
-    bot.on('message', (ctx, next) => {
+    bot.on('message', async (ctx, next) => {
         async function handleNext() {
             try {
                 await next();
@@ -18,8 +18,9 @@ export default function msgDelay(config: Config) {
 
         // TODO: Make sure this will not cause any concurrency issues (how)
 
-        // Wait for half a second before replying
-        // to make sure user is finished typing
+        const effectiveConfig = await ctx.m.getEffectiveConfig(config);
+
+        // Wait for configured delay before replying
         setTimeout(async () => {
             // If user is sent something after this message, drop current one
 
@@ -60,7 +61,7 @@ export default function msgDelay(config: Config) {
             } finally {
                 typing.abort();
             }
-        }, config.responseDelay * 1000);
+        }, effectiveConfig.responseDelay * 1000);
     });
 
     return bot;

@@ -2,7 +2,13 @@ import { Bot, Context } from 'grammy';
 import { I18nFlavor } from '@grammyjs/i18n';
 import logger from '../logger.ts';
 import { Config } from '../config.ts';
-import { ChatMemory, Memory, ReplyTo } from '../memory.ts';
+import {
+    ChatMemory,
+    Memory,
+    ReactionCountEntry,
+    ReactionDelta,
+    ReplyTo,
+} from '../memory.ts';
 import { sequentialize } from '@grammyjs/runner';
 
 interface RequestInfo {
@@ -20,31 +26,88 @@ export type SlushaContext = Context & I18nFlavor & {
 function isEmojiReactionType(
     obj: unknown,
 ): obj is { type: 'emoji'; emoji: string } {
-    return typeof obj === 'object' && obj !== null &&
-        (obj as { type?: unknown }).type === 'emoji' &&
-        typeof (obj as { emoji?: unknown }).emoji === 'string';
+    return getUnknownProp(obj, 'type') === 'emoji' &&
+        typeof getUnknownProp(obj, 'emoji') === 'string';
 }
 
 function isCustomReactionType(
     obj: unknown,
 ): obj is { type: 'custom_emoji'; custom_emoji_id: string } {
-    return typeof obj === 'object' && obj !== null &&
-        (obj as { type?: unknown }).type === 'custom_emoji' &&
-        typeof (obj as { custom_emoji_id?: unknown }).custom_emoji_id ===
-            'string';
+    return getUnknownProp(obj, 'type') === 'custom_emoji' &&
+        typeof getUnknownProp(obj, 'custom_emoji_id') === 'string';
+}
+
+function getUnknownProp(obj: unknown, key: string): unknown {
+    if (typeof obj !== 'object' || obj === null) return undefined;
+    return Reflect.get(obj, key);
 }
 
 function pickCount(obj: unknown): number | undefined {
-    if (typeof obj !== 'object' || obj === null) return undefined;
-    const o = obj as {
-        total_count?: unknown;
-        count?: unknown;
-        total?: unknown;
-    };
-    if (typeof o.total_count === 'number') return o.total_count;
-    if (typeof o.count === 'number') return o.count;
-    if (typeof o.total === 'number') return o.total;
+    const totalCount = getUnknownProp(obj, 'total_count');
+    if (typeof totalCount === 'number') return totalCount;
+
+    const count = getUnknownProp(obj, 'count');
+    if (typeof count === 'number') return count;
+
+    const total = getUnknownProp(obj, 'total');
+    if (typeof total === 'number') return total;
+
     return undefined;
+}
+
+function parseReactionSet(raw: unknown): { emoji: string[]; custom: string[] } {
+    const out = { emoji: [] as string[], custom: [] as string[] };
+    if (!Array.isArray(raw)) return out;
+
+    for (const reaction of raw) {
+        if (isEmojiReactionType(reaction)) out.emoji.push(reaction.emoji);
+        else if (isCustomReactionType(reaction)) {
+            out.custom.push(reaction.custom_emoji_id);
+        }
+    }
+
+    return out;
+}
+
+function parseReactionDelta(messageReaction: unknown): ReactionDelta {
+    const added = parseReactionSet(getUnknownProp(messageReaction, 'new_reaction'));
+    const removed = parseReactionSet(getUnknownProp(messageReaction, 'old_reaction'));
+
+    return {
+        emojiAdded: added.emoji,
+        emojiRemoved: removed.emoji,
+        customAdded: added.custom,
+        customRemoved: removed.custom,
+    };
+}
+
+function parseReactionCounts(messageReactionCount: unknown): ReactionCountEntry[] {
+    const rawCounts = getUnknownProp(messageReactionCount, 'reactions') ??
+        getUnknownProp(messageReactionCount, 'reaction_counts') ??
+        [];
+    const arr = Array.isArray(rawCounts) ? rawCounts : [];
+
+    return arr.map((reaction: unknown) => {
+        const type = getUnknownProp(reaction, 'type') ?? reaction;
+
+        if (isEmojiReactionType(type)) {
+            return {
+                type: 'emoji' as const,
+                emoji: type.emoji,
+                total: pickCount(reaction) ?? 0,
+            };
+        }
+
+        if (isCustomReactionType(type)) {
+            return {
+                type: 'custom' as const,
+                customEmojiId: type.custom_emoji_id,
+                total: pickCount(reaction) ?? 0,
+            };
+        }
+
+        return undefined;
+    }).filter((entry): entry is ReactionCountEntry => entry !== undefined);
 }
 
 // TODO: Maybe derive from bot info somehow?
@@ -56,6 +119,7 @@ const commands = [
     '/random',
     '/summary',
     '/language',
+    '/config',
 ];
 
 const startDate = new Date();
@@ -79,13 +143,16 @@ export default async function setupBot(config: Config, memory: Memory) {
         return [chat, user].filter((con) => con !== undefined);
     }));
 
-    bot.use((ctx, next) => {
+    bot.use(async (ctx, next) => {
         // Init custom context
         ctx.memory = memory;
+        let aiConfig = config.ai;
         if (ctx.chat) {
             ctx.m = new ChatMemory(memory, ctx.chat);
+            const effective = await ctx.m.getEffectiveConfig(config);
+            aiConfig = effective.ai;
         }
-        ctx.info = { isRandom: false, config: config.ai };
+        ctx.info = { isRandom: false, config: aiConfig };
 
         return next();
     });
@@ -98,44 +165,7 @@ export default async function setupBot(config: Config, memory: Memory) {
             const messageId = mr.message_id;
             const chat = ctx.chat;
             if (!chat) return next();
-
-            // grammY exposes ctx.reactions() helper if plugin is present;
-            // fall back to raw arrays otherwise
-            let emojiAdded: string[] = [];
-            let emojiRemoved: string[] = [];
-            let customAdded: string[] = [];
-            let customRemoved: string[] = [];
-
-            try {
-                // @ts-ignore - available when reaction context is present
-                const r = ctx.reactions?.();
-                if (r) {
-                    emojiAdded = r.emojiAdded ?? [];
-                    emojiRemoved = r.emojiRemoved ?? [];
-                    customAdded = r.customEmojiAdded ?? [];
-                    customRemoved = r.customEmojiRemoved ?? [];
-                }
-            } catch (_) {
-                // ignore
-            }
-
-            // Fallback parse from raw arrays if available
-            if (emojiAdded.length === 0 && mr.new_reaction) {
-                for (const r of mr.new_reaction as unknown[]) {
-                    if (isEmojiReactionType(r)) emojiAdded.push(r.emoji);
-                    else if (isCustomReactionType(r)) {
-                        customAdded.push(r.custom_emoji_id);
-                    }
-                }
-            }
-            if (emojiRemoved.length === 0 && mr.old_reaction) {
-                for (const r of mr.old_reaction as unknown[]) {
-                    if (isEmojiReactionType(r)) emojiRemoved.push(r.emoji);
-                    else if (isCustomReactionType(r)) {
-                        customRemoved.push(r.custom_emoji_id);
-                    }
-                }
-            }
+            const delta = parseReactionDelta(mr);
 
             const by = ctx.from
                 ? {
@@ -144,19 +174,7 @@ export default async function setupBot(config: Config, memory: Memory) {
                     first_name: ctx.from.first_name,
                 }
                 : undefined;
-
-            for (const e of emojiAdded) {
-                await ctx.m.addEmojiReaction(messageId, e, by);
-            }
-            for (const e of emojiRemoved) {
-                await ctx.m.removeEmojiReaction(messageId, e, by);
-            }
-            for (const c of customAdded) {
-                await ctx.m.addCustomReaction(messageId, c, by);
-            }
-            for (const c of customRemoved) {
-                await ctx.m.removeCustomReaction(messageId, c, by);
-            }
+            await ctx.m.applyReactionDelta(messageId, delta, by);
         } catch (error) {
             logger.warn('Could not process message_reaction: ', error);
         }
@@ -170,45 +188,8 @@ export default async function setupBot(config: Config, memory: Memory) {
             const mrc = ctx.update.message_reaction_count;
             if (!mrc) return next();
             const messageId = mrc.message_id;
-
-            const rawCounts = ((mrc as unknown) as {
-                reactions?: unknown;
-                reaction_counts?: unknown;
-            }).reactions ??
-                ((mrc as unknown) as {
-                    reactions?: unknown;
-                    reaction_counts?: unknown;
-                }).reaction_counts ??
-                [];
-
-            const arr = Array.isArray(rawCounts) ? rawCounts : [];
-            const counts = arr.map((r: unknown) => {
-                const obj = r as { type?: unknown };
-                const t = obj.type ?? obj;
-                if (isEmojiReactionType(t)) {
-                    return {
-                        type: 'emoji' as const,
-                        emoji: t.emoji,
-                        total: pickCount(r) ?? 0,
-                    };
-                }
-                if (isCustomReactionType(t)) {
-                    return {
-                        type: 'custom' as const,
-                        customEmojiId: t.custom_emoji_id,
-                        total: pickCount(r) ?? 0,
-                    };
-                }
-                return undefined;
-            }).filter((
-                x,
-            ): x is { type: 'emoji'; emoji: string; total: number } | {
-                type: 'custom';
-                customEmojiId: string;
-                total: number;
-            } => x !== undefined);
-
-            await ctx.m.setReactionCounts(messageId, counts);
+            const counts = parseReactionCounts(mrc);
+            await ctx.m.replaceReactionCounts(messageId, counts);
         } catch (error) {
             logger.warn('Could not process message_reaction_count: ', error);
         }

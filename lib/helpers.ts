@@ -196,7 +196,7 @@ export async function deleteOldFiles(logger: Logger, maxAge: number) {
     logger.info(`Deleted ${deletedCount} files`);
 }
 
-export function getRandomNepon(config: Config) {
+export function getRandomNepon(config: Pick<Config, 'nepons'>) {
     const nepons = config.nepons;
     const randomIndex = getRandomInt(0, nepons.length - 1);
     return nepons[randomIndex];

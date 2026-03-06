@@ -14,6 +14,23 @@ export const chats = sqliteTable('chats', {
     locale: text('locale'),
 });
 
+export const globalConfig = sqliteTable('global_config', {
+    id: integer('id', { mode: 'number' }).primaryKey(),
+    payload: text('payload').notNull(),
+    updatedBy: integer('updated_by', { mode: 'number' }),
+    updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(0),
+});
+
+export const chatConfigOverrides = sqliteTable('chat_config_overrides', {
+    chatId: integer('chat_id', { mode: 'number' }).primaryKey().references(
+        () => chats.id,
+        { onDelete: 'cascade' },
+    ),
+    payload: text('payload').notNull(),
+    updatedBy: integer('updated_by', { mode: 'number' }),
+    updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(0),
+});
+
 export const chatNotes = sqliteTable('chat_notes', {
     id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
     chatId: integer('chat_id', { mode: 'number' }).notNull().references(

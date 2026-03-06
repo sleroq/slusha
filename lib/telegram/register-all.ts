@@ -34,14 +34,7 @@ export default function registerAll(bot: Bot<SlushaContext>, config: Config) {
 
     bot.on(
         'message',
-        shouldReply({
-            names: config.names,
-            tendToIgnore: config.tendToIgnore,
-            tendToIgnoreProbability: config.tendToIgnoreProbability,
-            tendToReply: config.tendToReply,
-            tendToReplyProbability: config.tendToReplyProbability,
-            randomReplyProbability: config.randomReplyProbability,
-        }),
+        shouldReply(config),
     );
 
     bot.use(msgDelay(config));

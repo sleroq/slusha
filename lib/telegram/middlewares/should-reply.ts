@@ -6,18 +6,13 @@ import {
     testMessage,
 } from '../../helpers.ts';
 import { SlushaContext } from '../setup-bot.ts';
+import { UserConfig } from '../../config.ts';
 
-export function shouldReply(config: {
-    names: (string | RegExp)[];
-    tendToIgnore: (string | RegExp)[];
-    tendToIgnoreProbability: number;
-    tendToReply: (string | RegExp)[];
-    tendToReplyProbability: number;
-    randomReplyProbability: number;
-}) {
+export function shouldReply(config: UserConfig) {
     return async (ctx: SlushaContext, next: () => Promise<void>) => {
         const msg = await ctx.m.getLastMessage();
         const currentMessage = ctx.msg;
+        const effectiveConfig = await ctx.m.getEffectiveConfig(config);
 
         if (!msg || !currentMessage) return;
 
@@ -47,7 +42,7 @@ export function shouldReply(config: {
         }
 
         const characterNames = (await ctx.m.getChat()).character?.names;
-        const names = config.names.concat(characterNames ?? []);
+        const names = effectiveConfig.names.concat(characterNames ?? []);
         const nameRegex = createNameMatcher(names);
 
         if (
@@ -61,16 +56,16 @@ export function shouldReply(config: {
         }
 
         if (
-            testMessage(config.tendToIgnore, msg.text) &&
+            testMessage(effectiveConfig.tendToIgnore, msg.text) &&
             msg.text.length < 20 &&
-            probability(config.tendToIgnoreProbability)
+            probability(effectiveConfig.tendToIgnoreProbability)
         ) {
             return;
         }
 
         if (
-            testMessage(config.tendToReply, msg.text) &&
-            probability(config.tendToReplyProbability)
+            testMessage(effectiveConfig.tendToReply, msg.text) &&
+            probability(effectiveConfig.tendToReplyProbability)
         ) {
             ctx.info.isRandom = true;
             return next();
@@ -78,7 +73,7 @@ export function shouldReply(config: {
 
         const randomReplyProbability =
             (await ctx.m.getChat()).randomReplyProbability ??
-                config.randomReplyProbability;
+                effectiveConfig.randomReplyProbability;
 
         if (probability(randomReplyProbability)) {
             ctx.info.isRandom = true;
