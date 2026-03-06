@@ -1,6 +1,6 @@
 import { Composer, InlineKeyboard } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
-import { Config } from '../../config.ts';
+import { getGlobalUserConfig } from '../../config.ts';
 
 function widgetUrl(scope: 'global' | 'chat', chatId: number): string {
     const base = Deno.env.get('WIDGET_BASE_URL');
@@ -22,9 +22,8 @@ function mainMiniAppUrl(username: string, startParam: string): string {
 
 export function registerConfig(
     composer: Composer<SlushaContext>,
-    config: Config,
 ) {
-    composer.command('config', async (ctx) => {
+    composer.command(['config', 'settings'], async (ctx) => {
         const args = ctx.msg.text
             .split(' ')
             .map((arg) => arg.trim())
@@ -41,8 +40,10 @@ export function registerConfig(
         }
 
         if (requestedScope === 'global') {
+            const globalConfig = await getGlobalUserConfig(ctx.memory.db);
             if (
-                !ctx.from || !(config.adminIds?.includes(ctx.from.id) ?? false)
+                !ctx.from ||
+                !(globalConfig.adminIds?.includes(ctx.from.id) ?? false)
             ) {
                 return ctx.reply(ctx.t('admin-only'));
             }
@@ -64,9 +65,6 @@ export function registerConfig(
                             ctx.t('config-open-widget'),
                             deepLink,
                         ),
-                        link_preview_options: {
-                            is_disabled: true,
-                        },
                     },
                 );
             }
@@ -93,11 +91,8 @@ export function registerConfig(
             ? ctx.t('config-open-global')
             : ctx.t('config-open-chat');
 
-        return ctx.reply(`${msg}\n\n${url}`, {
+        return ctx.reply(msg, {
             reply_markup: kb,
-            link_preview_options: {
-                is_disabled: true,
-            },
         });
     });
 }

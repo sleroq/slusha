@@ -1,6 +1,5 @@
 import { Composer } from 'grammy';
 import { SlushaContext } from './setup-bot.ts';
-import { Config } from '../config.ts';
 import start from './commands/start.ts';
 import forget from './commands/forget.ts';
 import lobotomy from './commands/lobotomy.ts';
@@ -20,11 +19,10 @@ export function registerEarlyCommands(bot: Composer<SlushaContext>) {
 
 export function registerLateCommands(
     bot: Composer<SlushaContext>,
-    config: Config,
 ) {
-    registerModel(bot, config);
-    registerRandom(bot, config);
-    registerSummary(bot, config);
+    registerModel(bot);
+    registerRandom(bot);
+    registerSummary(bot);
     registerHateMode(bot);
-    registerConfig(bot, config);
+    registerConfig(bot);
 }

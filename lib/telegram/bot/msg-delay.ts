@@ -1,10 +1,9 @@
 import logger from '../../logger.ts';
 import { SlushaContext } from '../setup-bot.ts';
-import { UserConfig } from '../../config.ts';
 import { Composer } from 'grammy';
 import { doTyping } from '../helpers.ts';
 
-export default function msgDelay(config: UserConfig) {
+export default function msgDelay() {
     const bot = new Composer<SlushaContext>();
 
     bot.on('message', async (ctx, next) => {
@@ -18,7 +17,7 @@ export default function msgDelay(config: UserConfig) {
 
         // TODO: Make sure this will not cause any concurrency issues (how)
 
-        const effectiveConfig = await ctx.m.getEffectiveConfig(config);
+        const effectiveConfig = await ctx.m.getEffectiveConfig();
 
         // Wait for configured delay before replying
         setTimeout(async () => {

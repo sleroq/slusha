@@ -1,14 +1,16 @@
 import { Logger } from '@deno-library/logger';
 import { deleteOldFiles } from '../helpers.ts';
-import { Config } from '../config.ts';
+import { getGlobalUserConfig } from '../config.ts';
+import { DbClient } from '../db/client.ts';
 
 export function startSchedulers(
-    args: { config: Config; logger: Logger },
+    args: { db: DbClient; logger: Logger },
 ) {
-    const { config, logger } = args;
+    const { db, logger } = args;
 
     const filesInterval = setInterval(async () => {
         try {
+            const config = await getGlobalUserConfig(db);
             await deleteOldFiles(logger, config.filesMaxAge);
         } catch (error) {
             logger.error('Could not delete old files: ', error);

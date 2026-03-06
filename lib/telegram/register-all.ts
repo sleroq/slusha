@@ -3,7 +3,6 @@ import { SlushaContext } from './setup-bot.ts';
 import { Config } from '../config.ts';
 import { applyLocaleFromMemory, createI18n } from '../i18n/index.ts';
 import optOut from './bot/opt-out.ts';
-import contextCommand from './bot/context.ts';
 import language from './bot/language.ts';
 import character from './bot/character.ts';
 import msgDelay from './bot/msg-delay.ts';
@@ -24,23 +23,22 @@ export default function registerAll(bot: Bot<SlushaContext>, config: Config) {
     registerEarlyCommands(bot);
 
     bot.use(optOut);
-    bot.use(contextCommand);
     bot.use(language);
     bot.use(character);
 
-    registerLateCommands(bot, config);
+    registerLateCommands(bot);
 
     bot.use(notes(config, bot.botInfo.id));
 
     bot.on(
         'message',
-        shouldReply(config),
+        shouldReply(),
     );
 
-    bot.use(msgDelay(config));
+    bot.use(msgDelay());
 
     bot.use(shortBurstLimiter());
     bot.use(rollingLimiter());
 
-    registerAI(bot, config);
+    registerAI(bot);
 }

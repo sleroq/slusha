@@ -1,6 +1,6 @@
 import _Werror from './lib/werror.ts';
 import logger from './lib/logger.ts';
-import resolveConfig, { Config, UserConfig } from './lib/config.ts';
+import resolveConfig, { Config } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
 import { run } from '@grammyjs/runner';
 import { loadMemory } from './lib/memory.ts';
@@ -35,14 +35,7 @@ try {
 }
 
 const runtimeConfig = {
-    get: () => config,
-    applyUserConfig: (next: UserConfig) => {
-        const envPart = {
-            botToken: config.botToken,
-            aiToken: config.aiToken,
-        };
-        config = { ...next, ...envPart };
-    },
+    getBotToken: () => config.botToken,
 };
 
 const bot = await setupBot(config, memory);
@@ -91,7 +84,7 @@ logger.info('Bot started');
 
 // TODO: Remind users about bot existence
 
-const _stopSchedulers = startSchedulers({ config, logger });
+const _stopSchedulers = startSchedulers({ db: memory.db, logger });
 
 // Save memory on exit
 wireShutdown(bot, sdk);

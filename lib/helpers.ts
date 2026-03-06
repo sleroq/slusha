@@ -75,19 +75,31 @@ export function splitMessage(message: string, maxLength = 3000) {
     return parts;
 }
 
-const AI_TOKEN = Deno.env.get('AI_TOKEN');
+let ai: GoogleGenAI | undefined;
 
-if (!AI_TOKEN) {
-    throw new Error('AI_TOKEN is required');
+function getGoogleGenAI(): GoogleGenAI {
+    if (ai) {
+        return ai;
+    }
+
+    const token = Deno.env.get('AI_TOKEN') ??
+        Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY');
+    if (!token) {
+        throw new Error(
+            'Google AI token is required for attachment uploads',
+        );
+    }
+
+    ai = new GoogleGenAI({ apiKey: token });
+    return ai;
 }
 
-const ai = new GoogleGenAI({ apiKey: AI_TOKEN });
-
 async function uploadToGoogle(path: string, _name: string, mimeType: string) {
+    const googleGenAI = getGoogleGenAI();
     const fileData = await Deno.readFile(path);
     const blob = new Blob([fileData], { type: mimeType });
 
-    const uploadResult = await ai.files.upload({
+    const uploadResult = await googleGenAI.files.upload({
         file: blob,
     });
 
@@ -95,12 +107,26 @@ async function uploadToGoogle(path: string, _name: string, mimeType: string) {
     while (file.state === 'PROCESSING') {
         await new Promise((resolve) => setTimeout(resolve, 100));
         if (uploadResult.name) {
-            file = await ai.files.get({ name: uploadResult.name });
+            file = await googleGenAI.files.get({ name: uploadResult.name });
         }
     }
 
     if (file.state === 'FAILED') {
-        throw new Error('Audio processing failed.');
+        const errorCode = file.error?.code ?? 'unknown';
+        const errorMessage = file.error?.message ??
+            'No error message from Google API';
+        const errorDetails = file.error?.details
+            ? JSON.stringify(file.error.details)
+            : '[]';
+
+        throw new Error(
+            `Attachment processing failed in Google API: ${errorMessage} ` +
+                `(code=${errorCode}, state=${file.state}, mimeType=${mimeType}, ` +
+                `localName=${_name}, remoteName=${
+                    file.name ?? uploadResult.name ?? 'unknown'
+                }, ` +
+                `details=${errorDetails})`,
+        );
     }
 
     return file.uri || '';

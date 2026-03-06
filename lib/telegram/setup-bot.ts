@@ -10,6 +10,7 @@ import {
     ReplyTo,
 } from '../memory.ts';
 import { sequentialize } from '@grammyjs/runner';
+import { canMemberSendTextMessages } from './reply-rights.ts';
 
 interface RequestInfo {
     isRandom: boolean;
@@ -119,7 +120,6 @@ function parseReactionCounts(
 // TODO: Maybe derive from bot info somehow?
 const commands = [
     '/optout',
-    '/context',
     '/model',
     '/lobotomy',
     '/random',
@@ -155,7 +155,7 @@ export default async function setupBot(config: Config, memory: Memory) {
         let aiConfig = config.ai;
         if (ctx.chat) {
             ctx.m = new ChatMemory(memory, ctx.chat);
-            const effective = await ctx.m.getEffectiveConfig(config);
+            const effective = await ctx.m.getEffectiveConfig();
             aiConfig = effective.ai;
         }
         ctx.info = { isRandom: false, config: aiConfig };
@@ -261,7 +261,27 @@ export default async function setupBot(config: Config, memory: Memory) {
             await ctx.m.updateUser(ctx.from);
         }
 
-        await ctx.m.removeOldMessages(config.maxMessagesToStore);
+        const effectiveConfig = await ctx.m.getEffectiveConfig();
+        await ctx.m.removeOldMessages(effectiveConfig.maxMessagesToStore);
+
+        return next();
+    });
+
+    bot.on('my_chat_member', async (ctx, next) => {
+        try {
+            const update = ctx.update.my_chat_member;
+            if (!update) return next();
+
+            if (canMemberSendTextMessages(update.new_chat_member)) {
+                await ctx.m.setDisableRepliesDueToRights(false);
+                await ctx.m.setDisabledReplyRightsLastProbeAt(undefined);
+            } else {
+                await ctx.m.setDisableRepliesDueToRights(true);
+                await ctx.m.setDisabledReplyRightsLastProbeAt(Date.now());
+            }
+        } catch (error) {
+            logger.warn('Could not process my_chat_member update: ', error);
+        }
 
         return next();
     });

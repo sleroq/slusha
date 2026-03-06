@@ -45,6 +45,24 @@ export async function ensureSqlitePragmas() {
     await sqlitePragmasPromise;
 }
 
+export async function ensureDatabaseWritable() {
+    if (!singletonClient) {
+        const created = createDb();
+        singletonDb = created.db;
+        singletonClient = created.client;
+    }
+
+    try {
+        await singletonClient!.execute('BEGIN IMMEDIATE;');
+        await singletonClient!.execute('ROLLBACK;');
+    } catch (error) {
+        throw new Error(
+            `Database is not writable (${resolveDbUrl()}). Check file and directory permissions.`,
+            { cause: error },
+        );
+    }
+}
+
 export function getDb() {
     if (!singletonDb) {
         const created = createDb();

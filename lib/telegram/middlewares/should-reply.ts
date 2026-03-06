@@ -6,15 +6,19 @@ import {
     testMessage,
 } from '../../helpers.ts';
 import { SlushaContext } from '../setup-bot.ts';
-import { UserConfig } from '../../config.ts';
+import { checkAndMaybeRecoverReplyRights } from './reply-rights-guard.ts';
 
-export function shouldReply(config: UserConfig) {
+export function shouldReply() {
     return async (ctx: SlushaContext, next: () => Promise<void>) => {
         const msg = await ctx.m.getLastMessage();
         const currentMessage = ctx.msg;
-        const effectiveConfig = await ctx.m.getEffectiveConfig(config);
+        const effectiveConfig = await ctx.m.getEffectiveConfig();
 
         if (!msg || !currentMessage) return;
+
+        if (!(await checkAndMaybeRecoverReplyRights(ctx))) {
+            return;
+        }
 
         if (
             !msg.text && !msgTypeSupported(msg.info) &&

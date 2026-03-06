@@ -1,7 +1,12 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { Chat as TgChat, Message, User } from 'grammy_types';
 import { Character } from './charhub/api.ts';
-import { DbClient, ensureSqlitePragmas, getDb } from './db/client.ts';
+import {
+    DbClient,
+    ensureDatabaseWritable,
+    ensureSqlitePragmas,
+    getDb,
+} from './db/client.ts';
 import {
     chatCharacters,
     chatConfigOverrides,
@@ -18,6 +23,7 @@ import { ReplyMessage } from './telegram/helpers.ts';
 import {
     ChatConfigOverride,
     chatConfigOverrideSchema,
+    getGlobalUserConfig,
     mergeWithChatOverride,
     parseChatOverridePayload,
     serializeChatOverride,
@@ -112,6 +118,8 @@ export interface Chat {
     randomReplyProbability?: number;
     hateMode?: boolean;
     locale?: string;
+    disableRepliesDueToRights?: boolean;
+    disabledReplyRightsLastProbeAt?: number;
 }
 
 type Tx = Parameters<Parameters<DbClient['transaction']>[0]>[0];
@@ -296,6 +304,10 @@ export class Memory {
             randomReplyProbability: configOverride?.randomReplyProbability,
             hateMode: chatRow.hateMode ?? undefined,
             locale: chatRow.locale ?? undefined,
+            disableRepliesDueToRights: configOverride
+                ?.disableRepliesDueToRights,
+            disabledReplyRightsLastProbeAt: configOverride
+                ?.disabledReplyRightsLastProbeAt,
         };
     }
 
@@ -469,7 +481,8 @@ export class ChatMemory {
         await this.setChatConfigOverrideRaw(parsed.data, updatedBy);
     }
 
-    async getEffectiveConfig(base: UserConfig) {
+    async getEffectiveConfig(_base?: UserConfig) {
+        const base = await getGlobalUserConfig(this.memory.db);
         const override = await this.getChatConfigOverride();
         return mergeWithChatOverride(base, override);
     }
@@ -661,6 +674,32 @@ export class ChatMemory {
 
     async setHateMode(value: boolean) {
         await this.patchChat({ hateMode: value });
+    }
+
+    async setDisableRepliesDueToRights(value: boolean) {
+        const current = (await this.getChatConfigOverride()) ?? {};
+        const next: ChatConfigOverride = { ...current };
+
+        if (value) {
+            next.disableRepliesDueToRights = true;
+        } else {
+            delete next.disableRepliesDueToRights;
+        }
+
+        await this.setChatConfigOverrideRaw(next);
+    }
+
+    async setDisabledReplyRightsLastProbeAt(value?: number) {
+        const current = (await this.getChatConfigOverride()) ?? {};
+        const next: ChatConfigOverride = { ...current };
+
+        if (value === undefined) {
+            delete next.disabledReplyRightsLastProbeAt;
+        } else {
+            next.disabledReplyRightsLastProbeAt = value;
+        }
+
+        await this.setChatConfigOverrideRaw(next);
     }
 
     async setLocale(value?: string) {
@@ -1055,9 +1094,10 @@ export class ChatMemory {
 export async function loadMemory(): Promise<Memory> {
     const memory = new Memory();
     await ensureSqlitePragmas();
+    await ensureDatabaseWritable();
 
     try {
-        // Ensure DB file is writable and connection is valid.
+        // Ensure DB connection is valid.
         await memory.db.select({ id: chats.id }).from(chats).limit(1);
     } catch (error) {
         logger.error('Database is not ready: ', error);

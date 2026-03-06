@@ -1,15 +1,15 @@
 import { SlushaContext } from '../setup-bot.ts';
 import { Composer } from 'grammy';
-import { Config } from '../../config.ts';
+import { getGlobalUserConfig } from '../../config.ts';
 
 export function registerModel(
     composer: Composer<SlushaContext>,
-    config: Config,
 ) {
     composer.command('model', async (ctx) => {
+        const globalConfig = await getGlobalUserConfig(ctx.memory.db);
         if (
-            !config.adminIds || !ctx.msg.from ||
-            !config.adminIds.includes(ctx.msg.from.id)
+            !globalConfig.adminIds || !ctx.msg.from ||
+            !globalConfig.adminIds.includes(ctx.msg.from.id)
         ) {
             return ctx.reply(ctx.t('admin-only'));
         }
@@ -22,7 +22,8 @@ export function registerModel(
         if (args.length === 1) {
             return ctx.reply(
                 ctx.t('model-current', {
-                    model: (await ctx.m.getChat()).chatModel ?? config.ai.model,
+                    model: (await ctx.m.getChat()).chatModel ??
+                        globalConfig.ai.model,
                 }),
             );
         }

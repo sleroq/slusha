@@ -18,6 +18,42 @@ const matcherSchema = z.union([
     z.custom<RegExp>(isValidRegex),
 ]);
 
+const thinkingLevelSchema = z.enum(['minimal', 'low', 'medium', 'high']);
+const googleThinkingConfigSchema = z.object({
+    thinkingLevel: thinkingLevelSchema.optional(),
+    thinkingBudget: z.number().int().min(0).max(65536).optional(),
+    includeThoughts: z.boolean().optional(),
+});
+const openrouterReasoningSchema = z.object({
+    maxTokens: z.number().int().min(0).max(65536).optional(),
+});
+const generationTaskSchema = z.object({
+    thinking: googleThinkingConfigSchema.optional(),
+    openrouterReasoning: openrouterReasoningSchema.optional(),
+    maxOutputTokens: z.number().int().min(1).max(65536).optional(),
+});
+
+const defaultGoogleSafetySettings: Array<
+    { category: string; threshold: string }
+> = [
+    {
+        category: 'HARM_CATEGORY_HARASSMENT',
+        threshold: 'BLOCK_NONE',
+    },
+    {
+        category: 'HARM_CATEGORY_HATE_SPEECH',
+        threshold: 'BLOCK_NONE',
+    },
+    {
+        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+        threshold: 'BLOCK_NONE',
+    },
+    {
+        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+        threshold: 'BLOCK_NONE',
+    },
+];
+
 export const configSchema = z.object({
     ai: z.object({
         model: z.string().min(1).max(200),
@@ -65,6 +101,34 @@ export const configSchema = z.object({
         bytesLimit: boundedPositiveInt(1024, 100 * 1024 * 1024).default(
             20 * 1024 * 1024,
         ),
+        google: z.object({
+            safetySettings: z.array(
+                z.object({
+                    category: z.string().min(1).max(120),
+                    threshold: z.string().min(1).max(120),
+                }),
+            ).max(32).default(defaultGoogleSafetySettings),
+            structuredOutputs: z.boolean().default(true),
+        }).default({
+            safetySettings: defaultGoogleSafetySettings,
+            structuredOutputs: true,
+        }),
+        openrouter: z.object({
+            usageInclude: z.boolean().default(false),
+        }).default({
+            usageInclude: false,
+        }),
+        generation: z.object({
+            chat: generationTaskSchema.default({}),
+            notes: generationTaskSchema.default({}),
+            memory: generationTaskSchema.default({}),
+            character: generationTaskSchema.default({}),
+        }).default({
+            chat: {},
+            notes: {},
+            memory: {},
+            character: {},
+        }),
     }),
     startMessage: z.string().max(2000),
     names: z.array(matcherSchema).max(256),
@@ -123,25 +187,12 @@ export const chatConfigOverrideSchema = z.object({
         .optional(),
     nepons: configSchema.shape.nepons.optional(),
     responseDelay: configSchema.shape.responseDelay.optional(),
+    disableRepliesDueToRights: z.boolean().optional(),
+    disabledReplyRightsLastProbeAt: z.number().int().min(0).optional(),
 });
 
 export const safetySettings: Array<{ category: string; threshold: string }> = [
-    {
-        category: 'HARM_CATEGORY_HARASSMENT',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_HATE_SPEECH',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_NONE',
-    },
+    ...defaultGoogleSafetySettings,
 ];
 
 export type UserConfig = z.infer<typeof configSchema>;
@@ -149,7 +200,8 @@ export type ChatConfigOverride = z.infer<typeof chatConfigOverrideSchema>;
 
 const config = configSchema.extend({
     botToken: z.string(),
-    aiToken: z.string(),
+    aiToken: z.string().optional(),
+    openrouterApiKey: z.string().optional(),
 });
 
 export type Config = z.infer<typeof config>;
@@ -392,11 +444,23 @@ function resolveEnv() {
     if (!botToken) throw new Error('BOT_TOKEN is required');
 
     const aiToken = Deno.env.get('AI_TOKEN');
-    if (!aiToken) throw new Error('AI_TOKEN is required');
+    const openrouterApiKey = Deno.env.get('OPENROUTER_API_KEY');
 
-    Deno.env.set('GOOGLE_GENERATIVE_AI_API_KEY', aiToken);
+    if (!aiToken && !openrouterApiKey) {
+        throw new Error(
+            'At least one provider token is required: AI_TOKEN or OPENROUTER_API_KEY',
+        );
+    }
 
-    return { botToken, aiToken };
+    if (aiToken) {
+        Deno.env.set('GOOGLE_GENERATIVE_AI_API_KEY', aiToken);
+    }
+
+    if (openrouterApiKey) {
+        Deno.env.set('OPENROUTER_API_KEY', openrouterApiKey);
+    }
+
+    return { botToken, aiToken, openrouterApiKey };
 }
 
 /**
@@ -413,5 +477,6 @@ export default async function resolveConfig(db?: DbClient): Promise<Config> {
         ...userConfig,
         botToken: env.botToken,
         aiToken: env.aiToken,
+        openrouterApiKey: env.openrouterApiKey,
     };
 }

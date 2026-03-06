@@ -1,19 +1,77 @@
 import { Bot } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
-import { Config, safetySettings } from '../../config.ts';
 import logger from '../../logger.ts';
-import { APICallError, generateObject, generateText, ModelMessage } from 'ai';
-import { google } from '@ai-sdk/google';
+import {
+    APICallError,
+    generateText,
+    ModelMessage,
+    Output,
+} from 'ai';
 import { makeHistoryV2 } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
 import { ReplyTo } from '../../memory.ts';
 import {
     chatResponseSchema,
+    ChatEntry,
     isReactEntry,
     isTextEntry,
 } from '../../ai/schema.ts';
 import { canonicalizeReaction } from '../reactions.ts';
+import { isMissingSendTextRightsError } from '../reply-rights.ts';
+import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
+import { parseModelRef } from '../../ai/model-ref.ts';
+import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
+
+function isNoObjectGeneratedError(
+    error: unknown,
+): error is Error & { text?: string } {
+    return error instanceof Error &&
+        (error.name === 'AI_NoObjectGeneratedError' ||
+            error.name === 'NoObjectGeneratedError');
+}
+
+function isNoOutputGeneratedError(error: unknown): error is Error {
+    return error instanceof Error &&
+        (error.name === 'AI_NoOutputGeneratedError' ||
+            error.name === 'NoOutputGeneratedError');
+}
+
+function truncateForLog(text: string, maxLength = 4000): string {
+    if (text.length <= maxLength) {
+        return text;
+    }
+
+    return `${text.slice(0, maxLength)}...[truncated ${text.length - maxLength} chars]`;
+}
+
+function unwrapJsonCodeBlock(text: string): string {
+    const trimmed = text.trim();
+    const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    return fencedMatch?.[1]?.trim() ?? trimmed;
+}
+
+function tryRecoverChatOutput(rawText: string): ChatEntry[] | undefined {
+    const normalizedText = unwrapJsonCodeBlock(rawText);
+    if (normalizedText.length === 0) {
+        return undefined;
+    }
+
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(normalizedText);
+    } catch {
+        return undefined;
+    }
+
+    const normalized = Array.isArray(parsed) ? parsed : [parsed];
+    const validated = chatResponseSchema.safeParse(normalized);
+    if (!validated.success) {
+        return undefined;
+    }
+
+    return validated.data;
+}
 
 function getLanguageName(localeCode: string): string {
     const map: Record<string, string> = {
@@ -41,11 +99,11 @@ function buildLanguageProtocol(defaultLocale: string): string {
     ].join('\n');
 }
 
-export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
+export default function registerAI(bot: Bot<SlushaContext>) {
     bot.on('message', async (ctx) => {
         const messages: ModelMessage[] = [];
         const chatState = await ctx.m.getChat();
-        const effectiveConfig = await ctx.m.getEffectiveConfig(config);
+        const effectiveConfig = await ctx.m.getEffectiveConfig();
 
         const useJsonResponses = effectiveConfig.ai.useJsonResponses;
 
@@ -97,11 +155,6 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                 : (effectiveConfig.ai.dumbPrompt ?? effectiveConfig.ai.prompt);
         }
 
-        messages.push({
-            role: 'system',
-            content: prompt,
-        });
-
         let chatInfoMsg = `Date and time right now: ${prettyDate()}`;
 
         if (ctx.chat.type === 'private') {
@@ -133,13 +186,17 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                 `\n\nMY OWN PERSONAL NOTES AND MEMORY:\n${chatState.memory}`;
         }
 
+        prompt += `\n\n### Chat Info ###\n${chatInfoMsg}`;
+
         messages.push({
-            role: 'assistant',
-            content: chatInfoMsg,
+            role: 'system',
+            content: prompt,
         });
 
         const messagesToPass = chatState.messagesToPass ??
             effectiveConfig.ai.messagesToPass;
+        const modelRef = chatState.chatModel ?? effectiveConfig.ai.model;
+        const parsedModel = parseModelRef(modelRef);
 
         let history: ModelMessage[] = [];
         try {
@@ -153,7 +210,9 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                     bytesLimit: effectiveConfig.ai.bytesLimit,
                     symbolLimit: effectiveConfig.ai.messageMaxLength,
                     includeReactions: true,
-                    attachments: effectiveConfig.ai.includeAttachmentsInHistory,
+                    attachments:
+                        effectiveConfig.ai.includeAttachmentsInHistory &&
+                        parsedModel.provider === 'google',
                 },
             );
         } catch (error) {
@@ -179,8 +238,6 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             content: finalPrompt,
         });
 
-        const model = chatState.chatModel ?? effectiveConfig.ai.model;
-
         const time = new Date().getTime();
 
         const tags = ['user-message'];
@@ -191,61 +248,167 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             tags.push('random');
         }
 
-        let output;
+        const generatePlainTextOutput = async (): Promise<ChatEntry[]> => {
+            const generationPolicy = resolveGenerationPolicy({
+                modelRef,
+                config: effectiveConfig.ai,
+                task: 'chat',
+                expectsStructuredOutput: false,
+            });
+            const providerOptions = generationPolicy
+                .providerOptions as Parameters<
+                    typeof generateText
+                >[0]['providerOptions'];
+            const response = await generateText({
+                model: generationPolicy.model,
+                providerOptions,
+                messages,
+                temperature: effectiveConfig.ai.temperature,
+                topK: effectiveConfig.ai.topK,
+                topP: effectiveConfig.ai.topP,
+                maxOutputTokens: generationPolicy.maxOutputTokens,
+                experimental_telemetry: {
+                    isEnabled: true,
+                    functionId: 'user-message-dumb',
+                    metadata: buildGenerationTelemetryMetadata({
+                        sessionId: ctx.chat.id.toString(),
+                        userId: ctx.chat.type === 'private'
+                            ? ctx.from?.id.toString()
+                            : '',
+                        tags,
+                        temperature: effectiveConfig.ai.temperature,
+                        topK: effectiveConfig.ai.topK,
+                        topP: effectiveConfig.ai.topP,
+                        policy: generationPolicy,
+                    }),
+                },
+            });
+            return [{ text: response.text }];
+        };
+
+        let output: ChatEntry[];
+        let structuredOutputRecovery: 'none' | 'recovered_raw' |
+            'fallback_plain_text' = 'none';
         try {
             if (useJsonResponses) {
-                const result = await generateObject({
-                    model: google(model),
-                    providerOptions: {
-                        google: {
-                            safetySettings,
-                            thinkingConfig: { thinkingBudget: 1024 },
-                        },
-                    },
-                    schema: chatResponseSchema,
-                    temperature: effectiveConfig.ai.temperature,
-                    topK: effectiveConfig.ai.topK,
-                    topP: effectiveConfig.ai.topP,
-                    messages,
-                    experimental_telemetry: {
-                        isEnabled: true,
-                        functionId: 'user-message',
-                        metadata: {
-                            sessionId: ctx.chat.id.toString(),
-                            userId: ctx.chat.type === 'private'
-                                ? ctx.from?.id.toString()
-                                : '',
-                            tags,
-                        },
-                    },
+                const generationPolicy = resolveGenerationPolicy({
+                    modelRef,
+                    config: effectiveConfig.ai,
+                    task: 'chat',
+                    expectsStructuredOutput: true,
                 });
-                output = result.object;
+                const providerOptions = generationPolicy
+                    .providerOptions as Parameters<
+                        typeof generateText
+                    >[0]['providerOptions'];
+                try {
+                    const result = await generateText({
+                        model: generationPolicy.model,
+                        providerOptions,
+                        output: Output.object({
+                            schema: chatResponseSchema,
+                        }),
+                        temperature: effectiveConfig.ai.temperature,
+                        topK: effectiveConfig.ai.topK,
+                        topP: effectiveConfig.ai.topP,
+                        maxOutputTokens: generationPolicy.maxOutputTokens,
+                        messages,
+                        experimental_telemetry: {
+                            isEnabled: true,
+                            functionId: 'user-message',
+                            metadata: buildGenerationTelemetryMetadata({
+                                sessionId: ctx.chat.id.toString(),
+                                userId: ctx.chat.type === 'private'
+                                    ? ctx.from?.id.toString()
+                                    : '',
+                                tags,
+                                temperature: effectiveConfig.ai.temperature,
+                                topK: effectiveConfig.ai.topK,
+                                topP: effectiveConfig.ai.topP,
+                                policy: generationPolicy,
+                            }),
+                        },
+                    });
+                    try {
+                        output = result.output;
+                    } catch (error) {
+                        if (isNoOutputGeneratedError(error)) {
+                            logger.warn(
+                                'Structured output missing; logging raw model response',
+                                {
+                                    modelRef,
+                                    chatId: ctx.chat.id,
+                                    finishReason: result.finishReason,
+                                    rawText: truncateForLog(result.text),
+                                    steps: result.steps.map((step) => ({
+                                        finishReason: step.finishReason,
+                                        text: truncateForLog(step.text),
+                                    })),
+                                    usage: result.totalUsage,
+                                },
+                            );
+
+                            const recoveredOutput = tryRecoverChatOutput(
+                                result.text,
+                            );
+                            if (recoveredOutput) {
+                                structuredOutputRecovery = 'recovered_raw';
+                                logger.warn(
+                                    'Structured output missing; recovered from raw model text',
+                                    {
+                                        modelRef,
+                                        chatId: ctx.chat.id,
+                                    },
+                                );
+                                output = recoveredOutput;
+                            } else {
+                                structuredOutputRecovery =
+                                    'fallback_plain_text';
+                                logger.warn(
+                                    'Structured output missing; retrying in plain text mode',
+                                    {
+                                        modelRef,
+                                        chatId: ctx.chat.id,
+                                    },
+                                );
+                                output = await generatePlainTextOutput();
+                            }
+                        } else {
+                            throw error;
+                        }
+                    }
+                } catch (error) {
+                    if (!isNoObjectGeneratedError(error)) {
+                        throw error;
+                    }
+
+                    const recoveredOutput = tryRecoverChatOutput(
+                        error.text ?? '',
+                    );
+                    if (recoveredOutput) {
+                        structuredOutputRecovery = 'recovered_raw';
+                        logger.warn(
+                            'Structured output schema mismatch; recovered from raw model text',
+                            {
+                                modelRef,
+                                chatId: ctx.chat.id,
+                            },
+                        );
+                        output = recoveredOutput;
+                    } else {
+                        structuredOutputRecovery = 'fallback_plain_text';
+                        logger.warn(
+                            'Structured output schema mismatch; retrying in plain text mode',
+                            {
+                                modelRef,
+                                chatId: ctx.chat.id,
+                            },
+                        );
+                        output = await generatePlainTextOutput();
+                    }
+                }
             } else {
-                const response = await generateText({
-                    model: google(model),
-                    providerOptions: {
-                        google: {
-                            safetySettings,
-                            thinkingConfig: { thinkingBudget: 1024 },
-                        },
-                    },
-                    messages,
-                    temperature: effectiveConfig.ai.temperature,
-                    topK: effectiveConfig.ai.topK,
-                    topP: effectiveConfig.ai.topP,
-                    experimental_telemetry: {
-                        isEnabled: true,
-                        functionId: 'user-message-dumb',
-                        metadata: {
-                            sessionId: ctx.chat.id.toString(),
-                            userId: ctx.chat.type === 'private'
-                                ? ctx.from?.id.toString()
-                                : '',
-                            tags,
-                        },
-                    },
-                });
-                output = [{ text: response.text }];
+                output = await generatePlainTextOutput();
             }
         } catch (error) {
             logger.error('Could not get response: ', error);
@@ -279,6 +442,13 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             (new Date().getTime() - time) / 1000,
             `for "${name}" ${username}. `,
         );
+        if (structuredOutputRecovery !== 'none') {
+            logger.info('Structured output recovery applied', {
+                mode: structuredOutputRecovery,
+                modelRef,
+                chatId: ctx.chat.id,
+            });
+        }
 
         function resolveTargetMessageId(
             replyToUsername?: string,
@@ -351,7 +521,6 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                         'Reaction not allowed, dropping: ' + res.react,
                     );
                 }
-                continue;
             }
 
             if (!isTextEntry(res)) {
@@ -361,7 +530,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
             let replyText = (res.text ?? '').trim();
             if (replyText.length === 0) {
                 logger.info('Empty response from AI');
-                return;
+                continue;
             }
 
             if (replyText.startsWith('* ')) {
@@ -404,6 +573,18 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
                     );
                 }
             } catch (error) {
+                if (
+                    ctx.chat.type !== 'private' &&
+                    isMissingSendTextRightsError(error)
+                ) {
+                    await ctx.m.setDisableRepliesDueToRights(true);
+                    await ctx.m.setDisabledReplyRightsLastProbeAt(Date.now());
+                    logger.warn(
+                        'Disabled replies in chat due to missing send rights',
+                    );
+                    return;
+                }
+
                 logger.error('Could not reply to user: ', error);
                 if (!ctx.info.isRandom) {
                     await ctx.reply(getRandomNepon(effectiveConfig));

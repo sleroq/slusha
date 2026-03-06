@@ -12,6 +12,7 @@
     "jsr:@std/path@^1.1.4": "1.1.4",
     "npm:@ai-sdk/google@*": "3.0.37_zod@4.3.6",
     "npm:@ai-sdk/google@^3.0.37": "3.0.37_zod@4.3.6",
+    "npm:@ai-sdk/openai-compatible@^2.0.35": "2.0.35_zod@4.3.6",
     "npm:@google/genai@^1.43.0": "1.43.0",
     "npm:@libsql/client@*": "0.15.15",
     "npm:@libsql/client@~0.15.15": "0.15.15",
@@ -79,7 +80,7 @@
       "integrity": "sha512-0jwdkN3elC4Q9aT2ALxjXtGGVoye15zYgof6GfvuH1a9QKx9Rj4Wi2vy6SyyLvtSA/lB786dTZgC+cGwe6vzmA==",
       "dependencies": [
         "@ai-sdk/provider",
-        "@ai-sdk/provider-utils",
+        "@ai-sdk/provider-utils@4.0.17_zod@4.3.6",
         "@vercel/oidc",
         "zod"
       ]
@@ -88,12 +89,29 @@
       "integrity": "sha512-hZ7nO55+GfQEWJe2B5XRoLNeEubMTuk6OjJJUDS+XCtjKLCd973rRkc62vS86rHw5VuCGITwn3gUZRhSbuX5vw==",
       "dependencies": [
         "@ai-sdk/provider",
-        "@ai-sdk/provider-utils",
+        "@ai-sdk/provider-utils@4.0.17_zod@4.3.6",
+        "zod"
+      ]
+    },
+    "@ai-sdk/openai-compatible@2.0.35_zod@4.3.6": {
+      "integrity": "sha512-g3wA57IAQFb+3j4YuFndgkUdXyRETZVvbfAWM+UX7bZSxA3xjes0v3XKgIdKdekPtDGsh4ZX2byHD0gJIMPfiA==",
+      "dependencies": [
+        "@ai-sdk/provider",
+        "@ai-sdk/provider-utils@4.0.19_zod@4.3.6",
         "zod"
       ]
     },
     "@ai-sdk/provider-utils@4.0.17_zod@4.3.6": {
       "integrity": "sha512-oyCeFINTYK0B8ZGUBiQc05G5vytPlKSmTTtm19xfJuUgoi8zkvvRcoPQci4mSnyfpPn2XSFFDfsALG8uGcapfg==",
+      "dependencies": [
+        "@ai-sdk/provider",
+        "@standard-schema/spec",
+        "eventsource-parser",
+        "zod"
+      ]
+    },
+    "@ai-sdk/provider-utils@4.0.19_zod@4.3.6": {
+      "integrity": "sha512-3eG55CrSWCu2SXlqq2QCsFjo3+E7+Gmg7i/oRVoSZzIodTuDSfLb3MRje67xE9RFea73Zao7Lm4mADIfUETKGg==",
       "dependencies": [
         "@ai-sdk/provider",
         "@standard-schema/spec",
@@ -1458,7 +1476,7 @@
       "dependencies": [
         "@ai-sdk/gateway",
         "@ai-sdk/provider",
-        "@ai-sdk/provider-utils",
+        "@ai-sdk/provider-utils@4.0.17_zod@4.3.6",
         "@opentelemetry/api",
         "zod"
       ]
@@ -2806,6 +2824,7 @@
       "jsr:@std/encoding@^1.0.10",
       "jsr:@std/fs@^1.0.23",
       "npm:@ai-sdk/google@^3.0.37",
+      "npm:@ai-sdk/openai-compatible@^2.0.35",
       "npm:@google/genai@^1.43.0",
       "npm:@libsql/client@~0.15.15",
       "npm:@opentelemetry/auto-instrumentations-node@~0.70.1",

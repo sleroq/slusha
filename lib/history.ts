@@ -373,10 +373,15 @@ async function constructMsg(
         try {
             attachments = await getAttachments(api, botInfo.token, msg);
         } catch (error) {
-            logger.error(
-                'Could not download message attachments: ',
+            logger.error('Could not download message attachments', {
                 error,
-            );
+                messageId: msg.id,
+                isMyself: msg.isMyself,
+                hasText: Boolean(msg.text),
+                textLength: msg.text?.length ?? 0,
+                supportedFields: getSupportedContentFields(msg.info),
+                unsupportedFields: getUnsupportedContentFields(msg.info),
+            });
         }
 
         if (attachments.length > 0) {
@@ -609,18 +614,50 @@ async function getAttachments(
         const { sticker } = msg.info;
 
         if (sticker.is_video) {
-            const file = await downloadFile(
-                api,
-                token,
-                sticker.file_id,
-                'video/webm',
-            );
+            try {
+                const file = await downloadFile(
+                    api,
+                    token,
+                    sticker.file_id,
+                    'video/webm',
+                );
 
-            parts.push({
-                type: 'file',
-                data: file,
-                mediaType: 'video/webm',
-            });
+                parts.push({
+                    type: 'file',
+                    data: file,
+                    mediaType: 'video/webm',
+                });
+            } catch (error) {
+                const thumbnailId = sticker.thumbnail?.file_id;
+                if (!thumbnailId) {
+                    logger.error(
+                        'Could not process video sticker and it has no thumbnail: ',
+                        error,
+                    );
+                    return parts;
+                }
+
+                logger.warn(
+                    'Could not process video sticker, falling back to thumbnail: ',
+                    error,
+                );
+
+                try {
+                    parts.push(
+                        await getImageContent(
+                            api,
+                            token,
+                            thumbnailId,
+                            'image/webp',
+                        ),
+                    );
+                } catch (thumbnailError) {
+                    logger.error(
+                        'Could not download video sticker thumbnail: ',
+                        thumbnailError,
+                    );
+                }
+            }
 
             return parts;
         }

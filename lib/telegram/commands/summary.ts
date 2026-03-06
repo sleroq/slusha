@@ -1,15 +1,15 @@
 import { SlushaContext } from '../setup-bot.ts';
 import { Composer } from 'grammy';
-import { Config } from '../../config.ts';
+import { getGlobalUserConfig } from '../../config.ts';
 
 export function registerSummary(
     composer: Composer<SlushaContext>,
-    config: Config,
 ) {
     composer.command('summary', async (ctx) => {
+        const globalConfig = await getGlobalUserConfig(ctx.memory.db);
         await ctx.m.setLastUse(Date.now());
         const notes = (await ctx.m.getChat()).notes.slice(
-            -config.maxNotesToStore - 2,
+            -globalConfig.maxNotesToStore - 2,
         );
 
         if (notes.length === 0) {

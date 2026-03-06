@@ -1,10 +1,11 @@
 import { Composer } from 'grammy';
-import { google } from '@ai-sdk/google';
 import { generateText, ModelMessage } from 'ai';
-import { Config, safetySettings } from '../../config.ts';
+import { Config } from '../../config.ts';
 import logger from '../../logger.ts';
 import { SlushaContext } from '../setup-bot.ts';
 import { makeNotesHistory } from '../../history.ts';
+import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
+import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
 
 export default function notes(config: Config, botId: number) {
     const bot = new Composer<SlushaContext>();
@@ -12,7 +13,7 @@ export default function notes(config: Config, botId: number) {
     // if bot was used in last 3 days
     bot.on('message', (ctx, next) => {
         async function handleNotes() {
-            const effectiveConfig = await ctx.m.getEffectiveConfig(config);
+            const effectiveConfig = await ctx.m.getEffectiveConfig();
             const frequency = effectiveConfig.ai.notesFrequency;
             const chat = await ctx.m.getChat();
             const history = await ctx.m.getHistory();
@@ -85,23 +86,38 @@ export default function notes(config: Config, botId: number) {
 
             let response;
             try {
+                const generationPolicy = resolveGenerationPolicy({
+                    modelRef: model,
+                    config: effectiveConfig.ai,
+                    task: 'notes',
+                    expectsStructuredOutput: false,
+                });
+                const providerOptions = generationPolicy
+                    .providerOptions as Parameters<
+                        typeof generateText
+                    >[0]['providerOptions'];
                 response = await generateText({
-                    model: google(model),
-                    providerOptions: { google: { safetySettings } },
+                    model: generationPolicy.model,
+                    providerOptions,
                     messages,
                     temperature: effectiveConfig.ai.temperature,
                     topK: effectiveConfig.ai.topK,
                     topP: effectiveConfig.ai.topP,
+                    maxOutputTokens: generationPolicy.maxOutputTokens,
                     experimental_telemetry: {
                         isEnabled: true,
                         functionId: 'generate-notes',
-                        metadata: {
+                        metadata: buildGenerationTelemetryMetadata({
                             sessionId: ctx.chat.id.toString(),
-                            tags,
                             userId: ctx.chat.type === 'private'
                                 ? ctx.from?.id.toString()
                                 : '',
-                        },
+                            tags,
+                            temperature: effectiveConfig.ai.temperature,
+                            topK: effectiveConfig.ai.topK,
+                            topP: effectiveConfig.ai.topP,
+                            policy: generationPolicy,
+                        }),
                     },
                 });
             } catch (error) {
@@ -151,7 +167,7 @@ export default function notes(config: Config, botId: number) {
 
     bot.on('message', (ctx, next) => {
         async function handleMemory() {
-            const effectiveConfig = await ctx.m.getEffectiveConfig(config);
+            const effectiveConfig = await ctx.m.getEffectiveConfig();
             const frequency = effectiveConfig.ai.memoryFrequency;
             const chat = await ctx.m.getChat();
             const history = await ctx.m.getHistory();
@@ -294,28 +310,38 @@ export default function notes(config: Config, botId: number) {
 
             let response;
             try {
+                const generationPolicy = resolveGenerationPolicy({
+                    modelRef: model,
+                    config: effectiveConfig.ai,
+                    task: 'memory',
+                    expectsStructuredOutput: false,
+                });
+                const providerOptions = generationPolicy
+                    .providerOptions as Parameters<
+                        typeof generateText
+                    >[0]['providerOptions'];
                 response = await generateText({
-                    model: google(model),
-                    providerOptions: {
-                        google: {
-                            safetySettings,
-                            thinkingConfig: { thinkingBudget: 2048 },
-                        },
-                    },
+                    model: generationPolicy.model,
+                    providerOptions,
                     messages,
                     temperature: effectiveConfig.ai.temperature,
                     topK: effectiveConfig.ai.topK,
                     topP: effectiveConfig.ai.topP,
+                    maxOutputTokens: generationPolicy.maxOutputTokens,
                     experimental_telemetry: {
                         isEnabled: true,
                         functionId: 'generate-memory',
-                        metadata: {
+                        metadata: buildGenerationTelemetryMetadata({
                             sessionId: ctx.chat.id.toString(),
-                            tags,
                             userId: ctx.chat.type === 'private'
                                 ? ctx.from?.id.toString()
                                 : '',
-                        },
+                            tags,
+                            temperature: effectiveConfig.ai.temperature,
+                            topK: effectiveConfig.ai.topK,
+                            topP: effectiveConfig.ai.topP,
+                            policy: generationPolicy,
+                        }),
                     },
                 });
             } catch (error) {

@@ -11,14 +11,14 @@ import { ChatMemory } from '../../memory.ts';
 import logger from '../../logger.ts';
 import { InlineQueryResultArticle } from 'grammy_types';
 import { generateObject, generateText } from 'ai';
-import { google } from '@ai-sdk/google';
-import { safetySettings } from '../../config.ts';
 import z from 'zod';
 import { limit } from 'grammy_ratelimiter';
 import DOMPurify from 'isomorphic-dompurify';
 import remarkHtml from 'remark-html';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
+import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
+import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
 
 const bot = new Composer<SlushaContext>();
 
@@ -418,43 +418,75 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     let names: string[] = [];
     try {
         if (useJsonResponses) {
+            const generationPolicy = resolveGenerationPolicy({
+                modelRef: model,
+                config,
+                task: 'character',
+                expectsStructuredOutput: true,
+            });
+            const providerOptions = generationPolicy
+                .providerOptions as Parameters<
+                    typeof generateObject
+                >[0]['providerOptions'];
             const result = await generateObject({
-                model: google(model),
-                providerOptions: { google: { safetySettings } },
+                model: generationPolicy.model,
+                providerOptions,
                 schema: z.array(z.string()),
                 temperature: config.temperature,
                 topK: config.topK,
                 topP: config.topP,
+                maxOutputTokens: generationPolicy.maxOutputTokens,
                 prompt:
                     `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
                     'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.',
                 experimental_telemetry: {
                     isEnabled: true,
                     functionId: 'character-names',
-                    metadata: {
+                    metadata: buildGenerationTelemetryMetadata({
                         sessionId: chatId.toString(),
+                        userId: '',
                         tags: ['character'],
-                    },
+                        temperature: config.temperature,
+                        topK: config.topK,
+                        topP: config.topP,
+                        policy: generationPolicy,
+                    }),
                 },
             });
             names = result.object;
         } else {
+            const generationPolicy = resolveGenerationPolicy({
+                modelRef: model,
+                config,
+                task: 'character',
+                expectsStructuredOutput: false,
+            });
+            const providerOptions = generationPolicy
+                .providerOptions as Parameters<
+                    typeof generateText
+                >[0]['providerOptions'];
             const response = await generateText({
-                model: google(model),
-                providerOptions: { google: { safetySettings } },
+                model: generationPolicy.model,
+                providerOptions,
                 temperature: config.temperature,
                 topK: config.topK,
                 topP: config.topP,
+                maxOutputTokens: generationPolicy.maxOutputTokens,
                 prompt:
                     `Напиши варианты имени "${character.name}" (русские и английские, уменьшительные и очевидные похожие формы). ` +
                     'Верни только список вариантов через запятую или с новой строки, без пояснений.',
                 experimental_telemetry: {
                     isEnabled: true,
                     functionId: 'character-names-dumb',
-                    metadata: {
+                    metadata: buildGenerationTelemetryMetadata({
                         sessionId: chatId.toString(),
+                        userId: '',
                         tags: ['character'],
-                    },
+                        temperature: config.temperature,
+                        topK: config.topK,
+                        topP: config.topP,
+                        policy: generationPolicy,
+                    }),
                 },
             });
 

@@ -1,20 +1,20 @@
 import { SlushaContext } from '../setup-bot.ts';
 import { Composer } from 'grammy';
-import { Config } from '../../config.ts';
+import { getGlobalUserConfig } from '../../config.ts';
 import { replyWithMarkdown } from '../helpers.ts';
 
 export function registerRandom(
     composer: Composer<SlushaContext>,
-    config: Config,
 ) {
     composer.command('random', async (ctx) => {
+        const globalConfig = await getGlobalUserConfig(ctx.memory.db);
         const args = ctx.msg.text
             .split(' ')
             .map((arg) => arg.trim())
             .filter((arg) => arg !== '');
 
         const currentValue = (await ctx.m.getChat()).randomReplyProbability ??
-            config.randomReplyProbability;
+            globalConfig.randomReplyProbability;
 
         if (args.length === 1) {
             return replyWithMarkdown(
