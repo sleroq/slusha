@@ -34,7 +34,10 @@ export async function ensureSqlitePragmas() {
             try {
                 await singletonClient!.execute('PRAGMA busy_timeout = 5000;');
             } catch (error) {
-                logger.warn('Could not apply SQLite busy_timeout pragma: ', error);
+                logger.warn(
+                    'Could not apply SQLite busy_timeout pragma: ',
+                    error,
+                );
             }
         })();
     }

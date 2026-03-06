@@ -13,9 +13,8 @@ export function registerRandom(
             .map((arg) => arg.trim())
             .filter((arg) => arg !== '');
 
-        const currentValue =
-            (await ctx.m.getChat()).randomReplyProbability ??
-                config.randomReplyProbability;
+        const currentValue = (await ctx.m.getChat()).randomReplyProbability ??
+            config.randomReplyProbability;
 
         if (args.length === 1) {
             return replyWithMarkdown(

@@ -22,9 +22,7 @@ export default function registerHateMode(composer: Composer<SlushaContext>) {
 
         return ctx.reply(
             ctx.t('hate-mode-status', {
-                status: nextMode
-                    ? ctx.t('enabled')
-                    : ctx.t('disabled'),
+                status: nextMode ? ctx.t('enabled') : ctx.t('disabled'),
             }),
         );
     });

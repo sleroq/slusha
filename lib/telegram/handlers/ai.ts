@@ -94,8 +94,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
         } else {
             prompt += useJsonResponses
                 ? effectiveConfig.ai.prompt
-                :
-                    (effectiveConfig.ai.dumbPrompt ?? effectiveConfig.ai.prompt);
+                : (effectiveConfig.ai.dumbPrompt ?? effectiveConfig.ai.prompt);
         }
 
         messages.push({
@@ -126,9 +125,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
 
         // If we have notes, add them to messages
         if (chatState.notes.length > 0) {
-            chatInfoMsg += `\n\nChat notes:\n${
-                chatState.notes.join('\n')
-            }`;
+            chatInfoMsg += `\n\nChat notes:\n${chatState.notes.join('\n')}`;
         }
 
         if (chatState.memory) {
@@ -172,8 +169,7 @@ export default function registerAI(bot: Bot<SlushaContext>, config: Config) {
 
         let finalPrompt = useJsonResponses
             ? effectiveConfig.ai.finalPrompt
-            :
-                (effectiveConfig.ai.dumbFinalPrompt ?? 'Ответь простым текстом.');
+            : (effectiveConfig.ai.dumbFinalPrompt ?? 'Ответь простым текстом.');
         if (ctx.info.userToReply) {
             finalPrompt += ` Ответь на сообщение от ${ctx.info.userToReply}.`;
         }

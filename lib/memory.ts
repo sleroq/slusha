@@ -3,8 +3,8 @@ import { Chat as TgChat, Message, User } from 'grammy_types';
 import { Character } from './charhub/api.ts';
 import { DbClient, ensureSqlitePragmas, getDb } from './db/client.ts';
 import {
-    chatConfigOverrides,
     chatCharacters,
+    chatConfigOverrides,
     chatMembers,
     chatMessages,
     chatNotes,
@@ -16,8 +16,8 @@ import {
 import logger from './logger.ts';
 import { ReplyMessage } from './telegram/helpers.ts';
 import {
-    chatConfigOverrideSchema,
     ChatConfigOverride,
+    chatConfigOverrideSchema,
     mergeWithChatOverride,
     parseChatOverridePayload,
     serializeChatOverride,
@@ -134,8 +134,9 @@ function buildMessageFromRow(
                 id: row.replyToId,
                 text: row.replyToText ?? '',
                 isMyself: row.replyToIsMyself ?? false,
-                info: row.replyToInfo ? parseJson<ReplyMessage>(row.replyToInfo) :
-                    ({} as ReplyMessage),
+                info: row.replyToInfo
+                    ? parseJson<ReplyMessage>(row.replyToInfo)
+                    : ({} as ReplyMessage),
             }
             : undefined,
         reactions,
@@ -168,9 +169,9 @@ export class Memory {
             .from(messageReactions)
             .where(eq(messageReactions.chatId, chatId));
 
-        const keys = reactionRows.map((r: typeof messageReactions.$inferSelect) =>
-            r.reactionKey
-        );
+        const keys = reactionRows.map((
+            r: typeof messageReactions.$inferSelect,
+        ) => r.reactionKey);
         const usersRows = keys.length === 0 ? [] : await this.db
             .select()
             .from(messageReactionUsers)
@@ -198,7 +199,9 @@ export class Memory {
                 type: row.type,
                 emoji: row.emoji ?? undefined,
                 customEmojiId: row.customEmojiId ?? undefined,
-                by: usersByReaction.get(`${row.messageId}:${row.reactionKey}`) ?? [],
+                by: usersByReaction.get(
+                    `${row.messageId}:${row.reactionKey}`,
+                ) ?? [],
                 count: row.count,
             };
             reactionsByMessage.set(row.messageId, bucket);
@@ -267,14 +270,17 @@ export class Memory {
             memory: chatRow.memory ?? undefined,
             lastUse: chatRow.lastUse,
             info: parseJson<TgChat>(chatRow.info),
-            chatModel: configOverride?.ai?.model ?? chatRow.chatModel ?? undefined,
+            chatModel: configOverride?.ai?.model ?? chatRow.chatModel ??
+                undefined,
             character: characterRow
                 ? {
                     ...parseJson<Character>(characterRow.payload),
                     names: parseJson<string[]>(characterRow.names),
                 }
                 : undefined,
-            optOutUsers: optOutRows.map((u: typeof chatOptOutUsers.$inferSelect) => ({
+            optOutUsers: optOutRows.map((
+                u: typeof chatOptOutUsers.$inferSelect,
+            ) => ({
                 id: u.userId,
                 username: u.username ?? undefined,
                 first_name: u.firstName,
@@ -309,7 +315,9 @@ export class Memory {
         if (from === to) return;
 
         await this.db.transaction(async (tx: Tx) => {
-            const fromChat = await tx.query.chats.findFirst({ where: eq(chats.id, from) });
+            const fromChat = await tx.query.chats.findFirst({
+                where: eq(chats.id, from),
+            });
             if (!fromChat) {
                 await tx
                     .insert(chats)
@@ -324,7 +332,9 @@ export class Memory {
                 return;
             }
 
-            await tx.delete(messageReactionUsers).where(eq(messageReactionUsers.chatId, to));
+            await tx.delete(messageReactionUsers).where(
+                eq(messageReactionUsers.chatId, to),
+            );
             await tx.delete(chats).where(eq(chats.id, to));
 
             await tx.insert(chats).values({
@@ -406,22 +416,37 @@ export class ChatMemory {
             locale: string | null;
         }>,
     ) {
-        await this.memory.db.update(chats).set(patch).where(eq(chats.id, this.chatInfo.id));
+        await this.memory.db.update(chats).set(patch).where(
+            eq(chats.id, this.chatInfo.id),
+        );
         if (this.cache) {
             if (patch.lastUse !== undefined) this.cache.lastUse = patch.lastUse;
-            if (patch.lastNotes !== undefined) this.cache.lastNotes = patch.lastNotes;
-            if (patch.lastMemory !== undefined) this.cache.lastMemory = patch.lastMemory;
-            if (patch.memory !== undefined) this.cache.memory = patch.memory ?? undefined;
-            if (patch.chatModel !== undefined) this.cache.chatModel = patch.chatModel ?? undefined;
+            if (patch.lastNotes !== undefined) {
+                this.cache.lastNotes = patch.lastNotes;
+            }
+            if (patch.lastMemory !== undefined) {
+                this.cache.lastMemory = patch.lastMemory;
+            }
+            if (patch.memory !== undefined) {
+                this.cache.memory = patch.memory ?? undefined;
+            }
+            if (patch.chatModel !== undefined) {
+                this.cache.chatModel = patch.chatModel ?? undefined;
+            }
             if (patch.messagesToPass !== undefined) {
                 this.cache.messagesToPass = patch.messagesToPass ?? undefined;
             }
             if (patch.randomReplyProbability !== undefined) {
-                this.cache.randomReplyProbability = patch.randomReplyProbability ??
-                    undefined;
+                this.cache.randomReplyProbability =
+                    patch.randomReplyProbability ??
+                        undefined;
             }
-            if (patch.hateMode !== undefined) this.cache.hateMode = patch.hateMode ?? undefined;
-            if (patch.locale !== undefined) this.cache.locale = patch.locale ?? undefined;
+            if (patch.hateMode !== undefined) {
+                this.cache.hateMode = patch.hateMode ?? undefined;
+            }
+            if (patch.locale !== undefined) {
+                this.cache.locale = patch.locale ?? undefined;
+            }
         }
     }
 
@@ -469,7 +494,10 @@ export class ChatMemory {
             });
     }
 
-    async setChatConfigOverride(value: ChatConfigOverride | undefined, updatedBy?: number) {
+    async setChatConfigOverride(
+        value: ChatConfigOverride | undefined,
+        updatedBy?: number,
+    ) {
         if (value === undefined) {
             await this.setChatConfigOverrideRaw(undefined, updatedBy);
             return;
@@ -477,7 +505,9 @@ export class ChatMemory {
 
         const parsed = chatConfigOverrideSchema.safeParse(value);
         if (!parsed.success) {
-            throw new Error('Invalid chat config override payload: ' + parsed.error.message);
+            throw new Error(
+                'Invalid chat config override payload: ' + parsed.error.message,
+            );
         }
 
         await this.setChatConfigOverrideRaw(parsed.data, updatedBy);
@@ -500,8 +530,12 @@ export class ChatMemory {
             await tx.delete(messageReactions).where(
                 eq(messageReactions.chatId, this.chatInfo.id),
             );
-            await tx.delete(chatMessages).where(eq(chatMessages.chatId, this.chatInfo.id));
-            await tx.update(chats).set({ lastNotes: 0 }).where(eq(chats.id, this.chatInfo.id));
+            await tx.delete(chatMessages).where(
+                eq(chatMessages.chatId, this.chatInfo.id),
+            );
+            await tx.update(chats).set({ lastNotes: 0 }).where(
+                eq(chats.id, this.chatInfo.id),
+            );
         });
 
         if (this.cache) {
@@ -557,7 +591,9 @@ export class ChatMemory {
         const history = await this.getHistory();
         if (history.length <= maxLength) return;
 
-        const toDelete = history.slice(0, history.length - maxLength).map((m) => m.id);
+        const toDelete = history.slice(0, history.length - maxLength).map((m) =>
+            m.id
+        );
         await this.memory.db.transaction(async (tx: Tx) => {
             await tx.delete(messageReactionUsers).where(and(
                 eq(messageReactionUsers.chatId, this.chatInfo.id),
@@ -574,7 +610,9 @@ export class ChatMemory {
         });
 
         if (this.cache) {
-            this.cache.history = this.cache.history.slice(this.cache.history.length - maxLength);
+            this.cache.history = this.cache.history.slice(
+                this.cache.history.length - maxLength,
+            );
         }
     }
 
@@ -588,7 +626,9 @@ export class ChatMemory {
 
     private async replaceNotes(notes: string[]) {
         await this.memory.db.transaction(async (tx: Tx) => {
-            await tx.delete(chatNotes).where(eq(chatNotes.chatId, this.chatInfo.id));
+            await tx.delete(chatNotes).where(
+                eq(chatNotes.chatId, this.chatInfo.id),
+            );
             if (notes.length > 0) {
                 await tx.insert(chatNotes).values(notes.map((note, index) => ({
                     chatId: this.chatInfo.id,
@@ -626,7 +666,9 @@ export class ChatMemory {
     }
 
     async clearNotes() {
-        await this.memory.db.delete(chatNotes).where(eq(chatNotes.chatId, this.chatInfo.id));
+        await this.memory.db.delete(chatNotes).where(
+            eq(chatNotes.chatId, this.chatInfo.id),
+        );
 
         if (this.cache) {
             this.cache.notes = [];
@@ -770,7 +812,9 @@ export class ChatMemory {
         ));
 
         if (this.cache) {
-            this.cache.members = this.cache.members.filter((m) => m.id !== userId);
+            this.cache.members = this.cache.members.filter((m) =>
+                m.id !== userId
+            );
         }
     }
 
@@ -820,7 +864,9 @@ export class ChatMemory {
             });
 
         if (this.cache) {
-            const idx = this.cache.optOutUsers.findIndex((u) => u.id === user.id);
+            const idx = this.cache.optOutUsers.findIndex((u) =>
+                u.id === user.id
+            );
             if (idx === -1) this.cache.optOutUsers.push(user);
             else this.cache.optOutUsers[idx] = user;
         }
@@ -833,7 +879,9 @@ export class ChatMemory {
         ));
 
         if (this.cache) {
-            this.cache.optOutUsers = this.cache.optOutUsers.filter((u) => u.id !== userId);
+            this.cache.optOutUsers = this.cache.optOutUsers.filter((u) =>
+                u.id !== userId
+            );
         }
     }
 
@@ -862,7 +910,11 @@ export class ChatMemory {
         customEmojiId: string,
         by?: Pick<User, 'id' | 'username' | 'first_name'>,
     ) {
-        await this.upsertReaction(messageId, { type: 'custom', customEmojiId }, by);
+        await this.upsertReaction(
+            messageId,
+            { type: 'custom', customEmojiId },
+            by,
+        );
     }
 
     async removeCustomReaction(
@@ -870,7 +922,11 @@ export class ChatMemory {
         customEmojiId: string,
         by?: Pick<User, 'id' | 'username' | 'first_name'>,
     ) {
-        await this.removeReaction(messageId, { type: 'custom', customEmojiId }, by);
+        await this.removeReaction(
+            messageId,
+            { type: 'custom', customEmojiId },
+            by,
+        );
     }
 
     async setReactionCounts(
@@ -892,10 +948,16 @@ export class ChatMemory {
             await this.removeReaction(messageId, { type: 'emoji', emoji }, by);
         }
         for (const customEmojiId of delta.customAdded) {
-            await this.upsertReaction(messageId, { type: 'custom', customEmojiId }, by);
+            await this.upsertReaction(messageId, {
+                type: 'custom',
+                customEmojiId,
+            }, by);
         }
         for (const customEmojiId of delta.customRemoved) {
-            await this.removeReaction(messageId, { type: 'custom', customEmojiId }, by);
+            await this.removeReaction(messageId, {
+                type: 'custom',
+                customEmojiId,
+            }, by);
         }
     }
 
@@ -960,7 +1022,9 @@ export class ChatMemory {
                 msg.reactions[key] = {
                     type: c.type,
                     emoji: c.type === 'emoji' ? c.emoji : undefined,
-                    customEmojiId: c.type === 'custom' ? c.customEmojiId : undefined,
+                    customEmojiId: c.type === 'custom'
+                        ? c.customEmojiId
+                        : undefined,
                     by: [],
                     count: c.total,
                 };

@@ -68,7 +68,8 @@ bot.callbackQuery(/set-lang .*/, async (ctx) => {
             return ctx.answerCallbackQuery(ctx.t('language-invalid-locale'));
         }
 
-        const current = (await ctx.m.getChat()).locale ?? await ctx.i18n.getLocale();
+        const current = (await ctx.m.getChat()).locale ??
+            await ctx.i18n.getLocale();
         if (current === locale) {
             return ctx.answerCallbackQuery(ctx.t('language-already-set'));
         }

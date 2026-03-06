@@ -41,7 +41,9 @@ export function registerConfig(
         }
 
         if (requestedScope === 'global') {
-            if (!ctx.from || !(config.adminIds?.includes(ctx.from.id) ?? false)) {
+            if (
+                !ctx.from || !(config.adminIds?.includes(ctx.from.id) ?? false)
+            ) {
                 return ctx.reply(ctx.t('admin-only'));
             }
         } else if (ctx.chat.type !== 'private') {
@@ -83,7 +85,10 @@ export function registerConfig(
             return ctx.reply(ctx.t('config-widget-unavailable'));
         }
 
-        const kb = new InlineKeyboard().webApp(ctx.t('config-open-widget'), url);
+        const kb = new InlineKeyboard().webApp(
+            ctx.t('config-open-widget'),
+            url,
+        );
         const msg = requestedScope === 'global'
             ? ctx.t('config-open-global')
             : ctx.t('config-open-chat');

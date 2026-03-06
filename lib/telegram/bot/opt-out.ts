@@ -78,7 +78,9 @@ bot.command('optin', (ctx) => {
 });
 
 async function optIn(ctx: SlushaContext, id: number, reply: boolean) {
-    const wasOptedIn = (await ctx.m.getChat()).optOutUsers.some((u) => u.id === id);
+    const wasOptedIn = (await ctx.m.getChat()).optOutUsers.some((u) =>
+        u.id === id
+    );
     let message = ctx.t('opt-out-status', {
         verb: wasOptedIn ? ctx.t('again') : ctx.t('already'),
     });

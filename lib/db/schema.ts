@@ -1,4 +1,10 @@
-import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import {
+    integer,
+    primaryKey,
+    real,
+    sqliteTable,
+    text,
+} from 'drizzle-orm/sqlite-core';
 
 export const chats = sqliteTable('chats', {
     id: integer('id', { mode: 'number' }).primaryKey(),
@@ -97,7 +103,9 @@ export const messageReactions = sqliteTable('message_reactions', {
     customEmojiId: text('custom_emoji_id'),
     count: integer('count', { mode: 'number' }).notNull().default(0),
 }, (table) => ({
-    pk: primaryKey({ columns: [table.chatId, table.messageId, table.reactionKey] }),
+    pk: primaryKey({
+        columns: [table.chatId, table.messageId, table.reactionKey],
+    }),
 }));
 
 export const messageReactionUsers = sqliteTable('message_reaction_users', {
@@ -109,7 +117,12 @@ export const messageReactionUsers = sqliteTable('message_reaction_users', {
     name: text('name').notNull(),
 }, (table) => ({
     pk: primaryKey({
-        columns: [table.chatId, table.messageId, table.reactionKey, table.userId],
+        columns: [
+            table.chatId,
+            table.messageId,
+            table.reactionKey,
+            table.userId,
+        ],
     }),
 }));
 

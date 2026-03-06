@@ -65,7 +65,9 @@ export async function verifyTelegramInitData(
     const authDateRaw = params.get('auth_date');
     if (!authDateRaw) throw new Error('Missing auth_date in initData');
     const authDate = Number(authDateRaw);
-    if (!Number.isFinite(authDate)) throw new Error('Invalid auth_date in initData');
+    if (!Number.isFinite(authDate)) {
+        throw new Error('Invalid auth_date in initData');
+    }
 
     const nowSec = Math.floor(Date.now() / 1000);
     if (nowSec - authDate > maxAgeSec) {

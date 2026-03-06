@@ -11,8 +11,12 @@ function isValidRegex(val: unknown): val is RegExp {
 }
 
 const boundedProbability = z.number().min(0).max(100);
-const boundedPositiveInt = (min: number, max: number) => z.number().int().min(min).max(max);
-const matcherSchema = z.union([z.string().max(256), z.custom<RegExp>(isValidRegex)]);
+const boundedPositiveInt = (min: number, max: number) =>
+    z.number().int().min(min).max(max);
+const matcherSchema = z.union([
+    z.string().max(256),
+    z.custom<RegExp>(isValidRegex),
+]);
 
 export const configSchema = z.object({
     ai: z.object({
@@ -58,7 +62,9 @@ export const configSchema = z.object({
          * from user messages when constructing model history
          */
         includeAttachmentsInHistory: z.boolean().default(true),
-        bytesLimit: boundedPositiveInt(1024, 100 * 1024 * 1024).default(20 * 1024 * 1024),
+        bytesLimit: boundedPositiveInt(1024, 100 * 1024 * 1024).default(
+            20 * 1024 * 1024,
+        ),
     }),
     startMessage: z.string().max(2000),
     names: z.array(matcherSchema).max(256),
@@ -71,9 +77,10 @@ export const configSchema = z.object({
     filesMaxAge: boundedPositiveInt(1, 720).default(72),
     adminIds: z.array(z.number().int()).max(256).optional(),
     trustedIds: z.array(z.number().int()).max(10000).default([]),
-    availableModels: z.array(z.string().min(1).max(200)).min(1).max(256).default([
-        'gemini-3.1-flash-lite-preview',
-    ]),
+    availableModels: z.array(z.string().min(1).max(200)).min(1).max(256)
+        .default([
+            'gemini-3.1-flash-lite-preview',
+        ]),
     maxNotesToStore: boundedPositiveInt(1, 200).default(5),
     maxMessagesToStore: boundedPositiveInt(1, 2000).default(100),
     chatLastUseNotes: boundedPositiveInt(1, 100).default(3),
@@ -88,14 +95,18 @@ const chatOverrideAiSchema = z.object({
     topP: configSchema.shape.ai.shape.topP.optional(),
     prompt: configSchema.shape.ai.shape.prompt.optional(),
     dumbPrompt: configSchema.shape.ai.shape.dumbPrompt.optional(),
-    privateChatPromptAddition: configSchema.shape.ai.shape.privateChatPromptAddition.optional(),
-    groupChatPromptAddition: configSchema.shape.ai.shape.groupChatPromptAddition.optional(),
-    commentsPromptAddition: configSchema.shape.ai.shape.commentsPromptAddition.optional(),
+    privateChatPromptAddition: configSchema.shape.ai.shape
+        .privateChatPromptAddition.optional(),
+    groupChatPromptAddition: configSchema.shape.ai.shape.groupChatPromptAddition
+        .optional(),
+    commentsPromptAddition: configSchema.shape.ai.shape.commentsPromptAddition
+        .optional(),
     hateModePrompt: configSchema.shape.ai.shape.hateModePrompt.optional(),
     useJsonResponses: configSchema.shape.ai.shape.useJsonResponses.optional(),
     messagesToPass: configSchema.shape.ai.shape.messagesToPass.optional(),
     messageMaxLength: configSchema.shape.ai.shape.messageMaxLength.optional(),
-    includeAttachmentsInHistory: configSchema.shape.ai.shape.includeAttachmentsInHistory.optional(),
+    includeAttachmentsInHistory: configSchema.shape.ai.shape
+        .includeAttachmentsInHistory.optional(),
     bytesLimit: configSchema.shape.ai.shape.bytesLimit.optional(),
 });
 
@@ -103,10 +114,13 @@ export const chatConfigOverrideSchema = z.object({
     ai: chatOverrideAiSchema.optional(),
     names: configSchema.shape.names.optional(),
     tendToReply: configSchema.shape.tendToReply.optional(),
-    tendToReplyProbability: configSchema.shape.tendToReplyProbability.optional(),
+    tendToReplyProbability: configSchema.shape.tendToReplyProbability
+        .optional(),
     tendToIgnore: configSchema.shape.tendToIgnore.optional(),
-    tendToIgnoreProbability: configSchema.shape.tendToIgnoreProbability.optional(),
-    randomReplyProbability: configSchema.shape.randomReplyProbability.optional(),
+    tendToIgnoreProbability: configSchema.shape.tendToIgnoreProbability
+        .optional(),
+    randomReplyProbability: configSchema.shape.randomReplyProbability
+        .optional(),
     nepons: configSchema.shape.nepons.optional(),
     responseDelay: configSchema.shape.responseDelay.optional(),
 });
@@ -147,7 +161,8 @@ type SerializedRegex = {
 
 type SerializedMatcher = string | SerializedRegex;
 
-interface StoredUserConfig extends Omit<UserConfig, 'names' | 'tendToReply' | 'tendToIgnore'> {
+interface StoredUserConfig
+    extends Omit<UserConfig, 'names' | 'tendToReply' | 'tendToIgnore'> {
     names: SerializedMatcher[];
     tendToReply: SerializedMatcher[];
     tendToIgnore: SerializedMatcher[];
@@ -188,7 +203,9 @@ function fromStoredUserConfig(input: StoredUserConfig): UserConfig {
     };
 }
 
-function toStoredChatOverride(input: ChatConfigOverride): StoredChatConfigOverride {
+function toStoredChatOverride(
+    input: ChatConfigOverride,
+): StoredChatConfigOverride {
     return {
         ...input,
         names: input.names?.map(serializeMatcher),
@@ -197,7 +214,9 @@ function toStoredChatOverride(input: ChatConfigOverride): StoredChatConfigOverri
     };
 }
 
-function fromStoredChatOverride(input: StoredChatConfigOverride): ChatConfigOverride {
+function fromStoredChatOverride(
+    input: StoredChatConfigOverride,
+): ChatConfigOverride {
     return {
         ...input,
         names: input.names?.map(deserializeMatcher),
@@ -225,14 +244,20 @@ export function serializeChatOverride(override: ChatConfigOverride): string {
 
 export function parseChatOverridePayload(payload: string): ChatConfigOverride {
     const raw = JSON.parse(payload) as StoredChatConfigOverride;
-    const parsed = chatConfigOverrideSchema.safeParse(fromStoredChatOverride(raw));
+    const parsed = chatConfigOverrideSchema.safeParse(
+        fromStoredChatOverride(raw),
+    );
     if (!parsed.success) {
-        throw new Error('Invalid chat config override in DB: ' + parsed.error.message);
+        throw new Error(
+            'Invalid chat config override in DB: ' + parsed.error.message,
+        );
     }
     return parsed.data;
 }
 
-export async function getGlobalUserConfig(db: DbClient = getDb()): Promise<UserConfig> {
+export async function getGlobalUserConfig(
+    db: DbClient = getDb(),
+): Promise<UserConfig> {
     await ensureSqlitePragmas();
 
     let row = await db.query.globalConfig.findFirst({
@@ -243,7 +268,8 @@ export async function getGlobalUserConfig(db: DbClient = getDb()): Promise<UserC
         const parsedDefaults = configSchema.safeParse(defaultConfig);
         if (!parsedDefaults.success) {
             throw new Error(
-                'Invalid built-in default config: ' + parsedDefaults.error.message,
+                'Invalid built-in default config: ' +
+                    parsedDefaults.error.message,
             );
         }
 
@@ -275,10 +301,14 @@ export async function setGlobalUserConfig(
 
     const parsed = configSchema.safeParse(value);
     if (!parsed.success) {
-        throw new Error('Invalid global config payload: ' + parsed.error.message);
+        throw new Error(
+            'Invalid global config payload: ' + parsed.error.message,
+        );
     }
 
-    const normalizedModels = Array.from(new Set(parsed.data.availableModels.map((m) => m.trim())))
+    const normalizedModels = Array.from(
+        new Set(parsed.data.availableModels.map((m) => m.trim())),
+    )
         .filter((m) => m.length > 0);
     if (normalizedModels.length === 0) {
         throw new Error('availableModels must contain at least one model');
@@ -288,11 +318,15 @@ export async function setGlobalUserConfig(
         parsed.data.ai.model,
         parsed.data.ai.notesModel,
         parsed.data.ai.memoryModel,
-    ].filter((item): item is string => typeof item === 'string' && item.length > 0);
+    ].filter((item): item is string =>
+        typeof item === 'string' && item.length > 0
+    );
 
     for (const model of modelsToCheck) {
         if (!normalizedModels.includes(model)) {
-            throw new Error(`Model "${model}" is not listed in availableModels`);
+            throw new Error(
+                `Model "${model}" is not listed in availableModels`,
+            );
         }
     }
 
@@ -337,7 +371,9 @@ export function mergeWithChatOverride(
         },
     };
 
-    const entries = Object.entries(override).filter(([k]) => k !== 'ai') as Array<[
+    const entries = Object.entries(override).filter(([k]) =>
+        k !== 'ai'
+    ) as Array<[
         keyof Omit<ChatConfigOverride, 'ai'>,
         ChatConfigOverride[keyof Omit<ChatConfigOverride, 'ai'>],
     ]>;

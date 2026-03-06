@@ -70,8 +70,12 @@ function parseReactionSet(raw: unknown): { emoji: string[]; custom: string[] } {
 }
 
 function parseReactionDelta(messageReaction: unknown): ReactionDelta {
-    const added = parseReactionSet(getUnknownProp(messageReaction, 'new_reaction'));
-    const removed = parseReactionSet(getUnknownProp(messageReaction, 'old_reaction'));
+    const added = parseReactionSet(
+        getUnknownProp(messageReaction, 'new_reaction'),
+    );
+    const removed = parseReactionSet(
+        getUnknownProp(messageReaction, 'old_reaction'),
+    );
 
     return {
         emojiAdded: added.emoji,
@@ -81,7 +85,9 @@ function parseReactionDelta(messageReaction: unknown): ReactionDelta {
     };
 }
 
-function parseReactionCounts(messageReactionCount: unknown): ReactionCountEntry[] {
+function parseReactionCounts(
+    messageReactionCount: unknown,
+): ReactionCountEntry[] {
     const rawCounts = getUnknownProp(messageReactionCount, 'reactions') ??
         getUnknownProp(messageReactionCount, 'reaction_counts') ??
         [];
@@ -216,7 +222,9 @@ export default async function setupBot(config: Config, memory: Memory) {
 
         // Ignore opted out users and commands
         if (
-            (await ctx.m.getChat()).optOutUsers.some((u) => u.id === ctx.from?.id) &&
+            (await ctx.m.getChat()).optOutUsers.some((u) =>
+                u.id === ctx.from?.id
+            ) &&
             !ctx.msg.text?.startsWith('/optin')
         ) {
             return;

@@ -147,7 +147,9 @@ export function startWebServer(options: StartWebServerOptions) {
                 const chatIdRaw = url.searchParams.get('chatId');
                 const chatId = chatIdRaw ? Number(chatIdRaw) : undefined;
 
-                const globalConfig = await getGlobalUserConfig(options.memory.db);
+                const globalConfig = await getGlobalUserConfig(
+                    options.memory.db,
+                );
                 const canEditGlobal = canEditGlobalConfig(
                     runtimeConfig,
                     userId,
@@ -231,7 +233,11 @@ export function startWebServer(options: StartWebServerOptions) {
                 const parsed = parseUserConfigPayload(
                     JSON.stringify(body.payload),
                 );
-                const saved = await setGlobalUserConfig(parsed, userId, options.memory.db);
+                const saved = await setGlobalUserConfig(
+                    parsed,
+                    userId,
+                    options.memory.db,
+                );
                 options.runtimeConfig.applyUserConfig(saved);
 
                 return jsonResponse({ ok: true });
@@ -264,7 +270,9 @@ export function startWebServer(options: StartWebServerOptions) {
                 const parsedOverride = parseChatOverridePayload(
                     JSON.stringify(body.payload),
                 );
-                const globalConfig = await getGlobalUserConfig(options.memory.db);
+                const globalConfig = await getGlobalUserConfig(
+                    options.memory.db,
+                );
                 const sanitizedOverride = sanitizeChatOverrideForRole(
                     parsedOverride,
                     role,

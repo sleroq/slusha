@@ -4,7 +4,9 @@ import { ConfigRole } from './permissions.ts';
 type ChatEditableAi = NonNullable<ChatConfigOverride['ai']>;
 
 function uniqueModels(models: string[]): string[] {
-    return Array.from(new Set(models.map((item) => item.trim()))).filter((item) => item.length > 0);
+    return Array.from(new Set(models.map((item) => item.trim()))).filter((
+        item,
+    ) => item.length > 0);
 }
 
 function resolveAvailableModels(config: UserConfig): string[] {
@@ -92,7 +94,10 @@ export function buildBootstrapCapabilities(role: ConfigRole): {
     };
 }
 
-export function projectGlobalConfigForRole(config: UserConfig, role: ConfigRole): unknown {
+export function projectGlobalConfigForRole(
+    config: UserConfig,
+    role: ConfigRole,
+): unknown {
     if (role === 'admin') {
         return config;
     }
@@ -163,7 +168,10 @@ export function sanitizeChatOverrideForRole(
     return next;
 }
 
-export function getModelOptionsForRole(config: UserConfig, role: ConfigRole): string[] {
+export function getModelOptionsForRole(
+    config: UserConfig,
+    role: ConfigRole,
+): string[] {
     if (role === 'trusted' || role === 'admin') {
         return resolveAvailableModels(config);
     }

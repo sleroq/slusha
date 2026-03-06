@@ -60,7 +60,8 @@ export default function notes(config: Config, botId: number) {
                 return;
             }
 
-            const model = effectiveConfig.ai.notesModel ?? effectiveConfig.ai.model;
+            const model = effectiveConfig.ai.notesModel ??
+                effectiveConfig.ai.model;
             const prompt = effectiveConfig.ai.notesPrompt;
 
             const messages: ModelMessage[] = [
@@ -212,7 +213,9 @@ export default function notes(config: Config, botId: number) {
                 if (effectiveConfig.ai.privateChatPromptAddition) {
                     prompt += effectiveConfig.ai.privateChatPromptAddition;
                 }
-            } else if (isComments && effectiveConfig.ai.commentsPromptAddition) {
+            } else if (
+                isComments && effectiveConfig.ai.commentsPromptAddition
+            ) {
                 prompt += effectiveConfig.ai.commentsPromptAddition;
             } else if (effectiveConfig.ai.groupChatPromptAddition) {
                 prompt += effectiveConfig.ai.groupChatPromptAddition;
@@ -265,7 +268,8 @@ export default function notes(config: Config, botId: number) {
 
             prompt += '\n\n' + effectiveConfig.ai.memoryPrompt;
 
-            const model = effectiveConfig.ai.memoryModel ?? effectiveConfig.ai.model;
+            const model = effectiveConfig.ai.memoryModel ??
+                effectiveConfig.ai.model;
 
             const messages: ModelMessage[] = [
                 {
