@@ -1,1 +1,1 @@
-PRAGMA journal_mode = WAL;
+SELECT 1;

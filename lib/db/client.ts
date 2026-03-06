@@ -32,10 +32,11 @@ export async function ensureSqlitePragmas() {
 
         sqlitePragmasPromise = (async () => {
             try {
+                await singletonClient!.execute('PRAGMA journal_mode = WAL;');
                 await singletonClient!.execute('PRAGMA busy_timeout = 5000;');
             } catch (error) {
                 logger.warn(
-                    'Could not apply SQLite busy_timeout pragma: ',
+                    'Could not apply SQLite pragmas: ',
                     error,
                 );
             }
