@@ -411,22 +411,34 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 output = await generatePlainTextOutput();
             }
         } catch (error) {
-            logger.error('Could not get response: ', error);
-            if (error instanceof APICallError) {
-                if (error.responseBody) {
-                    let err;
-                    try {
-                        err = JSON.parse(error.responseBody);
-                    } catch (error) {
-                        logger.error('Could not parse error response: ', error);
+            let blockReason: string | undefined;
+            if (error instanceof APICallError && error.responseBody) {
+                try {
+                    const parsedError = JSON.parse(error.responseBody);
+                    if (typeof parsedError?.promptFeedback?.blockReason === 'string') {
+                        blockReason = parsedError.promptFeedback.blockReason;
                     }
-                    if (err?.promptFeedback?.blockReason) {
-                        return ctx.reply(
-                            'API провайдер запрещает тебе отвечать. Возможно это из-за персонажа: ' +
-                                err.promptFeedback.blockReason,
-                        );
-                    }
+                } catch {
+                    blockReason = undefined;
                 }
+            }
+
+            if (blockReason === 'PROHIBITED_CONTENT') {
+                logger.warn(
+                    'Could not get response: blocked by provider (PROHIBITED_CONTENT)',
+                );
+                return ctx.reply(
+                    'API провайдер запрещает тебе отвечать. Возможно это из-за персонажа: ' +
+                        blockReason,
+                );
+            }
+
+            logger.error('Could not get response: ', error);
+            if (blockReason) {
+                return ctx.reply(
+                    'API провайдер запрещает тебе отвечать. Возможно это из-за персонажа: ' +
+                        blockReason,
+                );
             }
             if (!ctx.info.isRandom) {
                 await ctx.reply(getRandomNepon(effectiveConfig));
