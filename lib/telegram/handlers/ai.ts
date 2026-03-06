@@ -14,8 +14,8 @@ import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
 import { ReplyTo } from '../../memory.ts';
 import {
     chatActionsToolInputSchema,
-    chatResponseSchema,
     ChatEntry,
+    chatResponseSchema,
     isReactEntry,
     isTextEntry,
 } from '../../ai/schema.ts';
@@ -30,7 +30,9 @@ function truncateForLog(text: string, maxLength = 4000): string {
         return text;
     }
 
-    return `${text.slice(0, maxLength)}...[truncated ${text.length - maxLength} chars]`;
+    return `${text.slice(0, maxLength)}...[truncated ${
+        text.length - maxLength
+    } chars]`;
 }
 
 function unwrapJsonCodeBlock(text: string): string {
@@ -394,7 +396,9 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     call.toolName === 'send_chat_actions'
                 );
                 const parsedToolCallInput = chatActionsToolCall
-                    ? chatActionsToolInputSchema.safeParse(chatActionsToolCall.input)
+                    ? chatActionsToolInputSchema.safeParse(
+                        chatActionsToolCall.input,
+                    )
                     : undefined;
 
                 if (parsedToolCallInput?.success) {
@@ -431,7 +435,10 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             if (error instanceof APICallError && error.responseBody) {
                 try {
                     const parsedError = JSON.parse(error.responseBody);
-                    if (typeof parsedError?.promptFeedback?.blockReason === 'string') {
+                    if (
+                        typeof parsedError?.promptFeedback?.blockReason ===
+                            'string'
+                    ) {
                         blockReason = parsedError.promptFeedback.blockReason;
                     }
                 } catch {

@@ -20,11 +20,12 @@ const groupChatPromptAddition = "It's a group chat.";
 
 const privateChatPromptAddition = "It's a private chat.";
 
-const prompt = "Your character is Слюша. She is cute and dumb.";
+const prompt = 'Your character is Слюша. She is cute and dumb.';
 
-const finalPrompt = "Answer must be concise.";
+const finalPrompt = 'Answer must be concise.';
 
-const notesPrompt = "Напиши краткое обзор важных событий в трех-пяти пунктах без нумирации. Твой ответ должен содержать только пункты событий чата."
+const notesPrompt =
+    'Напиши краткое обзор важных событий в трех-пяти пунктах без нумирации. Твой ответ должен содержать только пункты событий чата.';
 
 const memoryPrompt = `
 ### IMPORTANT SYSTEM CONTEXT ###

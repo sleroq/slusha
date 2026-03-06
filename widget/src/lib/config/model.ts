@@ -464,7 +464,10 @@ export function fromUnknownGlobal(payload: unknown): UserConfigPayload {
   const ai = obj.ai && typeof obj.ai === "object"
     ? (obj.ai as Partial<AiPayload>)
     : {};
-  const generation = normalizeGenerationConfig(ai.generation, base.ai.generation);
+  const generation = normalizeGenerationConfig(
+    ai.generation,
+    base.ai.generation,
+  );
 
   return {
     ...base,
@@ -543,10 +546,9 @@ export function fromUnknownCurrentCharacter(
     description: typeof obj.description === "string" ? obj.description : "",
     scenario: typeof obj.scenario === "string" ? obj.scenario : "",
     systemPrompt: typeof obj.systemPrompt === "string" ? obj.systemPrompt : "",
-    postHistoryInstructions:
-      typeof obj.postHistoryInstructions === "string"
-        ? obj.postHistoryInstructions
-        : "",
+    postHistoryInstructions: typeof obj.postHistoryInstructions === "string"
+      ? obj.postHistoryInstructions
+      : "",
     firstMessage: typeof obj.firstMessage === "string" ? obj.firstMessage : "",
     messageExample: typeof obj.messageExample === "string"
       ? obj.messageExample
@@ -700,7 +702,9 @@ export function buildChatPayload(
   return payload;
 }
 
-export function collectChatOverridePaths(payload: ChatOverridePayload): string[] {
+export function collectChatOverridePaths(
+  payload: ChatOverridePayload,
+): string[] {
   const paths: string[] = [];
 
   if (payload.names) paths.push("names");
