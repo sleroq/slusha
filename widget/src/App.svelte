@@ -79,6 +79,7 @@
         canViewGlobal={controller.canViewGlobal}
         role={controller.role}
         categories={controller.categories}
+        availableChats={controller.availableChats}
         onReload={reloadWithFeedback}
     />
 

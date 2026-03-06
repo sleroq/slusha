@@ -1,10 +1,18 @@
 export type ConfigScope = "global" | "chat";
 export type ConfigRole = "viewer" | "regular" | "trusted" | "admin";
 
+export interface AvailableChat {
+  id: number;
+  title: string;
+  username?: string;
+  type: "private" | "group" | "supergroup" | "channel";
+}
+
 export interface BootstrapResponse {
   role: ConfigRole;
   categories: string[];
   availableModels: string[];
+  availableChats: AvailableChat[];
   canViewGlobal: boolean;
   canEditGlobal: boolean;
   canEditChat: boolean;

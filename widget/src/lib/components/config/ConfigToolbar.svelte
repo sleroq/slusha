@@ -1,9 +1,12 @@
 <script lang="ts">
     import { Button } from '$lib/components/ui/button';
     import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
-    import { Input } from '$lib/components/ui/input';
     import { Label } from '$lib/components/ui/label';
-    import type { ConfigRole, ConfigScope } from '$lib/config/model';
+    import type {
+        AvailableChat,
+        ConfigRole,
+        ConfigScope,
+    } from '$lib/config/model';
 
     function formatCategory(category: string): string {
         return category.charAt(0).toUpperCase() + category.slice(1);
@@ -16,6 +19,7 @@
         canViewGlobal: boolean;
         role: ConfigRole;
         categories: string[];
+        availableChats: AvailableChat[];
         onReload: () => void;
     }
 
@@ -26,6 +30,7 @@
         canViewGlobal,
         role,
         categories,
+        availableChats,
         onReload,
     }: Props = $props();
 </script>
@@ -47,10 +52,26 @@
                 </div>
             {/if}
 
-            <div class="space-y-2">
-                <Label for="chat-id">Chat ID</Label>
-                <Input id="chat-id" bind:value={chatId} />
-            </div>
+            {#if scope === 'chat'}
+                <div class="space-y-2">
+                    <Label for="chat-id">Chat</Label>
+                    <select
+                        id="chat-id"
+                        bind:value={chatId}
+                        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm"
+                    >
+                        {#if availableChats.length === 0}
+                            <option value="" disabled>No chats available</option>
+                        {:else}
+                            {#each availableChats as chat (chat.id)}
+                                <option value={String(chat.id)}>
+                                    {chat.title}{chat.username ? ` (@${chat.username})` : ''}
+                                </option>
+                            {/each}
+                        {/if}
+                    </select>
+                </div>
+            {/if}
 
             <div class="flex items-end">
                 <Button class="w-full" onclick={onReload}>Reload</Button>

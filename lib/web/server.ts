@@ -1,5 +1,7 @@
 import { extname, join, normalize } from 'node:path';
+import { desc, eq, inArray } from 'drizzle-orm';
 import { Bot } from 'grammy';
+import type { Chat as TgChat } from 'grammy_types';
 import {
     Config,
     getGlobalUserConfig,
@@ -27,6 +29,7 @@ import {
 import { verifyTelegramInitData } from './auth.ts';
 import logger from '../logger.ts';
 import { ChatMemory, Memory } from '../memory.ts';
+import { chatMembers, chats } from '../db/schema.ts';
 
 interface RuntimeConfigAccess {
     get: () => Config;
@@ -37,6 +40,103 @@ interface StartWebServerOptions {
     bot: Bot<SlushaContext>;
     memory: Memory;
     runtimeConfig: RuntimeConfigAccess;
+}
+
+interface AvailableChat {
+    id: number;
+    title: string;
+    username?: string;
+    type: TgChat['type'];
+}
+
+function readChatSummary(chatId: number, infoRaw: string): AvailableChat {
+    try {
+        const info = JSON.parse(infoRaw) as TgChat;
+        const title = info.type === 'private'
+            ? [info.first_name, info.last_name].filter(Boolean).join(' ').trim()
+            : info.title;
+        const normalizedTitle = typeof title === 'string' &&
+                title.trim().length > 0
+            ? title.trim()
+            : String(chatId);
+
+        return {
+            id: chatId,
+            title: normalizedTitle,
+            username: info.username ?? undefined,
+            type: info.type,
+        };
+    } catch {
+        return {
+            id: chatId,
+            title: String(chatId),
+            type: 'group',
+        };
+    }
+}
+
+async function resolveAvailableChats(
+    options: StartWebServerOptions,
+    userId: number,
+): Promise<AvailableChat[]> {
+    const memberRows = await options.memory.db
+        .select({
+            chatId: chatMembers.chatId,
+            lastUse: chatMembers.lastUse,
+        })
+        .from(chatMembers)
+        .where(eq(chatMembers.userId, userId))
+        .orderBy(desc(chatMembers.lastUse));
+
+    if (memberRows.length === 0) {
+        return [];
+    }
+
+    const candidateChatIds = memberRows.map((row) => row.chatId);
+    const chatRows = await options.memory.db
+        .select({
+            id: chats.id,
+            info: chats.info,
+        })
+        .from(chats)
+        .where(inArray(chats.id, candidateChatIds));
+
+    if (chatRows.length === 0) {
+        return [];
+    }
+
+    const chatMap = new Map(chatRows.map((row) => [row.id, row]));
+    const seen = new Set<number>();
+    const filtered = await Promise.all(memberRows.map(async ({ chatId }) => {
+        if (seen.has(chatId)) {
+            return undefined;
+        }
+        seen.add(chatId);
+
+        const chat = chatMap.get(chatId);
+        if (!chat) {
+            return undefined;
+        }
+
+        if (chatId === userId) {
+            return readChatSummary(chatId, chat.info);
+        }
+
+        try {
+            const member = await options.bot.api.getChatMember(chatId, userId);
+            const isAdmin = member.status === 'creator' ||
+                member.status === 'administrator';
+            if (!isAdmin) {
+                return undefined;
+            }
+        } catch {
+            // Unknown membership/admin state: keep chat in list.
+        }
+
+        return readChatSummary(chatId, chat.info);
+    }));
+
+    return filtered.filter((chat): chat is AvailableChat => Boolean(chat));
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -155,6 +255,9 @@ export function startWebServer(options: StartWebServerOptions) {
                     userId,
                 );
                 const canViewGlobal = canEditGlobal;
+                const availableChats = userId
+                    ? await resolveAvailableChats(options, userId)
+                    : [];
                 const serializedGlobalConfig = JSON.parse(
                     serializeUserConfig(globalConfig),
                 ) as UserConfig;
@@ -214,6 +317,7 @@ export function startWebServer(options: StartWebServerOptions) {
                     canViewGlobal,
                     canEditGlobal,
                     canEditChat,
+                    availableChats,
                     globalPayload,
                     chatOverridePayload,
                     effectiveConfigPayload,

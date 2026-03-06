@@ -1,6 +1,7 @@
 import { initData } from "@tma.js/sdk-svelte";
 import { fetchBootstrap, saveChatConfig, saveGlobalConfig } from "./api";
 import {
+  type AvailableChat,
   type BootstrapResponse,
   buildChatPayload,
   buildGlobalPayload,
@@ -48,6 +49,7 @@ export class ConfigController {
   role = $state<ConfigRole>("viewer");
   categories = $state<string[]>([]);
   availableModels = $state<string[]>([]);
+  availableChats = $state<AvailableChat[]>([]);
 
   globalConfig = $state(defaultGlobalConfig());
   globalText = $state<GlobalFormText>({
@@ -119,6 +121,17 @@ export class ConfigController {
     this.role = data.role;
     this.categories = data.categories ?? [];
     this.availableModels = data.availableModels ?? [];
+    this.availableChats = data.availableChats ?? [];
+
+    const currentChatId = this.chatId.trim();
+    const hasCurrentChat = this.availableChats.some((chat) =>
+      String(chat.id) === currentChatId
+    );
+    if (!hasCurrentChat) {
+      this.chatId = this.availableChats.length > 0
+        ? String(this.availableChats[0].id)
+        : "";
+    }
 
     this.globalConfig = fromUnknownGlobal(data.globalPayload);
     this.globalText = globalTextFromConfig(this.globalConfig);
@@ -176,7 +189,8 @@ export class ConfigController {
     this.#clearRetryTimer();
     this.status = "Loading...";
 
-    const result = await fetchBootstrap(this.chatId, rawInitData);
+    const requestedChatId = this.chatId.trim();
+    const result = await fetchBootstrap(requestedChatId, rawInitData);
     if (!result.ok || !result.data) {
       this.status = result.error ?? "Failed to load";
       return false;
@@ -184,6 +198,24 @@ export class ConfigController {
 
     this.bootstrap = result.data;
     this.#hydrateForms(result.data);
+
+    const selectedChatId = this.chatId.trim();
+    if (selectedChatId && selectedChatId !== requestedChatId) {
+      const selectedResult = await fetchBootstrap(selectedChatId, rawInitData);
+      if (!selectedResult.ok || !selectedResult.data) {
+        this.status = selectedResult.error ?? "Failed to load";
+        return false;
+      }
+
+      this.bootstrap = selectedResult.data;
+      this.#hydrateForms(selectedResult.data);
+    }
+
+    if (this.scope === "chat" && this.availableChats.length === 0) {
+      this.status = "No available chats for configuration";
+      return false;
+    }
+
     this.status = "Loaded";
     return true;
   }
