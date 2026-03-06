@@ -29,6 +29,13 @@
             "when": 1772710200000,
             "tag": "0003_enable_wal",
             "breakpoints": true
+        },
+        {
+            "idx": 4,
+            "version": "7",
+            "when": 1772809200000,
+            "tag": "0004_fix_messages_to_pass",
+            "breakpoints": true
         }
     ]
 }
