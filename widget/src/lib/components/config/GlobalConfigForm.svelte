@@ -1,141 +1,560 @@
 <script lang="ts">
-    import { Button } from '$lib/components/ui/button';
-    import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
-    import { Input } from '$lib/components/ui/input';
-    import { Label } from '$lib/components/ui/label';
-    import { Switch } from '$lib/components/ui/switch';
-    import { Textarea } from '$lib/components/ui/textarea';
+    import SettingInputField from '$lib/components/config/fields/SettingInputField.svelte';
+    import SettingMatcherListField from '$lib/components/config/fields/SettingMatcherListField.svelte';
+    import SettingSelectField from '$lib/components/config/fields/SettingSelectField.svelte';
+    import SettingStringListField from '$lib/components/config/fields/SettingStringListField.svelte';
+    import SettingTextareaField from '$lib/components/config/fields/SettingTextareaField.svelte';
+    import SettingToggleField from '$lib/components/config/fields/SettingToggleField.svelte';
+    import { createSectionMatcher } from '$lib/components/config/search';
     import type { GlobalFormText, UserConfigPayload } from '$lib/config/model';
 
     interface Props {
         config: UserConfigPayload;
         text: GlobalFormText;
         availableModels: string[];
-        canSave: boolean;
-        onSave: () => void;
+        searchQuery: string;
     }
 
-    let { config = $bindable(), text = $bindable(), availableModels = [], canSave, onSave }: Props = $props();
+    let {
+        config = $bindable(),
+        text = $bindable(),
+        availableModels = [],
+        searchQuery = '',
+    }: Props = $props();
+
+    let sectionMatcher = $derived(createSectionMatcher(searchQuery));
+    let hasSearch = $derived(sectionMatcher.hasSearch);
+
+    const matchesSection = (...terms: string[]): boolean => sectionMatcher.matchesSection(...terms);
+
+    const matchesBlockItem = (section: string, ...terms: string[]): boolean =>
+        sectionMatcher.matchesBlockItem(section, ...terms);
+
+    let showGeneral = $derived(
+        matchesSection(
+            'general',
+            'start message',
+            'file retention',
+            'reply tendency',
+            'ignore tendency',
+            'random reply chance',
+            'response delay',
+            'bot names',
+            'reply trigger patterns',
+            'ignore trigger patterns',
+            'nepon replies',
+        ),
+    );
+    let showModel = $derived(
+        matchesSection(
+            'model',
+            'primary model',
+            'notes model',
+            'memory model',
+            'temperature',
+            'top-k',
+            'top-p',
+        ),
+    );
+    let showPrompts = $derived(
+        matchesSection(
+            'prompts',
+            'system preface prompt',
+            'primary chat prompt',
+            'low-context chat prompt',
+            'low-context preface prompt',
+            'private chat prompt addition',
+            'group chat prompt addition',
+            'comment prompt addition',
+            'hate mode prompt',
+            'final prompt wrapper',
+            'low-context final wrapper',
+            'notes extraction prompt',
+            'memory prompt',
+            'memory repeat prompt',
+        ),
+    );
+    let showAdvanced = $derived(
+        matchesSection(
+            'advanced',
+            'max notes to store',
+            'max messages to store',
+            'recent messages for notes',
+            'recent messages for memory',
+            'messages passed to ai',
+            'max output tokens',
+            'thinking budget',
+            'reasoning max tokens',
+            'notes update frequency',
+            'memory update frequency',
+            'max reply length',
+            'attachment byte limit',
+            'use json responses',
+            'include attachments in history',
+        ),
+    );
+    let showAdmin = $derived(
+        matchesSection(
+            'admin',
+            'admin user ids',
+            'trusted user ids',
+            'allowed model names',
+            'model selector',
+        ),
+    );
+    let hasMatches = $derived(
+        showGeneral || showModel || showPrompts || showAdvanced || showAdmin,
+    );
 </script>
 
-<Card>
-    <CardHeader>
-        <CardTitle>Global Config</CardTitle>
-        <CardDescription>Admin-only settings and internal prompts.</CardDescription>
-    </CardHeader>
-    <CardContent class="space-y-4">
-        <details open class="quick-details rounded-md border p-3">
-            <summary class="cursor-pointer font-medium">General</summary>
-            <div class="mt-4 space-y-6">
-                <div class="grid gap-3 md:grid-cols-2">
-                    <div class="space-y-2"><Label for="g-start-message">startMessage</Label><Input id="g-start-message" bind:value={config.startMessage} /></div>
-                    <div class="space-y-2"><Label for="g-files-max-age">filesMaxAge</Label><Input id="g-files-max-age" type="number" bind:value={config.filesMaxAge} /></div>
-                    <div class="space-y-2"><Label for="g-tend-reply-prob">tendToReplyProbability</Label><Input id="g-tend-reply-prob" type="number" bind:value={config.tendToReplyProbability} /></div>
-                    <div class="space-y-2"><Label for="g-tend-ignore-prob">tendToIgnoreProbability</Label><Input id="g-tend-ignore-prob" type="number" bind:value={config.tendToIgnoreProbability} /></div>
-                    <div class="space-y-2"><Label for="g-random-reply-prob">randomReplyProbability</Label><Input id="g-random-reply-prob" type="number" bind:value={config.randomReplyProbability} /></div>
-                    <div class="space-y-2"><Label for="g-response-delay">responseDelay</Label><Input id="g-response-delay" type="number" bind:value={config.responseDelay} /></div>
-                </div>
+<section class="config-form space-y-6">
+    <header class="space-y-1 pb-4">
+        <h2 class="text-lg font-semibold">Global Config</h2>
+        <p class="text-sm text-muted-foreground">Admin-only settings and internal prompts.</p>
+    </header>
 
-                <div class="grid gap-3 md:grid-cols-2">
-                    <div class="space-y-2"><Label for="g-names">names (one per line, /regex/flags)</Label><Textarea id="g-names" rows={5} bind:value={text.names} /></div>
-                    <div class="space-y-2"><Label for="g-tend-reply">tendToReply (one per line, /regex/flags)</Label><Textarea id="g-tend-reply" rows={5} bind:value={text.tendToReply} /></div>
-                    <div class="space-y-2"><Label for="g-tend-ignore">tendToIgnore (one per line, /regex/flags)</Label><Textarea id="g-tend-ignore" rows={5} bind:value={text.tendToIgnore} /></div>
-                    <div class="space-y-2"><Label for="g-nepons">nepons (one per line)</Label><Textarea id="g-nepons" rows={5} bind:value={text.nepons} /></div>
-                </div>
-            </div>
-        </details>
+    <div class="space-y-5">
+        {#if hasSearch && !hasMatches}
+            <p class="text-sm text-muted-foreground">No global settings match "{searchQuery.trim()}".</p>
+        {/if}
 
-        <details class="quick-details rounded-md border p-3">
-            <summary class="cursor-pointer font-medium">Model</summary>
-            <div class="mt-4 grid gap-3 md:grid-cols-2">
-                <div class="space-y-2">
-                    <Label for="g-ai-model">ai.model</Label>
-                    <select
+        {#if showGeneral}
+            <details open class="quick-details border-t pt-4">
+                <summary class="cursor-pointer font-medium">General</summary>
+                <div class="mt-4 space-y-6">
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <SettingInputField
+                            id="g-start-message"
+                            label="Start message"
+                            description="Shown when someone starts the bot."
+                            hidden={!matchesBlockItem('general', 'start message')}
+                            bind:value={config.startMessage}
+                        />
+                        <SettingInputField
+                            id="g-files-max-age"
+                            type="number"
+                            label="File retention (hours)"
+                            description="How long uploaded files remain available."
+                            hidden={!matchesBlockItem('general', 'file retention', 'files max age')}
+                            bind:value={config.filesMaxAge}
+                        />
+                        <SettingInputField
+                            id="g-tend-reply-prob"
+                            type="number"
+                            label="Reply tendency (%)"
+                            description="Chance to answer when a match is in tend-to-reply."
+                            hidden={!matchesBlockItem('general', 'reply tendency', 'tend to reply probability')}
+                            bind:value={config.tendToReplyProbability}
+                        />
+                        <SettingInputField
+                            id="g-tend-ignore-prob"
+                            type="number"
+                            label="Ignore tendency (%)"
+                            description="Chance to stay silent when a match is in tend-to-ignore."
+                            hidden={!matchesBlockItem('general', 'ignore tendency', 'tend to ignore probability')}
+                            bind:value={config.tendToIgnoreProbability}
+                        />
+                        <SettingInputField
+                            id="g-random-reply-prob"
+                            type="number"
+                            label="Random reply chance (%)"
+                            description="Fallback probability to reply with no explicit match."
+                            hidden={!matchesBlockItem('general', 'random reply chance', 'random reply probability')}
+                            bind:value={config.randomReplyProbability}
+                        />
+                        <SettingInputField
+                            id="g-response-delay"
+                            type="number"
+                            label="Response delay (seconds)"
+                            description="Wait time before sending a reply."
+                            hidden={!matchesBlockItem('general', 'response delay')}
+                            bind:value={config.responseDelay}
+                        />
+                    </div>
+
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <SettingMatcherListField
+                            id="g-names"
+                            label="Bot names"
+                            description="One name or regex per line; used for mention matching."
+                            hidden={!matchesBlockItem('general', 'bot names', 'names')}
+                            bind:value={text.names}
+                        />
+                        <SettingMatcherListField
+                            id="g-tend-reply"
+                            label="Reply trigger patterns"
+                            description="One pattern per line; supports /regex/flags."
+                            hidden={!matchesBlockItem('general', 'reply trigger patterns', 'tend to reply')}
+                            bind:value={text.tendToReply}
+                        />
+                        <SettingMatcherListField
+                            id="g-tend-ignore"
+                            label="Ignore trigger patterns"
+                            description="One pattern per line; supports /regex/flags."
+                            hidden={!matchesBlockItem('general', 'ignore trigger patterns', 'tend to ignore')}
+                            bind:value={text.tendToIgnore}
+                        />
+                        <SettingStringListField
+                            id="g-nepons"
+                            label="Nepon replies"
+                            description="Add, reorder, and remove canned fallback messages."
+                            itemPlaceholder="Fallback reply"
+                            addLabel="Add reply"
+                            hidden={!matchesBlockItem('general', 'nepon replies', 'nepons')}
+                            bind:value={text.nepons}
+                        />
+                    </div>
+                </div>
+            </details>
+        {/if}
+
+        {#if showModel}
+            <details class="quick-details border-t pt-4" open={hasSearch}>
+                <summary class="cursor-pointer font-medium">Model</summary>
+                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                    <SettingSelectField
                         id="g-ai-model"
-                        class="h-10 w-full rounded-md border bg-transparent px-3 text-sm"
+                        label="Primary model"
+                        description="Main model used for chat responses."
+                        options={availableModels}
+                        hidden={!matchesBlockItem('model', 'primary model', 'ai model')}
                         bind:value={config.ai.model}
-                    >
-                        {#each availableModels as model (model)}
-                            <option value={model}>{model}</option>
-                        {/each}
-                    </select>
-                </div>
-                <div class="space-y-2">
-                    <Label for="g-ai-notes-model">ai.notesModel</Label>
-                    <select
+                    />
+                    <SettingSelectField
                         id="g-ai-notes-model"
-                        class="h-10 w-full rounded-md border bg-transparent px-3 text-sm"
+                        label="Notes model"
+                        description="Model used for note extraction and updates."
+                        options={availableModels}
+                        hidden={!matchesBlockItem('model', 'notes model')}
                         bind:value={config.ai.notesModel}
-                    >
-                        {#each availableModels as model (model)}
-                            <option value={model}>{model}</option>
-                        {/each}
-                    </select>
-                </div>
-                <div class="space-y-2">
-                    <Label for="g-ai-memory-model">ai.memoryModel</Label>
-                    <select
+                    />
+                    <SettingSelectField
                         id="g-ai-memory-model"
-                        class="h-10 w-full rounded-md border bg-transparent px-3 text-sm"
+                        label="Memory model"
+                        description="Model used for memory summarization tasks."
+                        options={availableModels}
+                        hidden={!matchesBlockItem('model', 'memory model')}
                         bind:value={config.ai.memoryModel}
-                    >
-                        {#each availableModels as model (model)}
-                            <option value={model}>{model}</option>
-                        {/each}
-                    </select>
+                    />
+                    <SettingInputField
+                        id="g-ai-temp"
+                        type="number"
+                        label="Temperature"
+                        description="Higher values increase randomness."
+                        hidden={!matchesBlockItem('model', 'temperature')}
+                        bind:value={config.ai.temperature}
+                    />
+                    <SettingInputField
+                        id="g-ai-topk"
+                        type="number"
+                        label="Top-K"
+                        description="Limits token choices to the top K candidates."
+                        hidden={!matchesBlockItem('model', 'top-k', 'topk')}
+                        bind:value={config.ai.topK}
+                    />
+                    <SettingInputField
+                        id="g-ai-topp"
+                        type="number"
+                        label="Top-P"
+                        description="Uses nucleus sampling with cumulative probability P."
+                        hidden={!matchesBlockItem('model', 'top-p', 'topp')}
+                        bind:value={config.ai.topP}
+                    />
                 </div>
-                <div class="space-y-2"><Label for="g-ai-temp">ai.temperature</Label><Input id="g-ai-temp" type="number" bind:value={config.ai.temperature} /></div>
-                <div class="space-y-2"><Label for="g-ai-topk">ai.topK</Label><Input id="g-ai-topk" type="number" bind:value={config.ai.topK} /></div>
-                <div class="space-y-2"><Label for="g-ai-topp">ai.topP</Label><Input id="g-ai-topp" type="number" bind:value={config.ai.topP} /></div>
-            </div>
-        </details>
+            </details>
+        {/if}
 
-        <details class="quick-details rounded-md border p-3">
-            <summary class="cursor-pointer font-medium">Prompts</summary>
-            <div class="mt-4 grid gap-3 md:grid-cols-2">
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-preprompt">ai.prePrompt</Label><Textarea id="g-ai-preprompt" rows={4} bind:value={config.ai.prePrompt} /></div>
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-prompt">ai.prompt</Label><Textarea id="g-ai-prompt" rows={4} bind:value={config.ai.prompt} /></div>
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-dumb-prompt">ai.dumbPrompt</Label><Textarea id="g-ai-dumb-prompt" rows={3} bind:value={config.ai.dumbPrompt} /></div>
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-dumb-preprompt">ai.dumbPrePrompt</Label><Textarea id="g-ai-dumb-preprompt" rows={3} bind:value={config.ai.dumbPrePrompt} /></div>
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-private-addition">ai.privateChatPromptAddition</Label><Textarea id="g-ai-private-addition" rows={3} bind:value={config.ai.privateChatPromptAddition} /></div>
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-group-addition">ai.groupChatPromptAddition</Label><Textarea id="g-ai-group-addition" rows={3} bind:value={config.ai.groupChatPromptAddition} /></div>
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-comments-addition">ai.commentsPromptAddition</Label><Textarea id="g-ai-comments-addition" rows={3} bind:value={config.ai.commentsPromptAddition} /></div>
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-hate-prompt">ai.hateModePrompt</Label><Textarea id="g-ai-hate-prompt" rows={3} bind:value={config.ai.hateModePrompt} /></div>
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-final-prompt">ai.finalPrompt</Label><Textarea id="g-ai-final-prompt" rows={4} bind:value={config.ai.finalPrompt} /></div>
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-dumb-final">ai.dumbFinalPrompt</Label><Textarea id="g-ai-dumb-final" rows={3} bind:value={config.ai.dumbFinalPrompt} /></div>
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-notes-prompt">ai.notesPrompt</Label><Textarea id="g-ai-notes-prompt" rows={4} bind:value={config.ai.notesPrompt} /></div>
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-memory-prompt">ai.memoryPrompt</Label><Textarea id="g-ai-memory-prompt" rows={4} bind:value={config.ai.memoryPrompt} /></div>
-                <div class="space-y-2 md:col-span-2"><Label for="g-ai-memory-repeat">ai.memoryPromptRepeat</Label><Textarea id="g-ai-memory-repeat" rows={4} bind:value={config.ai.memoryPromptRepeat} /></div>
-            </div>
-        </details>
+        {#if showPrompts}
+            <details class="quick-details border-t pt-4" open={hasSearch}>
+                <summary class="cursor-pointer font-medium">Prompts</summary>
+                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                    <SettingTextareaField
+                        id="g-ai-preprompt"
+                        rows={4}
+                        containerClass="md:col-span-2"
+                        label="System preface prompt"
+                        description="Prepended context before the main prompt."
+                        hidden={!matchesBlockItem('prompts', 'system preface prompt', 'preprompt')}
+                        bind:value={config.ai.prePrompt}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-prompt"
+                        rows={4}
+                        containerClass="md:col-span-2"
+                        label="Primary chat prompt"
+                        description="Core behavior and persona instructions."
+                        hidden={!matchesBlockItem('prompts', 'primary chat prompt')}
+                        bind:value={config.ai.prompt}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-dumb-prompt"
+                        rows={3}
+                        containerClass="md:col-span-2"
+                        label="Low-context chat prompt"
+                        description="Used when running the simplified response mode."
+                        hidden={!matchesBlockItem('prompts', 'low-context chat prompt', 'dumb prompt')}
+                        bind:value={config.ai.dumbPrompt}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-dumb-preprompt"
+                        rows={3}
+                        containerClass="md:col-span-2"
+                        label="Low-context preface prompt"
+                        description="Preface used with the low-context prompt."
+                        hidden={!matchesBlockItem('prompts', 'low-context preface prompt', 'dumb preprompt')}
+                        bind:value={config.ai.dumbPrePrompt}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-private-addition"
+                        rows={3}
+                        containerClass="md:col-span-2"
+                        label="Private chat prompt addition"
+                        description="Extra instructions for private chats only."
+                        hidden={!matchesBlockItem('prompts', 'private chat prompt addition')}
+                        bind:value={config.ai.privateChatPromptAddition}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-group-addition"
+                        rows={3}
+                        containerClass="md:col-span-2"
+                        label="Group chat prompt addition"
+                        description="Extra instructions for group chats only."
+                        hidden={!matchesBlockItem('prompts', 'group chat prompt addition')}
+                        bind:value={config.ai.groupChatPromptAddition}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-comments-addition"
+                        rows={3}
+                        containerClass="md:col-span-2"
+                        label="Comment prompt addition"
+                        description="Extra guidance when replying to comment-style messages."
+                        hidden={!matchesBlockItem('prompts', 'comment prompt addition', 'comments prompt addition')}
+                        bind:value={config.ai.commentsPromptAddition}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-hate-prompt"
+                        rows={3}
+                        containerClass="md:col-span-2"
+                        label="Hate mode prompt"
+                        description="Special prompt used when hate mode is enabled."
+                        hidden={!matchesBlockItem('prompts', 'hate mode prompt')}
+                        bind:value={config.ai.hateModePrompt}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-final-prompt"
+                        rows={4}
+                        containerClass="md:col-span-2"
+                        label="Final prompt wrapper"
+                        description="Last instruction template before model generation."
+                        hidden={!matchesBlockItem('prompts', 'final prompt wrapper', 'final prompt')}
+                        bind:value={config.ai.finalPrompt}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-dumb-final"
+                        rows={3}
+                        containerClass="md:col-span-2"
+                        label="Low-context final wrapper"
+                        description="Final wrapper used in low-context mode."
+                        hidden={!matchesBlockItem('prompts', 'low-context final wrapper', 'dumb final prompt')}
+                        bind:value={config.ai.dumbFinalPrompt}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-notes-prompt"
+                        rows={4}
+                        containerClass="md:col-span-2"
+                        label="Notes extraction prompt"
+                        description="Template for generating structured notes."
+                        hidden={!matchesBlockItem('prompts', 'notes extraction prompt', 'notes prompt')}
+                        bind:value={config.ai.notesPrompt}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-memory-prompt"
+                        rows={4}
+                        containerClass="md:col-span-2"
+                        label="Memory prompt"
+                        description="Template for creating memory summaries."
+                        hidden={!matchesBlockItem('prompts', 'memory prompt')}
+                        bind:value={config.ai.memoryPrompt}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-memory-repeat"
+                        rows={4}
+                        containerClass="md:col-span-2"
+                        label="Memory repeat prompt"
+                        description="Template used when refreshing existing memory."
+                        hidden={!matchesBlockItem('prompts', 'memory repeat prompt')}
+                        bind:value={config.ai.memoryPromptRepeat}
+                    />
+                </div>
+            </details>
+        {/if}
 
-        <details class="quick-details rounded-md border p-3">
-            <summary class="cursor-pointer font-medium">Advanced</summary>
-            <div class="mt-4 grid gap-3 md:grid-cols-2">
-                <div class="space-y-2"><Label for="g-max-notes">maxNotesToStore</Label><Input id="g-max-notes" type="number" bind:value={config.maxNotesToStore} /></div>
-                <div class="space-y-2"><Label for="g-max-messages">maxMessagesToStore</Label><Input id="g-max-messages" type="number" bind:value={config.maxMessagesToStore} /></div>
-                <div class="space-y-2"><Label for="g-chat-last-notes">chatLastUseNotes</Label><Input id="g-chat-last-notes" type="number" bind:value={config.chatLastUseNotes} /></div>
-                <div class="space-y-2"><Label for="g-chat-last-memory">chatLastUseMemory</Label><Input id="g-chat-last-memory" type="number" bind:value={config.chatLastUseMemory} /></div>
-                <div class="space-y-2"><Label for="g-ai-msgs">ai.messagesToPass</Label><Input id="g-ai-msgs" type="number" bind:value={config.ai.messagesToPass} /></div>
-                <div class="space-y-2"><Label for="g-ai-notes-freq">ai.notesFrequency</Label><Input id="g-ai-notes-freq" type="number" bind:value={config.ai.notesFrequency} /></div>
-                <div class="space-y-2"><Label for="g-ai-memory-freq">ai.memoryFrequency</Label><Input id="g-ai-memory-freq" type="number" bind:value={config.ai.memoryFrequency} /></div>
-                <div class="space-y-2"><Label for="g-ai-max-len">ai.messageMaxLength</Label><Input id="g-ai-max-len" type="number" bind:value={config.ai.messageMaxLength} /></div>
-                <div class="space-y-2"><Label for="g-ai-bytes">ai.bytesLimit</Label><Input id="g-ai-bytes" type="number" bind:value={config.ai.bytesLimit} /></div>
-                <div class="flex items-center justify-between rounded-md border p-3"><Label for="g-ai-json">ai.useJsonResponses</Label><Switch id="g-ai-json" bind:checked={config.ai.useJsonResponses} /></div>
-                <div class="flex items-center justify-between rounded-md border p-3"><Label for="g-ai-attachments">ai.includeAttachmentsInHistory</Label><Switch id="g-ai-attachments" bind:checked={config.ai.includeAttachmentsInHistory} /></div>
-            </div>
-        </details>
+        {#if showAdvanced}
+            <details class="quick-details border-t pt-4" open={hasSearch}>
+                <summary class="cursor-pointer font-medium">Advanced</summary>
+                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                    <SettingInputField
+                        id="g-max-notes"
+                        type="number"
+                        label="Max notes to store"
+                        description="Upper limit for saved notes per chat."
+                        hidden={!matchesBlockItem('advanced', 'max notes to store')}
+                        bind:value={config.maxNotesToStore}
+                    />
+                    <SettingInputField
+                        id="g-max-messages"
+                        type="number"
+                        label="Max messages to store"
+                        description="Conversation history cap kept in storage."
+                        hidden={!matchesBlockItem('advanced', 'max messages to store')}
+                        bind:value={config.maxMessagesToStore}
+                    />
+                    <SettingInputField
+                        id="g-chat-last-notes"
+                        type="number"
+                        label="Recent messages for notes"
+                        description="How many latest messages feed note updates."
+                        hidden={!matchesBlockItem('advanced', 'recent messages for notes', 'chat last use notes')}
+                        bind:value={config.chatLastUseNotes}
+                    />
+                    <SettingInputField
+                        id="g-chat-last-memory"
+                        type="number"
+                        label="Recent messages for memory"
+                        description="How many latest messages feed memory updates."
+                        hidden={!matchesBlockItem('advanced', 'recent messages for memory', 'chat last use memory')}
+                        bind:value={config.chatLastUseMemory}
+                    />
+                    <SettingInputField
+                        id="g-ai-msgs"
+                        type="number"
+                        label="Messages passed to AI"
+                        description="Number of recent messages sent to the model."
+                        hidden={!matchesBlockItem('advanced', 'messages passed to ai')}
+                        bind:value={config.ai.messagesToPass}
+                    />
+                    <SettingInputField
+                        id="g-ai-max-output-tokens"
+                        type="number"
+                        label="Max output tokens"
+                        description="Hard cap for generated tokens in chat responses."
+                        hidden={!matchesBlockItem('advanced', 'max output tokens')}
+                        bind:value={config.ai.generation.chat.maxOutputTokens}
+                    />
+                    <SettingInputField
+                        id="g-ai-thinking-budget"
+                        type="number"
+                        label="Thinking budget"
+                        description="Google thinking token budget for chat generation."
+                        hidden={!matchesBlockItem('advanced', 'thinking budget')}
+                        bind:value={config.ai.generation.chat.thinking.thinkingBudget}
+                    />
+                    <SettingInputField
+                        id="g-ai-reasoning-max-tokens"
+                        type="number"
+                        label="Reasoning max tokens"
+                        description="OpenRouter reasoning token budget for chat generation."
+                        hidden={!matchesBlockItem('advanced', 'reasoning max tokens', 'openrouter reasoning max tokens')}
+                        bind:value={config.ai.generation.chat.openrouterReasoning.maxTokens}
+                    />
+                    <SettingInputField
+                        id="g-ai-notes-freq"
+                        type="number"
+                        label="Notes update frequency"
+                        description="Message interval between notes updates."
+                        hidden={!matchesBlockItem('advanced', 'notes update frequency')}
+                        bind:value={config.ai.notesFrequency}
+                    />
+                    <SettingInputField
+                        id="g-ai-memory-freq"
+                        type="number"
+                        label="Memory update frequency"
+                        description="Message interval between memory updates."
+                        hidden={!matchesBlockItem('advanced', 'memory update frequency')}
+                        bind:value={config.ai.memoryFrequency}
+                    />
+                    <SettingInputField
+                        id="g-ai-max-len"
+                        type="number"
+                        label="Max reply length (chars)"
+                        description="Soft limit for generated response length."
+                        hidden={!matchesBlockItem('advanced', 'max reply length', 'message max length')}
+                        bind:value={config.ai.messageMaxLength}
+                    />
+                    <SettingInputField
+                        id="g-ai-bytes"
+                        type="number"
+                        label="Attachment byte limit"
+                        description="Maximum attachment size included in processing."
+                        hidden={!matchesBlockItem('advanced', 'attachment byte limit', 'bytes limit')}
+                        bind:value={config.ai.bytesLimit}
+                    />
+                    <SettingToggleField
+                        id="g-ai-json"
+                        label="Use JSON responses"
+                        description="Request structured JSON output from the model."
+                        hidden={!matchesBlockItem('advanced', 'use json responses')}
+                        bind:checked={config.ai.useJsonResponses}
+                    />
+                    <SettingToggleField
+                        id="g-ai-attachments"
+                        label="Include attachments in history"
+                        description="Adds attachment text to model context when possible."
+                        hidden={!matchesBlockItem('advanced', 'include attachments in history')}
+                        bind:checked={config.ai.includeAttachmentsInHistory}
+                    />
+                </div>
+            </details>
+        {/if}
 
-        <details class="quick-details rounded-md border p-3">
-            <summary class="cursor-pointer font-medium">Admin</summary>
-            <div class="mt-4 space-y-3">
-                <div class="space-y-2"><Label for="g-admin-ids">adminIds (one number per line)</Label><Textarea id="g-admin-ids" rows={4} bind:value={text.adminIds} /></div>
-                <div class="space-y-2"><Label for="g-trusted-ids">trustedIds (one number per line)</Label><Textarea id="g-trusted-ids" rows={4} bind:value={text.trustedIds} /></div>
-                <div class="space-y-2"><Label for="g-available-models">availableModels (one per line)</Label><Textarea id="g-available-models" rows={4} bind:value={text.availableModels} /></div>
-                <p class="text-xs text-muted-foreground">Trusted model selector currently has {availableModels.length} options.</p>
-            </div>
-        </details>
+        {#if showAdmin}
+            <details class="quick-details border-t pt-4" open={hasSearch}>
+                <summary class="cursor-pointer font-medium">Admin</summary>
+                <div class="mt-4 space-y-3">
+                    <SettingStringListField
+                        id="g-admin-ids"
+                        label="Admin user IDs"
+                        description="Telegram numeric IDs with admin access."
+                        itemPlaceholder="123456789"
+                        addLabel="Add admin"
+                        numericOnly
+                        allowDuplicates={false}
+                        hidden={!matchesBlockItem('admin', 'admin user ids', 'admin ids')}
+                        bind:value={text.adminIds}
+                    />
+                    <SettingStringListField
+                        id="g-trusted-ids"
+                        label="Trusted user IDs"
+                        description="Telegram numeric IDs with trusted access."
+                        itemPlaceholder="123456789"
+                        addLabel="Add trusted"
+                        numericOnly
+                        allowDuplicates={false}
+                        hidden={!matchesBlockItem('admin', 'trusted user ids', 'trusted ids')}
+                        bind:value={text.trustedIds}
+                    />
+                    <SettingStringListField
+                        id="g-available-models"
+                        label="Allowed model names"
+                        description="Allow-list used by model selectors."
+                        itemPlaceholder="provider/model-id"
+                        addLabel="Add model"
+                        suggestions={availableModels}
+                        allowDuplicates={false}
+                        hidden={!matchesBlockItem('admin', 'allowed model names', 'available models')}
+                        bind:value={text.availableModels}
+                    />
+                    <p class="text-xs text-muted-foreground" hidden={!matchesBlockItem('admin', 'model selector')}>Trusted model selector currently has {availableModels.length} options.</p>
+                </div>
+            </details>
+        {/if}
 
-        <Button onclick={onSave} disabled={!canSave}>Save global</Button>
-    </CardContent>
-</Card>
+    </div>
+</section>
+
+<style>
+    :global(.config-form details.quick-details[open] > div) {
+        max-height: none;
+        overflow: visible;
+    }
+</style>

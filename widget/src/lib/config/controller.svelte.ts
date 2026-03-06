@@ -79,6 +79,8 @@ export class ConfigController {
   });
 
   #retryTimer: ReturnType<typeof setTimeout> | undefined;
+  #loadRequestVersion = 0;
+  #bootstrapAbortController: AbortController | undefined;
 
   constructor() {
     const params = initialSearchParams();
@@ -118,6 +120,8 @@ export class ConfigController {
 
   dispose(): void {
     this.#clearRetryTimer();
+    this.#bootstrapAbortController?.abort();
+    this.#bootstrapAbortController = undefined;
   }
 
   #hydrateForms(data: BootstrapResponse): void {
@@ -139,7 +143,10 @@ export class ConfigController {
     this.globalConfig = fromUnknownGlobal(data.globalPayload);
     this.globalText = globalTextFromConfig(this.globalConfig);
 
-    const baseConfig = fromUnknownGlobal(data.effectiveConfigPayload);
+    const effectiveConfig = fromUnknownGlobal(data.effectiveConfigPayload);
+    const baseConfig = data.globalPayload === undefined
+      ? effectiveConfig
+      : this.globalConfig;
     this.chatBaseConfig = fromUnknownChatOverride({}, baseConfig);
     this.chatOverrideConfig = fromUnknownChatOverride(
       data.chatOverridePayload,
@@ -181,8 +188,16 @@ export class ConfigController {
   }
 
   async loadBootstrap(): Promise<boolean> {
+    const requestVersion = ++this.#loadRequestVersion;
+    this.#bootstrapAbortController?.abort();
+    this.#bootstrapAbortController = new AbortController();
+
     const rawInitData = this.ensureInitDataRaw();
     if (!rawInitData) {
+      if (requestVersion !== this.#loadRequestVersion) {
+        return false;
+      }
+
       this.status = "Waiting for Telegram init data...";
       this.#scheduleRetry();
       return false;
@@ -194,7 +209,15 @@ export class ConfigController {
     this.status = "Loading...";
 
     const requestedChatId = this.chatId.trim();
-    const result = await fetchBootstrap(requestedChatId, rawInitData);
+    const result = await fetchBootstrap(
+      requestedChatId,
+      rawInitData,
+      this.#bootstrapAbortController.signal,
+    );
+    if (requestVersion !== this.#loadRequestVersion) {
+      return false;
+    }
+
     if (!result.ok || !result.data) {
       this.status = result.error ?? "Failed to load";
       return false;
@@ -205,7 +228,15 @@ export class ConfigController {
 
     const selectedChatId = this.chatId.trim();
     if (selectedChatId && selectedChatId !== requestedChatId) {
-      const selectedResult = await fetchBootstrap(selectedChatId, rawInitData);
+      const selectedResult = await fetchBootstrap(
+        selectedChatId,
+        rawInitData,
+        this.#bootstrapAbortController.signal,
+      );
+      if (requestVersion !== this.#loadRequestVersion) {
+        return false;
+      }
+
       if (!selectedResult.ok || !selectedResult.data) {
         this.status = selectedResult.error ?? "Failed to load";
         return false;
@@ -220,13 +251,13 @@ export class ConfigController {
       return false;
     }
 
-    this.status = "Loaded";
+    this.status = "";
     return true;
   }
 
   async saveGlobal(): Promise<boolean> {
-    if (!this.canViewGlobal) {
-      this.status = "Global config is available only for admins";
+    if (!this.canSaveGlobal) {
+      this.status = "Global config is read-only for your role";
       return false;
     }
 

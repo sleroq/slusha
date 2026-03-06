@@ -1,17 +1,23 @@
 import { Bot } from 'grammy';
-import { Config } from '../config.ts';
+import { UserConfig } from '../config.ts';
 import { SlushaContext } from '../telegram/setup-bot.ts';
 
 export type ConfigRole = 'viewer' | 'regular' | 'trusted' | 'admin';
 
-export function resolveConfigRole(config: Config, userId?: number): ConfigRole {
+export function resolveConfigRole(
+    config: UserConfig,
+    userId?: number,
+): ConfigRole {
     if (!userId) return 'viewer';
     if (config.adminIds?.includes(userId)) return 'admin';
     if (config.trustedIds?.includes(userId)) return 'trusted';
     return 'regular';
 }
 
-export function canEditGlobalConfig(config: Config, userId?: number): boolean {
+export function canEditGlobalConfig(
+    config: UserConfig,
+    userId?: number,
+): boolean {
     return resolveConfigRole(config, userId) === 'admin';
 }
 

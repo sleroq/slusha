@@ -40,6 +40,27 @@ export interface SerializedRegex {
 
 export type Matcher = string | SerializedRegex;
 
+export interface GoogleSafetySetting {
+  category: string;
+  threshold: string;
+}
+
+export interface GoogleThinkingConfig {
+  thinkingLevel?: "minimal" | "low" | "medium" | "high";
+  thinkingBudget?: number;
+  includeThoughts?: boolean;
+}
+
+export interface OpenRouterReasoningConfig {
+  maxTokens?: number;
+}
+
+export interface GenerationTaskConfig {
+  thinking: GoogleThinkingConfig;
+  openrouterReasoning: OpenRouterReasoningConfig;
+  maxOutputTokens?: number;
+}
+
 export interface AiPayload {
   model: string;
   notesModel?: string;
@@ -67,6 +88,19 @@ export interface AiPayload {
   messageMaxLength: number;
   includeAttachmentsInHistory: boolean;
   bytesLimit: number;
+  google: {
+    safetySettings: GoogleSafetySetting[];
+    structuredOutputs: boolean;
+  };
+  openrouter: {
+    usageInclude: boolean;
+  };
+  generation: {
+    chat: GenerationTaskConfig;
+    notes: GenerationTaskConfig;
+    memory: GenerationTaskConfig;
+    character: GenerationTaskConfig;
+  };
 }
 
 export interface ChatEditableAiPayload {
@@ -118,6 +152,71 @@ export interface ChatOverridePayload {
   randomReplyProbability?: number;
   nepons?: string[];
   responseDelay?: number;
+}
+
+function normalizeThinkingConfig(value: unknown): GoogleThinkingConfig {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const obj = value as Partial<GoogleThinkingConfig>;
+  return {
+    thinkingLevel: obj.thinkingLevel,
+    thinkingBudget: obj.thinkingBudget,
+    includeThoughts: obj.includeThoughts,
+  };
+}
+
+function normalizeOpenRouterReasoningConfig(
+  value: unknown,
+): OpenRouterReasoningConfig {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const obj = value as Partial<OpenRouterReasoningConfig>;
+  return {
+    maxTokens: obj.maxTokens,
+  };
+}
+
+function normalizeGenerationTaskConfig(
+  value: unknown,
+  base: GenerationTaskConfig,
+): GenerationTaskConfig {
+  if (!value || typeof value !== "object") {
+    return {
+      ...base,
+      thinking: {},
+      openrouterReasoning: {},
+    };
+  }
+
+  const obj = value as Partial<GenerationTaskConfig>;
+  return {
+    ...base,
+    ...obj,
+    thinking: normalizeThinkingConfig(obj.thinking),
+    openrouterReasoning: normalizeOpenRouterReasoningConfig(
+      obj.openrouterReasoning,
+    ),
+  };
+}
+
+function normalizeGenerationConfig(
+  value: unknown,
+  base: AiPayload["generation"],
+): AiPayload["generation"] {
+  const obj = value && typeof value === "object"
+    ? (value as Partial<AiPayload["generation"]>)
+    : {};
+
+  return {
+    chat: normalizeGenerationTaskConfig(obj.chat, base.chat),
+    notes: normalizeGenerationTaskConfig(obj.notes, base.notes),
+    memory: normalizeGenerationTaskConfig(obj.memory, base.memory),
+    character: normalizeGenerationTaskConfig(obj.character, base.character),
+  };
 }
 
 export interface ResolvedChatOverridePayload {
@@ -177,6 +276,43 @@ export function defaultAiConfig(): AiPayload {
     messageMaxLength: 4096,
     includeAttachmentsInHistory: true,
     bytesLimit: 20 * 1024 * 1024,
+    google: {
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        {
+          category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          threshold: "BLOCK_NONE",
+        },
+        {
+          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+          threshold: "BLOCK_NONE",
+        },
+      ],
+      structuredOutputs: true,
+    },
+    openrouter: {
+      usageInclude: false,
+    },
+    generation: {
+      chat: {
+        maxOutputTokens: 512,
+        thinking: {},
+        openrouterReasoning: {},
+      },
+      notes: {
+        thinking: {},
+        openrouterReasoning: {},
+      },
+      memory: {
+        thinking: {},
+        openrouterReasoning: {},
+      },
+      character: {
+        thinking: {},
+        openrouterReasoning: {},
+      },
+    },
   };
 }
 
@@ -328,6 +464,7 @@ export function fromUnknownGlobal(payload: unknown): UserConfigPayload {
   const ai = obj.ai && typeof obj.ai === "object"
     ? (obj.ai as Partial<AiPayload>)
     : {};
+  const generation = normalizeGenerationConfig(ai.generation, base.ai.generation);
 
   return {
     ...base,
@@ -335,6 +472,7 @@ export function fromUnknownGlobal(payload: unknown): UserConfigPayload {
     ai: {
       ...base.ai,
       ...ai,
+      generation,
     },
     names: Array.isArray(obj.names) ? obj.names : [],
     tendToReply: Array.isArray(obj.tendToReply) ? obj.tendToReply : [],
@@ -560,4 +698,61 @@ export function buildChatPayload(
   }
 
   return payload;
+}
+
+export function collectChatOverridePaths(payload: ChatOverridePayload): string[] {
+  const paths: string[] = [];
+
+  if (payload.names) paths.push("names");
+  if (payload.tendToReply) paths.push("tendToReply");
+  if (payload.tendToReplyProbability !== undefined) {
+    paths.push("tendToReplyProbability");
+  }
+  if (payload.tendToIgnore) paths.push("tendToIgnore");
+  if (payload.tendToIgnoreProbability !== undefined) {
+    paths.push("tendToIgnoreProbability");
+  }
+  if (payload.randomReplyProbability !== undefined) {
+    paths.push("randomReplyProbability");
+  }
+  if (payload.nepons) paths.push("nepons");
+  if (payload.responseDelay !== undefined) paths.push("responseDelay");
+
+  if (!payload.ai) {
+    return paths;
+  }
+
+  if (payload.ai.model !== undefined) paths.push("ai.model");
+  if (payload.ai.temperature !== undefined) paths.push("ai.temperature");
+  if (payload.ai.topK !== undefined) paths.push("ai.topK");
+  if (payload.ai.topP !== undefined) paths.push("ai.topP");
+  if (payload.ai.prompt !== undefined) paths.push("ai.prompt");
+  if (payload.ai.dumbPrompt !== undefined) paths.push("ai.dumbPrompt");
+  if (payload.ai.privateChatPromptAddition !== undefined) {
+    paths.push("ai.privateChatPromptAddition");
+  }
+  if (payload.ai.groupChatPromptAddition !== undefined) {
+    paths.push("ai.groupChatPromptAddition");
+  }
+  if (payload.ai.commentsPromptAddition !== undefined) {
+    paths.push("ai.commentsPromptAddition");
+  }
+  if (payload.ai.hateModePrompt !== undefined) {
+    paths.push("ai.hateModePrompt");
+  }
+  if (payload.ai.useJsonResponses !== undefined) {
+    paths.push("ai.useJsonResponses");
+  }
+  if (payload.ai.messagesToPass !== undefined) {
+    paths.push("ai.messagesToPass");
+  }
+  if (payload.ai.messageMaxLength !== undefined) {
+    paths.push("ai.messageMaxLength");
+  }
+  if (payload.ai.includeAttachmentsInHistory !== undefined) {
+    paths.push("ai.includeAttachmentsInHistory");
+  }
+  if (payload.ai.bytesLimit !== undefined) paths.push("ai.bytesLimit");
+
+  return paths;
 }

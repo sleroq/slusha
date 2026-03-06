@@ -3,7 +3,6 @@ import { desc, eq, inArray } from 'drizzle-orm';
 import { Bot } from 'grammy';
 import type { Chat as TgChat } from 'grammy_types';
 import {
-    Config,
     getGlobalUserConfig,
     mergeWithChatOverride,
     parseChatOverridePayload,
@@ -32,8 +31,7 @@ import { type BotCharacter, ChatMemory, Memory } from '../memory.ts';
 import { chatMembers, chats } from '../db/schema.ts';
 
 interface RuntimeConfigAccess {
-    get: () => Config;
-    applyUserConfig: (value: UserConfig) => void;
+    getBotToken: () => string;
 }
 
 interface StartWebServerOptions {
@@ -265,11 +263,11 @@ export function startWebServer(options: StartWebServerOptions) {
             const initData = pickInitData(req);
             const verified = await verifyTelegramInitData(
                 initData,
-                options.runtimeConfig.get().botToken,
+                options.runtimeConfig.getBotToken(),
             );
             const userId = verified.user?.id;
-            const runtimeConfig = options.runtimeConfig.get();
-            const role = resolveConfigRole(runtimeConfig, userId);
+            const globalConfig = await getGlobalUserConfig(options.memory.db);
+            const role = resolveConfigRole(globalConfig, userId);
 
             if (
                 url.pathname === '/api/config/bootstrap' && req.method === 'GET'
@@ -277,11 +275,8 @@ export function startWebServer(options: StartWebServerOptions) {
                 const chatIdRaw = url.searchParams.get('chatId');
                 const chatId = chatIdRaw ? Number(chatIdRaw) : undefined;
 
-                const globalConfig = await getGlobalUserConfig(
-                    options.memory.db,
-                );
                 const canEditGlobal = canEditGlobalConfig(
-                    runtimeConfig,
+                    globalConfig,
                     userId,
                 );
                 const canViewGlobal = canEditGlobal;
@@ -361,7 +356,7 @@ export function startWebServer(options: StartWebServerOptions) {
             }
 
             if (url.pathname === '/api/config/global' && req.method === 'PUT') {
-                if (!canEditGlobalConfig(runtimeConfig, userId)) {
+                if (!canEditGlobalConfig(globalConfig, userId)) {
                     return jsonResponse({ error: 'Forbidden' }, 403);
                 }
 
@@ -373,12 +368,11 @@ export function startWebServer(options: StartWebServerOptions) {
                 const parsed = parseUserConfigPayload(
                     JSON.stringify(body.payload),
                 );
-                const saved = await setGlobalUserConfig(
+                await setGlobalUserConfig(
                     parsed,
                     userId,
                     options.memory.db,
                 );
-                options.runtimeConfig.applyUserConfig(saved);
 
                 return jsonResponse({ ok: true });
             }
