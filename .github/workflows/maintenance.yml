@@ -1,0 +1,50 @@
+name: Maintenance (Dependencies)
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: maintenance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependency-updates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Update root dependencies
+        run: deno outdated --update --latest
+
+      - name: Update widget dependencies
+        run: deno outdated --config widget/deno.json --update --latest
+
+      - name: Refresh lockfiles
+        run: deno cache --allow-import main.ts && deno cache --config widget/deno.json widget/src/main.ts
+
+      - name: Create update PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/weekly-dependency-updates
+          delete-branch: true
+          commit-message: 'chore: weekly dependency updates'
+          title: 'chore: weekly dependency updates'
+          body: |
+            Automated dependency refresh for root and widget Deno configs.
+          add-paths: |
+            deno.json
+            deno.lock
+            widget/deno.json
+            widget/deno.lock
