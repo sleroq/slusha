@@ -163,12 +163,12 @@ export class ConfigController {
     return initData.raw();
   }
 
-  async loadBootstrap(): Promise<void> {
+  async loadBootstrap(): Promise<boolean> {
     const rawInitData = this.ensureInitDataRaw();
     if (!rawInitData) {
       this.status = "Waiting for Telegram init data...";
       this.#scheduleRetry();
-      return;
+      return false;
     }
 
     this.userId = parseUserIdFromInitData(rawInitData);
@@ -179,24 +179,25 @@ export class ConfigController {
     const result = await fetchBootstrap(this.chatId, rawInitData);
     if (!result.ok || !result.data) {
       this.status = result.error ?? "Failed to load";
-      return;
+      return false;
     }
 
     this.bootstrap = result.data;
     this.#hydrateForms(result.data);
     this.status = "Loaded";
+    return true;
   }
 
-  async saveGlobal(): Promise<void> {
+  async saveGlobal(): Promise<boolean> {
     if (!this.canViewGlobal) {
       this.status = "Global config is available only for admins";
-      return;
+      return false;
     }
 
     const rawInitData = this.ensureInitDataRaw();
     if (!rawInitData) {
       this.status = "Missing Telegram init data";
-      return;
+      return false;
     }
 
     this.status = "Saving global config...";
@@ -205,19 +206,20 @@ export class ConfigController {
     this.status = result.ok
       ? "Global config saved"
       : (result.error ?? "Failed to save global config");
+    return result.ok;
   }
 
-  async saveChat(): Promise<void> {
+  async saveChat(): Promise<boolean> {
     const chatId = this.chatId.trim();
     if (!chatId) {
       this.status = "Chat ID is required";
-      return;
+      return false;
     }
 
     const rawInitData = this.ensureInitDataRaw();
     if (!rawInitData) {
       this.status = "Missing Telegram init data";
-      return;
+      return false;
     }
 
     this.status = "Saving chat override...";
@@ -230,6 +232,7 @@ export class ConfigController {
     this.status = result.ok
       ? "Chat override saved"
       : (result.error ?? "Failed to save chat override");
+    return result.ok;
   }
 }
 

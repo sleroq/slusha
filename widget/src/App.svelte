@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { hapticFeedback } from '@tma.js/sdk';
     import { init } from '@tma.js/sdk-svelte';
     import { onDestroy, onMount } from 'svelte';
     import ChatOverrideForm from '$lib/components/config/ChatOverrideForm.svelte';
@@ -7,6 +8,58 @@
     import { createConfigController } from '$lib/config/controller.svelte';
 
     const controller = createConfigController();
+
+    const hapticsSupported = () => hapticFeedback.isSupported();
+
+    const notifySuccess = () => {
+        if (!hapticsSupported()) {
+            return;
+        }
+
+        hapticFeedback.notificationOccurred('success');
+    };
+
+    const notifyError = () => {
+        if (!hapticsSupported()) {
+            return;
+        }
+
+        hapticFeedback.notificationOccurred('error');
+    };
+
+    const minorImpact = () => {
+        if (!hapticsSupported()) {
+            return;
+        }
+
+        hapticFeedback.impactOccurred('light');
+    };
+
+    const notifyFromResult = (ok: boolean) => {
+        if (ok) {
+            notifySuccess();
+            return;
+        }
+
+        notifyError();
+    };
+
+    const saveGlobalWithFeedback = async () => {
+        const ok = await controller.saveGlobal();
+        notifyFromResult(ok);
+    };
+
+    const saveChatWithFeedback = async () => {
+        const ok = await controller.saveChat();
+        notifyFromResult(ok);
+    };
+
+    const reloadWithFeedback = async () => {
+        minorImpact();
+
+        const ok = await controller.loadBootstrap();
+        notifyFromResult(ok);
+    };
 
     onMount(() => {
         init();
@@ -26,7 +79,7 @@
         canViewGlobal={controller.canViewGlobal}
         role={controller.role}
         categories={controller.categories}
-        onReload={() => controller.loadBootstrap()}
+        onReload={reloadWithFeedback}
     />
 
     {#if controller.scope === 'global' && controller.canViewGlobal}
@@ -35,7 +88,7 @@
             bind:text={controller.globalText}
             availableModels={controller.availableModels}
             canSave={controller.canSaveGlobal}
-            onSave={() => controller.saveGlobal()}
+            onSave={saveGlobalWithFeedback}
         />
     {:else}
         <ChatOverrideForm
@@ -44,7 +97,7 @@
             availableModels={controller.availableModels}
             canConfigureTrustedSettings={controller.canConfigureTrustedSettings}
             canSave={controller.canSaveChat}
-            onSave={() => controller.saveChat()}
+            onSave={saveChatWithFeedback}
         />
     {/if}
 </main>
