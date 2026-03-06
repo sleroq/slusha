@@ -14,6 +14,9 @@ export const chatEntrySchema = z.object({
 });
 
 export const chatResponseSchema = z.array(chatEntrySchema);
+export const chatActionsToolInputSchema = z.object({
+    entries: chatResponseSchema,
+});
 
 export type ChatEntry = z.infer<typeof chatEntrySchema>;
 export type TextEntry = ChatEntry & { text: string };

@@ -4,14 +4,16 @@ import logger from '../../logger.ts';
 import {
     APICallError,
     generateText,
+    hasToolCall,
     ModelMessage,
-    Output,
+    tool,
 } from 'ai';
 import { makeHistoryV2 } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
 import { ReplyTo } from '../../memory.ts';
 import {
+    chatActionsToolInputSchema,
     chatResponseSchema,
     ChatEntry,
     isReactEntry,
@@ -22,20 +24,6 @@ import { isMissingSendTextRightsError } from '../reply-rights.ts';
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { parseModelRef } from '../../ai/model-ref.ts';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
-
-function isNoObjectGeneratedError(
-    error: unknown,
-): error is Error & { text?: string } {
-    return error instanceof Error &&
-        (error.name === 'AI_NoObjectGeneratedError' ||
-            error.name === 'NoObjectGeneratedError');
-}
-
-function isNoOutputGeneratedError(error: unknown): error is Error {
-    return error instanceof Error &&
-        (error.name === 'AI_NoOutputGeneratedError' ||
-            error.name === 'NoOutputGeneratedError');
-}
 
 function truncateForLog(text: string, maxLength = 4000): string {
     if (text.length <= maxLength) {
@@ -100,6 +88,12 @@ function buildLanguageProtocol(defaultLocale: string): string {
 }
 
 export default function registerAI(bot: Bot<SlushaContext>) {
+    const sendChatActionsTool = tool({
+        description:
+            'Return all Telegram actions in one call: text messages and optional reactions/reply targets.',
+        inputSchema: chatActionsToolInputSchema,
+    });
+
     bot.on('message', async (ctx) => {
         const messages: ModelMessage[] = [];
         const chatState = await ctx.m.getChat();
@@ -299,8 +293,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         };
 
         let output: ChatEntry[];
-        let structuredOutputRecovery: 'none' | 'recovered_raw' |
-            'fallback_plain_text' = 'none';
+        let structuredOutputRecovery: 'none' | 'fallback_plain_text' = 'none';
         try {
             if (useJsonResponses) {
                 const generationPolicy = resolveGenerationPolicy({
@@ -313,111 +306,71 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     .providerOptions as Parameters<
                         typeof generateText
                     >[0]['providerOptions'];
-                try {
-                    const result = await generateText({
-                        model: generationPolicy.model,
-                        providerOptions,
-                        output: Output.object({
-                            schema: chatResponseSchema,
+                const result = await generateText({
+                    model: generationPolicy.model,
+                    providerOptions,
+                    tools: {
+                        send_chat_actions: sendChatActionsTool,
+                    },
+                    toolChoice: {
+                        type: 'tool',
+                        toolName: 'send_chat_actions',
+                    },
+                    stopWhen: hasToolCall('send_chat_actions'),
+                    temperature: effectiveConfig.ai.temperature,
+                    topK: effectiveConfig.ai.topK,
+                    topP: effectiveConfig.ai.topP,
+                    maxOutputTokens: generationPolicy.maxOutputTokens,
+                    messages,
+                    experimental_telemetry: {
+                        isEnabled: true,
+                        functionId: 'user-message',
+                        metadata: buildGenerationTelemetryMetadata({
+                            sessionId: ctx.chat.id.toString(),
+                            userId: ctx.chat.type === 'private'
+                                ? ctx.from?.id.toString()
+                                : '',
+                            tags,
+                            temperature: effectiveConfig.ai.temperature,
+                            topK: effectiveConfig.ai.topK,
+                            topP: effectiveConfig.ai.topP,
+                            policy: generationPolicy,
                         }),
-                        temperature: effectiveConfig.ai.temperature,
-                        topK: effectiveConfig.ai.topK,
-                        topP: effectiveConfig.ai.topP,
-                        maxOutputTokens: generationPolicy.maxOutputTokens,
-                        messages,
-                        experimental_telemetry: {
-                            isEnabled: true,
-                            functionId: 'user-message',
-                            metadata: buildGenerationTelemetryMetadata({
-                                sessionId: ctx.chat.id.toString(),
-                                userId: ctx.chat.type === 'private'
-                                    ? ctx.from?.id.toString()
-                                    : '',
-                                tags,
-                                temperature: effectiveConfig.ai.temperature,
-                                topK: effectiveConfig.ai.topK,
-                                topP: effectiveConfig.ai.topP,
-                                policy: generationPolicy,
-                            }),
+                    },
+                });
+
+                const chatActionsToolCall = result.toolCalls.find((call) =>
+                    call.toolName === 'send_chat_actions'
+                );
+                const parsedToolCallInput = chatActionsToolCall
+                    ? chatActionsToolInputSchema.safeParse(chatActionsToolCall.input)
+                    : undefined;
+
+                if (parsedToolCallInput?.success) {
+                    output = parsedToolCallInput.data.entries;
+                } else {
+                    structuredOutputRecovery = 'fallback_plain_text';
+                    logger.warn(
+                        'Structured tool call missing or invalid; retrying in plain text mode',
+                        {
+                            modelRef,
+                            chatId: ctx.chat.id,
+                            finishReason: result.finishReason,
+                            rawText: truncateForLog(result.text),
+                            toolCalls: result.toolCalls.map((call) => ({
+                                toolName: call.toolName,
+                                input: truncateForLog(
+                                    JSON.stringify(call.input) ?? '',
+                                ),
+                            })),
+                            steps: result.steps.map((step) => ({
+                                finishReason: step.finishReason,
+                                text: truncateForLog(step.text),
+                            })),
+                            usage: result.totalUsage,
                         },
-                    });
-                    try {
-                        output = result.output;
-                    } catch (error) {
-                        if (isNoOutputGeneratedError(error)) {
-                            logger.warn(
-                                'Structured output missing; logging raw model response',
-                                {
-                                    modelRef,
-                                    chatId: ctx.chat.id,
-                                    finishReason: result.finishReason,
-                                    rawText: truncateForLog(result.text),
-                                    steps: result.steps.map((step) => ({
-                                        finishReason: step.finishReason,
-                                        text: truncateForLog(step.text),
-                                    })),
-                                    usage: result.totalUsage,
-                                },
-                            );
-
-                            const recoveredOutput = tryRecoverChatOutput(
-                                result.text,
-                            );
-                            if (recoveredOutput) {
-                                structuredOutputRecovery = 'recovered_raw';
-                                logger.warn(
-                                    'Structured output missing; recovered from raw model text',
-                                    {
-                                        modelRef,
-                                        chatId: ctx.chat.id,
-                                    },
-                                );
-                                output = recoveredOutput;
-                            } else {
-                                structuredOutputRecovery =
-                                    'fallback_plain_text';
-                                logger.warn(
-                                    'Structured output missing; retrying in plain text mode',
-                                    {
-                                        modelRef,
-                                        chatId: ctx.chat.id,
-                                    },
-                                );
-                                output = await generatePlainTextOutput();
-                            }
-                        } else {
-                            throw error;
-                        }
-                    }
-                } catch (error) {
-                    if (!isNoObjectGeneratedError(error)) {
-                        throw error;
-                    }
-
-                    const recoveredOutput = tryRecoverChatOutput(
-                        error.text ?? '',
                     );
-                    if (recoveredOutput) {
-                        structuredOutputRecovery = 'recovered_raw';
-                        logger.warn(
-                            'Structured output schema mismatch; recovered from raw model text',
-                            {
-                                modelRef,
-                                chatId: ctx.chat.id,
-                            },
-                        );
-                        output = recoveredOutput;
-                    } else {
-                        structuredOutputRecovery = 'fallback_plain_text';
-                        logger.warn(
-                            'Structured output schema mismatch; retrying in plain text mode',
-                            {
-                                modelRef,
-                                chatId: ctx.chat.id,
-                            },
-                        );
-                        output = await generatePlainTextOutput();
-                    }
+                    output = await generatePlainTextOutput();
                 }
             } else {
                 output = await generatePlainTextOutput();
