@@ -319,9 +319,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     functionId: 'user-message-dumb',
                     metadata: buildGenerationTelemetryMetadata({
                         sessionId: ctx.chat.id.toString(),
-                        userId: ctx.chat.type === 'private'
-                            ? ctx.from?.id.toString()
-                            : '',
+                        userId: ctx.from?.id.toString() ?? '',
                         tags,
                         temperature: effectiveConfig.ai.temperature,
                         topK: effectiveConfig.ai.topK,
@@ -380,9 +378,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                         functionId: 'user-message',
                         metadata: buildGenerationTelemetryMetadata({
                             sessionId: ctx.chat.id.toString(),
-                            userId: ctx.chat.type === 'private'
-                                ? ctx.from?.id.toString()
-                                : '',
+                            userId: ctx.from?.id.toString() ?? '',
                             tags,
                             temperature: effectiveConfig.ai.temperature,
                             topK: effectiveConfig.ai.topK,
@@ -446,12 +442,16 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 }
             }
 
+            const blockedByProviderMessage = character
+                ? 'API провайдер запрещает тебе отвечать. Возможно это из-за персонажа: '
+                : 'API провайдер запрещает тебе отвечать: ';
+
             if (blockReason === 'PROHIBITED_CONTENT') {
                 logger.warn(
                     'Could not get response: blocked by provider (PROHIBITED_CONTENT)',
                 );
                 return ctx.reply(
-                    'API провайдер запрещает тебе отвечать. Возможно это из-за персонажа: ' +
+                    blockedByProviderMessage +
                         blockReason,
                 );
             }
@@ -459,7 +459,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             logger.error('Could not get response: ', error);
             if (blockReason) {
                 return ctx.reply(
-                    'API провайдер запрещает тебе отвечать. Возможно это из-за персонажа: ' +
+                    blockedByProviderMessage +
                         blockReason,
                 );
             }
