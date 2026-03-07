@@ -1,95 +1,95 @@
 name: CI (PR)
 
 on:
-  pull_request:
+    pull_request:
 
 concurrency:
-  group: ci-pr-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: ci-pr-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      root: ${{ steps.filter.outputs.root }}
-      widget: ${{ steps.filter.outputs.widget }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+    changes:
+        runs-on: ubuntu-latest
+        outputs:
+            root: ${{ steps.filter.outputs.root }}
+            widget: ${{ steps.filter.outputs.widget }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
-      - name: Detect changed paths
-        id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            root:
-              - 'main.ts'
-              - 'lib/**'
-              - 'scripts/**'
-              - 'drizzle/**'
-              - 'locales/**'
-              - 'deno.json'
-              - 'deno.lock'
-              - 'Dockerfile'
-            widget:
-              - 'widget/**'
+            - name: Detect changed paths
+              id: filter
+              uses: dorny/paths-filter@v3
+              with:
+                  filters: |
+                      root:
+                        - 'main.ts'
+                        - 'lib/**'
+                        - 'scripts/**'
+                        - 'drizzle/**'
+                        - 'locales/**'
+                        - 'deno.json'
+                        - 'deno.lock'
+                        - 'Dockerfile'
+                      widget:
+                        - 'widget/**'
 
-  root-checks:
-    name: Root checks
-    runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.root == 'true'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+    root-checks:
+        name: Root checks
+        runs-on: ubuntu-latest
+        needs: changes
+        if: needs.changes.outputs.root == 'true'
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
+            - name: Setup Deno
+              uses: denoland/setup-deno@v2
+              with:
+                  deno-version: v2.x
 
-      - name: Typecheck
-        run: deno check --allow-import main.ts
+            - name: Typecheck
+              run: deno check --allow-import main.ts
 
-      - name: Lint
-        run: deno lint
+            - name: Lint
+              run: deno lint
 
-      - name: Test
-        env:
-          AI_TOKEN: test
-        run: deno test -A
+            - name: Test
+              env:
+                  AI_TOKEN: test
+              run: deno test -A
 
-  widget-checks:
-    name: Widget checks
-    runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.widget == 'true'
-    defaults:
-      run:
-        working-directory: widget
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+    widget-checks:
+        name: Widget checks
+        runs-on: ubuntu-latest
+        needs: changes
+        if: needs.changes.outputs.widget == 'true'
+        defaults:
+            run:
+                working-directory: widget
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
+            - name: Setup Deno
+              uses: denoland/setup-deno@v2
+              with:
+                  deno-version: v2.x
 
-      - name: Typecheck
-        run: deno task check
+            - name: Typecheck
+              run: deno task check
 
-      - name: Lint
-        run: deno task lint
+            - name: Lint
+              run: deno task lint
 
-      - name: Build
-        run: deno task build
+            - name: Build
+              run: deno task build

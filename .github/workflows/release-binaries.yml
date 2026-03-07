@@ -1,34 +1,35 @@
 name: Release (Binaries)
 
 on:
-  push:
-    tags:
-      - 'v*'
+    push:
+        tags:
+            - 'v*'
+            - '[0-9]+.[0-9]+.[0-9]+'
 
 concurrency:
-  group: release-binaries-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: release-binaries-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 permissions:
-  contents: write
+    contents: write
 
 jobs:
-  build-and-release:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    build-and-release:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
+            - name: Setup Deno
+              uses: denoland/setup-deno@v2
+              with:
+                  deno-version: v2.x
 
-      - name: Build binaries
-        run: mkdir -p out && bash scripts/build.bash
+            - name: Build binaries
+              run: mkdir -p out && bash scripts/build.bash
 
-      - name: Publish release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: out/slusha.*
-          generate_release_notes: true
+            - name: Publish release assets
+              uses: softprops/action-gh-release@v2
+              with:
+                  files: out/slusha.*
+                  generate_release_notes: true
