@@ -242,10 +242,22 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         const messages: ModelMessage[] = [];
         const chatState = await ctx.m.getChat();
         const effectiveConfig = await ctx.m.getEffectiveConfig();
+        const savedHistory = await ctx.m.getHistory();
 
         const useJsonResponses = effectiveConfig.ai.useJsonResponses;
         const enabledReactions = resolveEnabledReactions(
             effectiveConfig.blacklistedReactions,
+        );
+
+        const messagesToPass = chatState.messagesToPass ??
+            effectiveConfig.ai.messagesToPass;
+        const maxTargetCount = Math.min(
+            Math.max(messagesToPass * 2, 12),
+            40,
+        );
+        const targetRefs = buildTargetRefs(savedHistory, maxTargetCount);
+        const targetRefMap = new Map(
+            targetRefs.map((target) => [target.ref, target.messageId]),
         );
 
         let prompt = '';
@@ -259,8 +271,6 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             prompt = (effectiveConfig.ai.dumbPrePrompt ?? fallbackDumbPre) +
                 '\n\n';
         }
-        const savedHistory = await ctx.m.getHistory();
-
         // TODO: Improve this check
         const isComments = savedHistory.some((m) =>
             m.info.forward_origin?.type === 'channel' &&
@@ -337,6 +347,8 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 prompt +=
                     `\n\n### Reactions ###\n- Allowed reactions for this chat: ${enabledReactions.join(', ')}`;
             }
+
+            prompt += `\n\n${buildTargetRefsPrompt(targetRefs)}`;
         }
 
         messages.push({
@@ -344,8 +356,6 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             content: prompt,
         });
 
-        const messagesToPass = chatState.messagesToPass ??
-            effectiveConfig.ai.messagesToPass;
         const modelRef = chatState.chatModel ?? effectiveConfig.ai.model;
         const parsedModel = parseModelRef(modelRef);
 
@@ -376,20 +386,6 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         }
 
         messages.push(...history);
-
-        const maxTargetCount = Math.min(
-            Math.max(messagesToPass * 2, 12),
-            40,
-        );
-        const targetRefs = buildTargetRefs(savedHistory, maxTargetCount);
-        const targetRefMap = new Map(
-            targetRefs.map((target) => [target.ref, target.messageId]),
-        );
-
-        messages.push({
-            role: 'system',
-            content: buildTargetRefsPrompt(targetRefs),
-        });
 
         let finalPrompt = useJsonResponses
             ? effectiveConfig.ai.finalPrompt
