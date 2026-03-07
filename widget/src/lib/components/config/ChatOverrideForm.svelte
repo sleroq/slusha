@@ -2,6 +2,7 @@
     import SettingInputField from '$lib/components/config/fields/SettingInputField.svelte';
     import SettingMatcherListField from '$lib/components/config/fields/SettingMatcherListField.svelte';
     import SettingReadonlyField from '$lib/components/config/fields/SettingReadonlyField.svelte';
+    import SettingReactionBlacklistField from '$lib/components/config/fields/SettingReactionBlacklistField.svelte';
     import SettingSelectField from '$lib/components/config/fields/SettingSelectField.svelte';
     import SettingStringListField from '$lib/components/config/fields/SettingStringListField.svelte';
     import SettingTextareaField from '$lib/components/config/fields/SettingTextareaField.svelte';
@@ -301,14 +302,11 @@
                             hidden={!matchesBlockItem('general', 'ignore trigger patterns', 'tend to ignore')}
                             bind:value={text.tendToIgnore}
                         />
-                        <SettingStringListField
+                        <SettingReactionBlacklistField
                             id="c-blacklisted-reactions"
                             label="Blacklisted reactions"
-                            description="Fixed reaction list is used globally. Add reactions here to prevent bot reactions in this chat."
-                            itemPlaceholder="Reaction emoji"
-                            addLabel="Block reaction"
-                            suggestions={availableReactions}
-                            allowDuplicates={false}
+                            description="Select reactions to block in this chat. Unselected reactions stay allowed."
+                            reactions={availableReactions}
                             sourceState={{
                                 overridden: isOverridden('blacklistedReactions'),
                                 label: sourceStateText('blacklistedReactions'),
