@@ -118,6 +118,121 @@ function buildTargetRefsPrompt(targets: TargetRef[]): string {
     ].join('\n');
 }
 
+function annotateHistoryWithTargetRefs(
+    history: ModelMessage[],
+    targets: TargetRef[],
+): ModelMessage[] {
+    if (targets.length === 0) {
+        return history;
+    }
+
+    const refByMessageId = new Map(
+        targets.map((target) => [target.messageId, target.ref]),
+    );
+
+    const annotateText = (text: string): string => {
+        return text.replace(/^\[m(\d+)\]/, (full, id) => {
+            const ref = refByMessageId.get(Number(id));
+            return ref ? `[${ref}]${full}` : full;
+        });
+    };
+
+    return history.map((entry) => {
+        if (
+            entry.role !== 'system' &&
+            entry.role !== 'user' &&
+            entry.role !== 'assistant'
+        ) {
+            return entry;
+        }
+
+        if (typeof entry.content === 'string') {
+            const annotatedContent = annotateText(entry.content);
+
+            if (annotatedContent === entry.content) {
+                return entry;
+            }
+
+            return {
+                ...entry,
+                content: annotatedContent,
+            };
+        }
+
+        if (entry.role === 'system') {
+            return entry;
+        }
+
+        if (entry.role === 'user') {
+            if (!Array.isArray(entry.content)) {
+                return entry;
+            }
+
+            let hasChanges = false;
+            const annotatedParts = entry.content.map((part) => {
+                if (part.type !== 'text') {
+                    return part;
+                }
+
+                const annotatedText = annotateText(part.text);
+                if (annotatedText === part.text) {
+                    return part;
+                }
+
+                hasChanges = true;
+                return {
+                    ...part,
+                    text: annotatedText,
+                };
+            });
+
+            if (!hasChanges) {
+                return entry;
+            }
+
+            return {
+                ...entry,
+                content: annotatedParts,
+            };
+        }
+
+        if (entry.role === 'assistant') {
+            if (!Array.isArray(entry.content)) {
+                return entry;
+            }
+
+            let hasChanges = false;
+            const annotatedParts = entry.content.map((part) => {
+                if (part.type !== 'text') {
+                    return part;
+                }
+
+                const annotatedText = annotateText(part.text);
+                if (annotatedText === part.text) {
+                    return part;
+                }
+
+                hasChanges = true;
+                return {
+                    ...part,
+                    text: annotatedText,
+                };
+            });
+
+            if (!hasChanges) {
+                return entry;
+            }
+
+            return {
+                ...entry,
+                content: annotatedParts,
+            };
+        }
+
+        return entry;
+    });
+}
+
 function tryRecoverChatOutput(rawText: string): ChatEntry[] | undefined {
     const normalizedText = unwrapJsonCodeBlock(rawText);
     if (normalizedText.length === 0) {
@@ -385,7 +500,8 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             return;
         }
 
-        messages.push(...history);
+        const annotatedHistory = annotateHistoryWithTargetRefs(history, targetRefs);
+        messages.push(...annotatedHistory);
 
         let finalPrompt = useJsonResponses
             ? effectiveConfig.ai.finalPrompt
