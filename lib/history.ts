@@ -21,7 +21,12 @@ interface HistoryOptions {
     includeReactions?: boolean;
 }
 
-function resolveReplyThread(
+interface HistoryCandidate {
+    msg: ChatMessage;
+    rootIndex: number;
+}
+
+function collectReplyThread(
     history: ChatMessage[],
     msg: ChatMessage,
     thread: ChatMessage[] = [],
@@ -35,7 +40,7 @@ function resolveReplyThread(
 
     const replyToMsg = history.find((m) => m.id === replyTo.id);
     if (replyToMsg) {
-        return resolveReplyThread(history, replyToMsg, thread);
+        return collectReplyThread(history, replyToMsg, thread);
     } else {
         // For bot relies and stuff not saved in history
         thread.push({
@@ -48,6 +53,51 @@ function resolveReplyThread(
     }
 
     return thread;
+}
+
+export function selectHistoryCandidates(
+    history: ChatMessage[],
+    options: {
+        resolveReplyThread: boolean;
+        maxRootMessages?: number;
+    },
+): HistoryCandidate[] {
+    const selected: HistoryCandidate[] = [];
+    const seen = new Set<number>();
+    let rootMessagesProcessed = 0;
+
+    for (let i = history.length - 1; i >= 0; i--) {
+        if (
+            typeof options.maxRootMessages === 'number' &&
+            rootMessagesProcessed >= options.maxRootMessages
+        ) {
+            break;
+        }
+        rootMessagesProcessed += 1;
+
+        const rootMsg = history[i];
+        if (seen.has(rootMsg.id)) {
+            continue;
+        }
+
+        const thread = options.resolveReplyThread
+            ? collectReplyThread(history, rootMsg)
+            : [rootMsg];
+
+        for (const threadMsg of thread) {
+            if (seen.has(threadMsg.id)) {
+                continue;
+            }
+
+            selected.push({
+                msg: threadMsg,
+                rootIndex: i,
+            });
+            seen.add(threadMsg.id);
+        }
+    }
+
+    return selected;
 }
 
 type PrintType = (name: keyof Message, msg: Message) => string;
@@ -421,86 +471,72 @@ export async function makeHistoryV2(
     let totalBytes = 0;
     let totalAttachments = 0;
     const prompt: ModelMessage[] = [];
-    const addedMessages: number[] = [];
 
-    // Go through history in reverse order
-    // to easily add reply threads and attachments
-    // prioritizing latest messages
-    for (let i = history.length - 1; i >= 0; i--) {
-        const msg = history[i];
+    const candidates = selectHistoryCandidates(history, {
+        resolveReplyThread: resolveReplies,
+    });
+
+    for (const candidate of candidates) {
+        const msg = candidate.msg;
         let attachAttachments = options.attachments ?? true;
 
         // If message is too old, don't attach attachments
-        if (i < history.length - 10 || totalAttachments > 2) {
+        if (candidate.rootIndex < history.length - 10 || totalAttachments > 2) {
             attachAttachments = false;
         }
 
-        // Skip if message is added by reply thread
-        if (addedMessages.includes(msg.id)) {
+        let msgRes;
+
+        try {
+            msgRes = await constructMsg(
+                api,
+                botInfo,
+                msg,
+                {
+                    symbolLimit,
+                    attachments: attachAttachments,
+                    includeReactions: options.includeReactions,
+                },
+            );
+        } catch (error) {
+            logger.error(
+                'Could not construct replied message',
+                {
+                    error,
+                    messageId: msg.id,
+                    isMyself: msg.isMyself,
+                    hasText: Boolean(msg.text),
+                    textLength: msg.text?.length ?? 0,
+                    supportedFields: getSupportedContentFields(msg.info),
+                    unsupportedFields: getUnsupportedContentFields(
+                        msg.info,
+                    ),
+                },
+            );
             continue;
         }
 
-        // Add reply thread
-        const thread = resolveReplyThread(history, msg);
-        for (const msg of thread) {
-            let msgRes;
+        if (Array.isArray(msgRes.content)) {
+            const attachmentsPart = msgRes.content.find((m) =>
+                m.type === 'file' || m.type === 'image'
+            );
 
-            try {
-                msgRes = await constructMsg(
-                    api,
-                    botInfo,
-                    msg,
-                    {
-                        symbolLimit,
-                        attachments: attachAttachments,
-                        includeReactions: options.includeReactions,
-                    },
-                );
-            } catch (error) {
-                logger.error(
-                    'Could not construct replied message',
-                    {
-                        error,
-                        messageId: msg.id,
-                        isMyself: msg.isMyself,
-                        hasText: Boolean(msg.text),
-                        textLength: msg.text?.length ?? 0,
-                        supportedFields: getSupportedContentFields(msg.info),
-                        unsupportedFields: getUnsupportedContentFields(
-                            msg.info,
-                        ),
-                    },
-                );
-                continue;
-            }
-
-            if (Array.isArray(msgRes.content)) {
-                const attachmentsPart = msgRes.content.find((m) =>
-                    m.type === 'file' || m.type === 'image'
-                );
-
-                totalAttachments += attachmentsPart ? 1 : 0;
-            }
-
-            const size = JSON.stringify(msgRes).length;
-
-            if (totalBytes + size >= bytesLimit) {
-                // logger.info(
-                //     `Skipping old messages because prompt is too big ${size} (${
-                //         totalBytes + size
-                //     } > ${bytesLimit})`,
-                // );
-                break;
-            }
-
-            prompt.push(msgRes);
-            addedMessages.push(msg.id);
-            totalBytes += size;
-
-            if (!resolveReplies) {
-                break;
-            }
+            totalAttachments += attachmentsPart ? 1 : 0;
         }
+
+        const size = JSON.stringify(msgRes).length;
+
+        if (totalBytes + size >= bytesLimit) {
+            // logger.info(
+            //     `Skipping old messages because prompt is too big ${size} (${
+            //         totalBytes + size
+            //     } > ${bytesLimit})`,
+            // );
+            break;
+        }
+
+        prompt.push(msgRes);
+        totalBytes += size;
     }
 
     // Reverse messages to make them in chronological order
@@ -531,13 +567,13 @@ export async function makeNotesHistory(
     let totalBytes = 0;
     let textPart = '';
 
-    // Go through history in reverse order
-    for (let i = history.length - 1; i >= 0; i--) {
-        const msg = history[i];
+    const candidates = selectHistoryCandidates(history, {
+        resolveReplyThread: false,
+        maxRootMessages: messagesLimit,
+    });
 
-        if (i < history.length - messagesLimit) {
-            break;
-        }
+    for (const candidate of candidates) {
+        const msg = candidate.msg;
 
         let msgRes;
         try {
@@ -588,9 +624,7 @@ export async function makeNotesHistory(
 
         textPart += content;
 
-        if (i >= history.length - messagesLimit) {
-            textPart += '\n--- ---\n';
-        }
+        textPart += '\n--- ---\n';
 
         totalBytes += size;
     }
