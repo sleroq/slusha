@@ -345,10 +345,10 @@ export function createNameMatcher(names: Array<string | RegExp>) {
 export function formatReply(
     m:
         | ModelMessage
-        | ({ text: string; reply_to?: string; offset?: number } | {
+        | ({ type: 'reply'; text: string; target_ref?: string } | {
+            type: 'react';
             react: string;
-            reply_to?: string;
-            offset?: number;
+            target_ref?: string;
         })[],
     char?: BotCharacter,
 ) {
@@ -386,17 +386,10 @@ export function formatReply(
     text += content.map((c) => {
         let res = '';
 
-        if (!('type' in c)) {
-            if ('text' in c) {
-                res = `    ${c.text}`;
-            } else if ('react' in c) {
-                res = `    [react ${c.react}${
-                    c.reply_to ? ' -> ' + c.reply_to : ''
-                }${typeof c.offset === 'number' ? ' #' + c.offset : ''}]`;
-            } else {
-                res = '';
-            }
-        } else {
+        if (
+            'type' in c &&
+            (c.type === 'text' || c.type === 'image' || c.type === 'file')
+        ) {
             switch (c.type) {
                 case 'text':
                     res = c.text;
@@ -409,6 +402,14 @@ export function formatReply(
                     break;
                 default:
                     res = '';
+            }
+        } else {
+            if (c.type === 'reply') {
+                res = `    ${c.text}`;
+            } else if (c.type === 'react') {
+                res = `    [react ${c.react}${
+                    c.target_ref ? ' -> ' + c.target_ref : ''
+                }]`;
             }
         }
 

@@ -283,6 +283,18 @@ async function constructMsg(
 
     let prettyInputMessage = '';
 
+    const authorId = typeof msg.info.from?.id === 'number'
+        ? msg.info.from.id.toString()
+        : 'unknown';
+    const authorTag = user.username ?? firstName;
+    const replyTargetId = msg.replyTo?.id;
+
+    prettyInputMessage += `[m${msg.id}][u${authorId}:${authorTag}]`;
+    if (typeof replyTargetId === 'number') {
+        prettyInputMessage += `[reply_to:m${replyTargetId}]`;
+    }
+    prettyInputMessage += ' ';
+
     if (characterName && msg.isMyself) {
         prettyInputMessage += `${characterName}`;
         if (user.username) {
