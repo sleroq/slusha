@@ -89,7 +89,7 @@
     const saveScopeWithFeedback = async () => {
         if (controller.scope === 'global') {
             isSavingGlobal = true;
-            let ok = false;
+            let ok: boolean;
             try {
                 ok = await controller.saveGlobal();
             } finally {
@@ -106,7 +106,7 @@
         }
 
         isSavingChat = true;
-        let ok = false;
+        let ok: boolean;
         try {
             ok = await controller.saveChat();
             if (ok && controller.canEditChatInternals) {
@@ -128,7 +128,7 @@
         minorImpact();
 
         isReloading = true;
-        let ok = false;
+        let ok: boolean;
         try {
             ok = await controller.loadBootstrap();
         } finally {
