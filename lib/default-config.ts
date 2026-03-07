@@ -190,6 +190,7 @@ const defaultConfig = {
         /\/q.*/,
     ],
     tendToIgnoreProbability: 90,
+    blacklistedReactions: [],
     filesMaxAge: 72,
     adminIds: [
         308552322,

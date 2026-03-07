@@ -266,6 +266,7 @@
                                 bind:config={controller.chatOverrideConfig}
                                 bind:text={controller.chatText}
                                 availableModels={controller.availableModels}
+                                availableReactions={controller.availableReactions}
                                 currentCharacter={controller.currentCharacter}
                                 canConfigureTrustedSettings={controller.canConfigureTrustedSettings}
                                 overriddenFieldPaths={overriddenFieldPaths}

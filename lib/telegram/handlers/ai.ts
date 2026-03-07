@@ -19,7 +19,10 @@ import {
     isReactEntry,
     isTextEntry,
 } from '../../ai/schema.ts';
-import { ALLOWED_REACTIONS, canonicalizeReaction } from '../reactions.ts';
+import {
+    canonicalizeReaction,
+    resolveEnabledReactions,
+} from '../reactions.ts';
 import { isMissingSendTextRightsError } from '../reply-rights.ts';
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { parseModelRef } from '../../ai/model-ref.ts';
@@ -92,8 +95,7 @@ function buildLanguageProtocol(defaultLocale: string): string {
 export default function registerAI(bot: Bot<SlushaContext>) {
     const sendChatActionsTool = tool({
         description:
-            'Submit Telegram actions once per turn. Return an entries array where each entry has text and/or react, with optional reply_to (@username) and offset (0-based). Use Telegram markdown in text without headings. Prefer reply_to over @mentions in text. React only with allowed free Telegram reactions: ' +
-            ALLOWED_REACTIONS.join(', ') + '.',
+            'Submit Telegram actions once per turn. Return an entries array where each entry has text and/or react, with optional reply_to (@username) and offset (0-based). Use Telegram markdown in text without headings. Prefer reply_to over @mentions in text. React only with the reactions explicitly allowed in the system prompt.',
         inputSchema: chatActionsToolInputSchema,
         inputExamples: [
             {
@@ -153,6 +155,9 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         const effectiveConfig = await ctx.m.getEffectiveConfig();
 
         const useJsonResponses = effectiveConfig.ai.useJsonResponses;
+        const enabledReactions = resolveEnabledReactions(
+            effectiveConfig.blacklistedReactions,
+        );
 
         let prompt = '';
         if (useJsonResponses) {
@@ -234,6 +239,16 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         }
 
         prompt += `\n\n### Chat Info ###\n${chatInfoMsg}`;
+
+        if (useJsonResponses) {
+            if (enabledReactions.length === 0) {
+                prompt +=
+                    '\n\n### Reactions ###\n- Reactions are disabled for this chat. Do not output react actions.';
+            } else {
+                prompt +=
+                    `\n\n### Reactions ###\n- Allowed reactions for this chat: ${enabledReactions.join(', ')}`;
+            }
+        }
 
         messages.push({
             role: 'system',
@@ -527,7 +542,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 res.react.trim().length > 0
             ) {
                 const canon = canonicalizeReaction(res.react.trim());
-                if (canon) {
+                if (canon && enabledReactions.includes(canon)) {
                     const targetId = resolveTargetMessageId(
                         res.reply_to,
                         res.offset,
@@ -553,7 +568,8 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     }
                 } else {
                     logger.debug(
-                        'Reaction not allowed, dropping: ' + res.react,
+                        'Reaction blocked or not allowed, dropping: ' +
+                            res.react,
                     );
                 }
             }

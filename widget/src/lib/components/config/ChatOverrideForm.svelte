@@ -17,6 +17,7 @@
         config: ResolvedChatOverridePayload;
         text: ChatFormText;
         availableModels: string[];
+        availableReactions: string[];
         currentCharacter?: CurrentCharacterPayload;
         canConfigureTrustedSettings: boolean;
         overriddenFieldPaths: string[];
@@ -27,6 +28,7 @@
         config = $bindable(),
         text = $bindable(),
         availableModels = [],
+        availableReactions = [],
         currentCharacter,
         canConfigureTrustedSettings,
         overriddenFieldPaths = [],
@@ -63,6 +65,7 @@
             'bot names',
             'reply trigger patterns',
             'ignore trigger patterns',
+            'blacklisted reactions',
             'nepon replies',
         ),
     );
@@ -282,6 +285,21 @@
                             }}
                             hidden={!matchesBlockItem('general', 'ignore trigger patterns', 'tend to ignore')}
                             bind:value={text.tendToIgnore}
+                        />
+                        <SettingStringListField
+                            id="c-blacklisted-reactions"
+                            label="Blacklisted reactions"
+                            description="Fixed reaction list is used globally. Add reactions here to prevent bot reactions in this chat."
+                            itemPlaceholder="Reaction emoji"
+                            addLabel="Block reaction"
+                            suggestions={availableReactions}
+                            allowDuplicates={false}
+                            sourceState={{
+                                overridden: isOverridden('blacklistedReactions'),
+                                label: sourceStateText('blacklistedReactions'),
+                            }}
+                            hidden={!matchesBlockItem('general', 'blacklisted reactions', 'reactions')}
+                            bind:value={text.blacklistedReactions}
                         />
                         <SettingStringListField
                             id="c-nepons"

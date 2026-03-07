@@ -29,6 +29,7 @@ import { verifyTelegramInitData } from './auth.ts';
 import logger from '../logger.ts';
 import { type BotCharacter, ChatMemory, Memory } from '../memory.ts';
 import { chatMembers, chats } from '../db/schema.ts';
+import { ALLOWED_REACTIONS } from '../telegram/reactions.ts';
 
 interface RuntimeConfigAccess {
     getBotToken: () => string;
@@ -358,6 +359,7 @@ export function startWebServer(options: StartWebServerOptions) {
                     role: capabilities.role,
                     categories: capabilities.categories,
                     availableModels: getModelOptionsForRole(globalConfig, role),
+                    availableReactions: [...ALLOWED_REACTIONS],
                     canViewGlobal,
                     canEditGlobal,
                     canEditChat,

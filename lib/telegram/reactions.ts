@@ -78,3 +78,34 @@ export function canonicalizeReaction(input: string): AllowedReaction | null {
 
     return null;
 }
+
+export function normalizeReactionBlacklist(
+    reactions: readonly string[] | undefined,
+): AllowedReaction[] {
+    if (!reactions || reactions.length === 0) {
+        return [];
+    }
+
+    const normalized: AllowedReaction[] = [];
+    for (const reaction of reactions) {
+        const canon = canonicalizeReaction(reaction);
+        if (!canon || normalized.includes(canon)) {
+            continue;
+        }
+
+        normalized.push(canon);
+    }
+
+    return normalized;
+}
+
+export function resolveEnabledReactions(
+    blacklistedReactions: readonly string[] | undefined,
+): AllowedReaction[] {
+    const blacklist = normalizeReactionBlacklist(blacklistedReactions);
+    if (blacklist.length === 0) {
+        return [...ALLOWED_REACTIONS];
+    }
+
+    return ALLOWED_REACTIONS.filter((reaction) => !blacklist.includes(reaction));
+}

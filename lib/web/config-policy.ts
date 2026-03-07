@@ -1,5 +1,6 @@
 import { ChatConfigOverride, UserConfig } from '../config.ts';
 import { ConfigRole } from './permissions.ts';
+import { normalizeReactionBlacklist } from '../telegram/reactions.ts';
 
 type ChatEditableAi = NonNullable<ChatConfigOverride['ai']>;
 
@@ -116,6 +117,7 @@ export function projectEffectiveConfigForRole(
         tendToIgnore: config.tendToIgnore,
         tendToIgnoreProbability: config.tendToIgnoreProbability,
         randomReplyProbability: config.randomReplyProbability,
+        blacklistedReactions: config.blacklistedReactions,
         nepons: config.nepons,
         responseDelay: config.responseDelay,
     };
@@ -144,9 +146,16 @@ export function sanitizeChatOverrideForRole(
         tendToIgnore: override.tendToIgnore,
         tendToIgnoreProbability: override.tendToIgnoreProbability,
         randomReplyProbability: override.randomReplyProbability,
+        blacklistedReactions: override.blacklistedReactions,
         nepons: override.nepons,
         responseDelay: override.responseDelay,
     };
+
+    if (next.blacklistedReactions) {
+        next.blacklistedReactions = normalizeReactionBlacklist(
+            next.blacklistedReactions,
+        );
+    }
 
     if ((role === 'trusted' || role === 'admin') && override.ai) {
         const ai = pickTrustedAiOverride(override.ai);

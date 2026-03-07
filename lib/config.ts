@@ -3,6 +3,10 @@ import defaultConfig from './default-config.ts';
 import { DbClient, ensureSqlitePragmas, getDb } from './db/client.ts';
 import { globalConfig } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
+import {
+    ALLOWED_REACTIONS,
+    normalizeReactionBlacklist,
+} from './telegram/reactions.ts';
 
 function isValidRegex(val: unknown): val is RegExp {
     if (val instanceof RegExp) return true;
@@ -13,6 +17,7 @@ function isValidRegex(val: unknown): val is RegExp {
 const boundedProbability = z.number().min(0).max(100);
 const boundedPositiveInt = (min: number, max: number) =>
     z.number().int().min(min).max(max);
+const allowedReactionSchema = z.enum(ALLOWED_REACTIONS);
 const matcherSchema = z.union([
     z.string().max(256),
     z.custom<RegExp>(isValidRegex),
@@ -137,6 +142,9 @@ export const configSchema = z.object({
     tendToIgnore: z.array(matcherSchema).max(256),
     tendToIgnoreProbability: boundedProbability.default(90),
     randomReplyProbability: boundedProbability.default(1),
+    blacklistedReactions: z.array(allowedReactionSchema).max(
+        ALLOWED_REACTIONS.length,
+    ).default([]),
     nepons: z.array(z.string().max(500)).max(256),
     filesMaxAge: boundedPositiveInt(1, 720).default(72),
     adminIds: z.array(z.number().int()).max(256).optional(),
@@ -185,6 +193,7 @@ export const chatConfigOverrideSchema = z.object({
         .optional(),
     randomReplyProbability: configSchema.shape.randomReplyProbability
         .optional(),
+    blacklistedReactions: configSchema.shape.blacklistedReactions.optional(),
     nepons: configSchema.shape.nepons.optional(),
     responseDelay: configSchema.shape.responseDelay.optional(),
     disableRepliesDueToRights: z.boolean().optional(),
@@ -385,6 +394,9 @@ export async function setGlobalUserConfig(
     const nextValue: UserConfig = {
         ...parsed.data,
         availableModels: normalizedModels,
+        blacklistedReactions: normalizeReactionBlacklist(
+            parsed.data.blacklistedReactions,
+        ),
     };
 
     const now = Date.now();

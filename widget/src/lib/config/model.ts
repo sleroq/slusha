@@ -12,6 +12,7 @@ export interface BootstrapResponse {
   role: ConfigRole;
   categories: string[];
   availableModels: string[];
+  availableReactions: string[];
   availableChats: AvailableChat[];
   canViewGlobal: boolean;
   canEditGlobal: boolean;
@@ -130,6 +131,7 @@ export interface UserConfigPayload {
   tendToIgnore: Matcher[];
   tendToIgnoreProbability: number;
   randomReplyProbability: number;
+  blacklistedReactions: string[];
   nepons: string[];
   filesMaxAge: number;
   adminIds?: number[];
@@ -150,6 +152,7 @@ export interface ChatOverridePayload {
   tendToIgnore?: Matcher[];
   tendToIgnoreProbability?: number;
   randomReplyProbability?: number;
+  blacklistedReactions?: string[];
   nepons?: string[];
   responseDelay?: number;
 }
@@ -227,6 +230,7 @@ export interface ResolvedChatOverridePayload {
   tendToIgnore: Matcher[];
   tendToIgnoreProbability: number;
   randomReplyProbability: number;
+  blacklistedReactions: string[];
   nepons: string[];
   responseDelay: number;
 }
@@ -245,6 +249,7 @@ export interface ChatFormText {
   names: string;
   tendToReply: string;
   tendToIgnore: string;
+  blacklistedReactions: string;
   nepons: string;
 }
 
@@ -369,6 +374,7 @@ export function defaultGlobalConfig(): UserConfigPayload {
     tendToIgnore: [],
     tendToIgnoreProbability: 90,
     randomReplyProbability: 1,
+    blacklistedReactions: [],
     nepons: [],
     filesMaxAge: 72,
     adminIds: [],
@@ -480,6 +486,11 @@ export function fromUnknownGlobal(payload: unknown): UserConfigPayload {
     names: Array.isArray(obj.names) ? obj.names : [],
     tendToReply: Array.isArray(obj.tendToReply) ? obj.tendToReply : [],
     tendToIgnore: Array.isArray(obj.tendToIgnore) ? obj.tendToIgnore : [],
+    blacklistedReactions: Array.isArray(obj.blacklistedReactions)
+      ? obj.blacklistedReactions.filter((item): item is string =>
+        typeof item === "string"
+      )
+      : [],
     nepons: Array.isArray(obj.nepons)
       ? obj.nepons.filter((item): item is string => typeof item === "string")
       : [],
@@ -519,6 +530,8 @@ export function fromUnknownChatOverride(
       global.tendToIgnoreProbability,
     randomReplyProbability: obj.randomReplyProbability ??
       global.randomReplyProbability,
+    blacklistedReactions: obj.blacklistedReactions ??
+      global.blacklistedReactions,
     nepons: obj.nepons ?? global.nepons,
     responseDelay: obj.responseDelay ?? global.responseDelay,
   };
@@ -577,6 +590,7 @@ export function chatTextFromConfig(
     names: matcherListToTextarea(config.names ?? []),
     tendToReply: matcherListToTextarea(config.tendToReply ?? []),
     tendToIgnore: matcherListToTextarea(config.tendToIgnore ?? []),
+    blacklistedReactions: stringListToTextarea(config.blacklistedReactions ?? []),
     nepons: stringListToTextarea(config.nepons ?? []),
   };
 }
@@ -617,6 +631,7 @@ export function buildChatPayload(
   const names = matcherTextareaToList(text.names);
   const tendToReply = matcherTextareaToList(text.tendToReply);
   const tendToIgnore = matcherTextareaToList(text.tendToIgnore);
+  const blacklistedReactions = textareaToStringList(text.blacklistedReactions);
   const nepons = textareaToStringList(text.nepons);
 
   const payload: ChatOverridePayload = {};
@@ -626,6 +641,9 @@ export function buildChatPayload(
   }
   if (!equalMatcherList(tendToIgnore, base.tendToIgnore)) {
     payload.tendToIgnore = tendToIgnore;
+  }
+  if (!equalStringList(blacklistedReactions, base.blacklistedReactions)) {
+    payload.blacklistedReactions = blacklistedReactions;
   }
   if (!equalStringList(nepons, base.nepons)) payload.nepons = nepons;
   if (config.tendToReplyProbability !== base.tendToReplyProbability) {
@@ -719,6 +737,7 @@ export function collectChatOverridePaths(
   if (payload.randomReplyProbability !== undefined) {
     paths.push("randomReplyProbability");
   }
+  if (payload.blacklistedReactions) paths.push("blacklistedReactions");
   if (payload.nepons) paths.push("nepons");
   if (payload.responseDelay !== undefined) paths.push("responseDelay");
 

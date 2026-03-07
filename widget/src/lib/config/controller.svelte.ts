@@ -51,6 +51,7 @@ export class ConfigController {
   role = $state<ConfigRole>("viewer");
   categories = $state<string[]>([]);
   availableModels = $state<string[]>([]);
+  availableReactions = $state<string[]>([]);
   availableChats = $state<AvailableChat[]>([]);
   currentCharacter = $state<CurrentCharacterPayload | undefined>(undefined);
 
@@ -75,6 +76,7 @@ export class ConfigController {
     names: "",
     tendToReply: "",
     tendToIgnore: "",
+    blacklistedReactions: "",
     nepons: "",
   });
 
@@ -128,6 +130,7 @@ export class ConfigController {
     this.role = data.role;
     this.categories = data.categories ?? [];
     this.availableModels = data.availableModels ?? [];
+    this.availableReactions = data.availableReactions ?? [];
     this.availableChats = data.availableChats ?? [];
 
     const currentChatId = this.chatId.trim();
