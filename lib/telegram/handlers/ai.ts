@@ -106,7 +106,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                             reply_to: '@username',
                         },
                         {
-                            text: 'second message',
+                            text: 'messages can be mixed with reactions, sometimes useful but only when reaction is actually relevant',
                             reply_to: '@username',
                         },
                         {
@@ -142,6 +142,16 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     entries: [
                         {
                             text: '',
+                        },
+                    ],
+                },
+            },
+            {
+                input: {
+                    entries: [
+                        {
+                            text: 'just a text message with no reactions which is preferred for most cases',
+                            reply_to: '@username',
                         },
                     ],
                 },
