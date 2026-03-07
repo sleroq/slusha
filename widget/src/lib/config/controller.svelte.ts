@@ -7,18 +7,18 @@ import {
 } from "./api";
 import {
   type AvailableChat,
-  type ChatInternalsPayload,
   type BootstrapResponse,
   buildChatPayload,
   buildGlobalPayload,
   type ChatFormText,
+  type ChatInternalsPayload,
   chatTextFromConfig,
   type ConfigRole,
   type ConfigScope,
   type CurrentCharacterPayload,
   defaultGlobalConfig,
-  fromUnknownChatOverride,
   fromUnknownChatInternals,
+  fromUnknownChatOverride,
   fromUnknownCurrentCharacter,
   fromUnknownGlobal,
   type GlobalFormText,
@@ -61,7 +61,9 @@ export class ConfigController {
   availableReactions = $state<string[]>([]);
   availableChats = $state<AvailableChat[]>([]);
   currentCharacter = $state<CurrentCharacterPayload | undefined>(undefined);
-  chatInternals = $state<ChatInternalsPayload>(fromUnknownChatInternals(undefined));
+  chatInternals = $state<ChatInternalsPayload>(
+    fromUnknownChatInternals(undefined),
+  );
 
   globalConfig = $state(defaultGlobalConfig());
   globalText = $state<GlobalFormText>({
@@ -338,7 +340,11 @@ export class ConfigController {
     }
 
     this.status = "Saving chat internals...";
-    const result = await saveChatInternals(chatId, this.chatInternals, rawInitData);
+    const result = await saveChatInternals(
+      chatId,
+      this.chatInternals,
+      rawInitData,
+    );
     this.status = result.ok
       ? "Chat internals saved"
       : (result.error ?? "Failed to save chat internals");

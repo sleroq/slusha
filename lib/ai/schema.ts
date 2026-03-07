@@ -43,7 +43,9 @@ export type ChatEntry = z.infer<typeof chatActionSchema>;
 export type TextEntry = z.infer<typeof chatEntrySchema>;
 export type ReactEntry = z.infer<typeof reactionEntrySchema>;
 
-export function parseChatEntriesFromUnknown(input: unknown): ChatEntry[] | null {
+export function parseChatEntriesFromUnknown(
+    input: unknown,
+): ChatEntry[] | null {
     const parsed = chatResponseSchema.safeParse(input);
     if (parsed.success) {
         return parsed.data;
@@ -72,5 +74,4 @@ export function parseChatEntriesFromUnknown(input: unknown): ChatEntry[] | null 
 
 export const isReactEntry = (e: ChatEntry): e is ReactEntry =>
     e.type === 'react';
-export const isTextEntry = (e: ChatEntry): e is TextEntry =>
-    e.type === 'reply';
+export const isTextEntry = (e: ChatEntry): e is TextEntry => e.type === 'reply';

@@ -311,7 +311,11 @@ export function startWebServer(options: StartWebServerOptions) {
                 );
                 const canViewGlobal = canEditGlobal;
                 const availableChats = userId
-                    ? await resolveAvailableChats(options, userId, canEditGlobal)
+                    ? await resolveAvailableChats(
+                        options,
+                        userId,
+                        canEditGlobal,
+                    )
                     : [];
                 const serializedGlobalConfig = JSON.parse(
                     serializeUserConfig(globalConfig),

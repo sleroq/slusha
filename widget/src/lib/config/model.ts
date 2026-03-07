@@ -621,7 +621,9 @@ export function chatTextFromConfig(
     names: matcherListToTextarea(config.names ?? []),
     tendToReply: matcherListToTextarea(config.tendToReply ?? []),
     tendToIgnore: matcherListToTextarea(config.tendToIgnore ?? []),
-    blacklistedReactions: stringListToTextarea(config.blacklistedReactions ?? []),
+    blacklistedReactions: stringListToTextarea(
+      config.blacklistedReactions ?? [],
+    ),
     nepons: stringListToTextarea(config.nepons ?? []),
   };
 }

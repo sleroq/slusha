@@ -107,5 +107,7 @@ export function resolveEnabledReactions(
         return [...ALLOWED_REACTIONS];
     }
 
-    return ALLOWED_REACTIONS.filter((reaction) => !blacklist.includes(reaction));
+    return ALLOWED_REACTIONS.filter((reaction) =>
+        !blacklist.includes(reaction)
+    );
 }
