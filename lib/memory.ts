@@ -597,6 +597,13 @@ export class ChatMemory {
         await this.replaceNotes(notes);
     }
 
+    async setNotes(notes: string[]) {
+        const normalized = notes
+            .map((note) => note.trim())
+            .filter((note) => note.length > 0);
+        await this.replaceNotes(normalized);
+    }
+
     async setLastUse(value = Date.now()) {
         await this.patchChat({ lastUse: value });
     }

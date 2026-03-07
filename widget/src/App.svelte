@@ -24,6 +24,7 @@
     let launchError = $state<string | null>(null);
     let savedGlobalSignature = $state<string | null>(null);
     let savedChatSignature = $state<string | null>(null);
+    let savedChatInternalsSignature = $state<string | null>(null);
     let isSavingGlobal = $state(false);
     let isSavingChat = $state(false);
     let isReloading = $state(false);
@@ -108,6 +109,9 @@
         let ok = false;
         try {
             ok = await controller.saveChat();
+            if (ok && controller.canEditChatInternals) {
+                ok = await controller.saveInternals();
+            }
         } finally {
             isSavingChat = false;
         }
@@ -116,6 +120,7 @@
 
         if (ok) {
             savedChatSignature = chatPayloadSignature;
+            savedChatInternalsSignature = chatInternalsSignature;
         }
     };
 
@@ -140,6 +145,7 @@
         ),
     );
     let chatPayloadSignature = $derived(JSON.stringify(chatPayloadPreview));
+    let chatInternalsSignature = $derived(JSON.stringify(controller.chatInternals));
     let globalPayloadSignature = $derived(
         JSON.stringify(buildGlobalPayload(controller.globalConfig, controller.globalText)),
     );
@@ -148,7 +154,11 @@
         savedGlobalSignature !== null && globalPayloadSignature !== savedGlobalSignature,
     );
     let hasUnsavedChat = $derived(
-        savedChatSignature !== null && chatPayloadSignature !== savedChatSignature,
+        savedChatSignature !== null &&
+            (chatPayloadSignature !== savedChatSignature ||
+                (controller.canEditChatInternals &&
+                    savedChatInternalsSignature !== null &&
+                    chatInternalsSignature !== savedChatInternalsSignature)),
     );
     let activeHasUnsavedChanges = $derived(
         controller.scope === 'global' ? hasUnsavedGlobal : hasUnsavedChat,
@@ -168,6 +178,7 @@
         untrack(() => {
             savedGlobalSignature = globalPayloadSignature;
             savedChatSignature = chatPayloadSignature;
+            savedChatInternalsSignature = chatInternalsSignature;
         });
     });
 
@@ -267,7 +278,9 @@
                                 bind:text={controller.chatText}
                                 availableModels={controller.availableModels}
                                 availableReactions={controller.availableReactions}
+                                chatInternals={controller.chatInternals}
                                 currentCharacter={controller.currentCharacter}
+                                canEditChatInternals={controller.canEditChatInternals}
                                 canConfigureTrustedSettings={controller.canConfigureTrustedSettings}
                                 overriddenFieldPaths={overriddenFieldPaths}
                                 searchQuery={settingsSearch}

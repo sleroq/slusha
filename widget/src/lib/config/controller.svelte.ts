@@ -1,7 +1,13 @@
 import { initData } from "@tma.js/sdk-svelte";
-import { fetchBootstrap, saveChatConfig, saveGlobalConfig } from "./api";
+import {
+  fetchBootstrap,
+  saveChatConfig,
+  saveChatInternals,
+  saveGlobalConfig,
+} from "./api";
 import {
   type AvailableChat,
+  type ChatInternalsPayload,
   type BootstrapResponse,
   buildChatPayload,
   buildGlobalPayload,
@@ -12,6 +18,7 @@ import {
   type CurrentCharacterPayload,
   defaultGlobalConfig,
   fromUnknownChatOverride,
+  fromUnknownChatInternals,
   fromUnknownCurrentCharacter,
   fromUnknownGlobal,
   type GlobalFormText,
@@ -54,6 +61,7 @@ export class ConfigController {
   availableReactions = $state<string[]>([]);
   availableChats = $state<AvailableChat[]>([]);
   currentCharacter = $state<CurrentCharacterPayload | undefined>(undefined);
+  chatInternals = $state<ChatInternalsPayload>(fromUnknownChatInternals(undefined));
 
   globalConfig = $state(defaultGlobalConfig());
   globalText = $state<GlobalFormText>({
@@ -111,6 +119,11 @@ export class ConfigController {
       this.chatId.trim().length > 0;
   }
 
+  get canEditChatInternals(): boolean {
+    return Boolean(this.bootstrap?.canEditChatInternals) &&
+      this.chatId.trim().length > 0;
+  }
+
   get isLoading(): boolean {
     return this.status.startsWith("Loading");
   }
@@ -157,6 +170,7 @@ export class ConfigController {
     );
     this.chatText = chatTextFromConfig(this.chatOverrideConfig);
     this.currentCharacter = fromUnknownCurrentCharacter(data.currentCharacter);
+    this.chatInternals = fromUnknownChatInternals(data.chatInternalsPayload);
 
     if (!this.canViewGlobal && this.scope === "global") {
       this.scope = "chat";
@@ -302,6 +316,32 @@ export class ConfigController {
     this.status = result.ok
       ? "Chat override saved"
       : (result.error ?? "Failed to save chat override");
+    return result.ok;
+  }
+
+  async saveInternals(): Promise<boolean> {
+    const chatId = this.chatId.trim();
+    if (!chatId) {
+      this.status = "Chat ID is required";
+      return false;
+    }
+
+    if (!this.canEditChatInternals) {
+      this.status = "Chat internals are read-only for your role";
+      return false;
+    }
+
+    const rawInitData = this.ensureInitDataRaw();
+    if (!rawInitData) {
+      this.status = "Missing Telegram init data";
+      return false;
+    }
+
+    this.status = "Saving chat internals...";
+    const result = await saveChatInternals(chatId, this.chatInternals, rawInitData);
+    this.status = result.ok
+      ? "Chat internals saved"
+      : (result.error ?? "Failed to save chat internals");
     return result.ok;
   }
 }

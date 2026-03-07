@@ -17,10 +17,12 @@ export interface BootstrapResponse {
   canViewGlobal: boolean;
   canEditGlobal: boolean;
   canEditChat: boolean;
+  canEditChatInternals?: boolean;
   globalPayload?: unknown;
   chatOverridePayload?: unknown;
   effectiveConfigPayload?: unknown;
   currentCharacter?: unknown;
+  chatInternalsPayload?: unknown;
 }
 
 export interface CurrentCharacterPayload {
@@ -32,6 +34,11 @@ export interface CurrentCharacterPayload {
   postHistoryInstructions: string;
   firstMessage: string;
   messageExample: string;
+}
+
+export interface ChatInternalsPayload {
+  summary: string;
+  personalNotes: string;
 }
 
 export interface SerializedRegex {
@@ -566,6 +573,30 @@ export function fromUnknownCurrentCharacter(
     messageExample: typeof obj.messageExample === "string"
       ? obj.messageExample
       : "",
+  };
+}
+
+export function defaultChatInternals(): ChatInternalsPayload {
+  return {
+    summary: "",
+    personalNotes: "",
+  };
+}
+
+export function fromUnknownChatInternals(
+  payload: unknown,
+): ChatInternalsPayload {
+  const base = defaultChatInternals();
+  if (!payload || typeof payload !== "object") {
+    return base;
+  }
+
+  const obj = payload as Record<string, unknown>;
+  return {
+    summary: typeof obj.summary === "string" ? obj.summary : base.summary,
+    personalNotes: typeof obj.personalNotes === "string"
+      ? obj.personalNotes
+      : base.personalNotes,
   };
 }
 

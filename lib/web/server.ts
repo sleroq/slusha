@@ -59,6 +59,11 @@ interface CurrentCharacterPayload {
     messageExample: string;
 }
 
+interface ChatInternalsPayload {
+    summary: string;
+    personalNotes: string;
+}
+
 function projectCurrentCharacter(
     character?: BotCharacter,
 ): CurrentCharacterPayload | undefined {
@@ -102,6 +107,17 @@ function readChatSummary(chatId: number, infoRaw: string): AvailableChat {
             type: 'group',
         };
     }
+}
+
+function notesToSummary(notes: string[]): string {
+    return notes.join('\n\n');
+}
+
+function summaryToNotes(summary: string): string[] {
+    return summary
+        .split(/\n{2,}/)
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
 }
 
 async function resolveAvailableChats(
@@ -309,6 +325,8 @@ export function startWebServer(options: StartWebServerOptions) {
                 let effectiveConfigPayload: unknown = undefined;
                 let currentCharacter: unknown = undefined;
                 let canEditChat = false;
+                let canEditChatInternals = false;
+                let chatInternalsPayload: ChatInternalsPayload | undefined;
 
                 if (chatId !== undefined && Number.isFinite(chatId)) {
                     canEditChat = await canEditChatConfig(
@@ -321,9 +339,16 @@ export function startWebServer(options: StartWebServerOptions) {
                         const chat = await options.bot.api.getChat(chatId);
                         const chatMemory = new ChatMemory(options.memory, chat);
                         const currentChat = await chatMemory.getChat();
+                        canEditChatInternals = role === 'admin';
                         currentCharacter = projectCurrentCharacter(
                             currentChat.character,
                         );
+                        if (canEditChatInternals) {
+                            chatInternalsPayload = {
+                                summary: notesToSummary(currentChat.notes),
+                                personalNotes: currentChat.memory ?? '',
+                            };
+                        }
                         const chatOverride = await chatMemory
                             .getChatConfigOverride();
                         chatOverridePayload = chatOverride
@@ -363,12 +388,66 @@ export function startWebServer(options: StartWebServerOptions) {
                     canViewGlobal,
                     canEditGlobal,
                     canEditChat,
+                    canEditChatInternals,
                     availableChats,
                     globalPayload,
                     chatOverridePayload,
                     effectiveConfigPayload,
                     currentCharacter,
+                    chatInternalsPayload,
                 });
+            }
+
+            if (
+                /^\/api\/config\/chat\/-?\d+\/internals$/.test(url.pathname) &&
+                req.method === 'PUT'
+            ) {
+                const match = /^\/api\/config\/chat\/(-?\d+)\/internals$/
+                    .exec(url.pathname);
+                const chatId = Number(match?.[1]);
+                if (!Number.isFinite(chatId)) {
+                    return jsonResponse({ error: 'Invalid chat id' }, 400);
+                }
+
+                const allowed = await canEditChatConfig(
+                    options.bot,
+                    globalConfig,
+                    chatId,
+                    userId,
+                );
+                if (!allowed) {
+                    return jsonResponse({ error: 'Forbidden' }, 403);
+                }
+
+                if (role !== 'admin') {
+                    return jsonResponse({ error: 'Forbidden' }, 403);
+                }
+
+                const body = await req.json() as {
+                    payload?: { summary?: unknown; personalNotes?: unknown };
+                };
+                if (!body.payload || typeof body.payload !== 'object') {
+                    return jsonResponse({ error: 'Missing payload' }, 400);
+                }
+
+                const summary = typeof body.payload.summary === 'string'
+                    ? body.payload.summary
+                    : '';
+                const personalNotes =
+                    typeof body.payload.personalNotes === 'string'
+                        ? body.payload.personalNotes
+                        : '';
+
+                const chatMemory = new ChatMemory(
+                    options.memory,
+                    await options.bot.api.getChat(chatId),
+                );
+                await chatMemory.setNotes(summaryToNotes(summary));
+                await chatMemory.setMemory(
+                    personalNotes.trim().length > 0 ? personalNotes : undefined,
+                );
+
+                return jsonResponse({ ok: true });
             }
 
             if (url.pathname === '/api/config/global' && req.method === 'PUT') {

@@ -1,5 +1,6 @@
 import type {
   BootstrapResponse,
+  ChatInternalsPayload,
   ChatOverridePayload,
   UserConfigPayload,
 } from "./model";
@@ -146,6 +147,36 @@ export async function saveChatConfig(
     return {
       ok: false,
       error: errorFromResponse(body, "Failed to save chat override"),
+    };
+  }
+
+  return { ok: true };
+}
+
+export async function saveChatInternals(
+  chatId: string,
+  payload: ChatInternalsPayload,
+  initDataRaw: string,
+): Promise<ApiResult<undefined>> {
+  const request = await safeFetch(`/api/config/chat/${chatId}/internals`, {
+    method: "PUT",
+    headers: buildHeaders(initDataRaw),
+    body: JSON.stringify({ payload }),
+  });
+  if (!request.ok || !request.response) {
+    return {
+      ok: false,
+      error: request.error ?? "Failed to save chat internals",
+    };
+  }
+
+  const response = request.response;
+  const body = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: errorFromResponse(body, "Failed to save chat internals"),
     };
   }
 
