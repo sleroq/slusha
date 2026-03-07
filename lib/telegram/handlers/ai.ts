@@ -17,7 +17,6 @@ import {
     ChatEntry,
     isReactEntry,
     isTextEntry,
-    parseChatEntriesFromUnknown,
 } from '../../ai/schema.ts';
 import {
     canonicalizeReaction,
@@ -27,22 +26,6 @@ import { isMissingSendTextRightsError } from '../reply-rights.ts';
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { parseModelRef } from '../../ai/model-ref.ts';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
-
-function truncateForLog(text: string, maxLength = 4000): string {
-    if (text.length <= maxLength) {
-        return text;
-    }
-
-    return `${text.slice(0, maxLength)}...[truncated ${
-        text.length - maxLength
-    } chars]`;
-}
-
-function unwrapJsonCodeBlock(text: string): string {
-    const trimmed = text.trim();
-    const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-    return fencedMatch?.[1]?.trim() ?? trimmed;
-}
 
 interface TargetRef {
     ref: string;
@@ -231,27 +214,6 @@ function annotateHistoryWithTargetRefs(
 
         return entry;
     });
-}
-
-function tryRecoverChatOutput(rawText: string): ChatEntry[] | undefined {
-    const normalizedText = unwrapJsonCodeBlock(rawText);
-    if (normalizedText.length === 0) {
-        return undefined;
-    }
-
-    let parsed: unknown;
-    try {
-        parsed = JSON.parse(normalizedText);
-    } catch {
-        return undefined;
-    }
-
-    const recovered = parseChatEntriesFromUnknown(parsed);
-    if (!recovered) {
-        return undefined;
-    }
-
-    return recovered;
 }
 
 function getLanguageName(localeCode: string): string {
@@ -520,6 +482,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         });
 
         const time = new Date().getTime();
+        const maxGenerationRetries = 2;
 
         const tags = ['user-message'];
         if (ctx.chat.type === 'private') {
@@ -543,6 +506,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             const response = await generateText({
                 model: generationPolicy.model,
                 providerOptions,
+                maxRetries: maxGenerationRetries,
                 messages,
                 temperature: effectiveConfig.ai.temperature,
                 topK: effectiveConfig.ai.topK,
@@ -562,23 +526,10 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     }),
                 },
             });
-            const recoveredOutput = tryRecoverChatOutput(response.text);
-            if (recoveredOutput) {
-                logger.warn(
-                    'Plain-text generation returned JSON payload; recovered structured entries',
-                    {
-                        modelRef,
-                        chatId: ctx.chat.id,
-                    },
-                );
-                return recoveredOutput;
-            }
-
             return [{ type: 'reply', text: response.text }];
         };
 
         let output: ChatEntry[];
-        let structuredOutputRecovery: 'none' | 'fallback_plain_text' = 'none';
         try {
             if (useJsonResponses) {
                 const generationPolicy = resolveGenerationPolicy({
@@ -594,6 +545,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 const result = await generateText({
                     model: generationPolicy.model,
                     providerOptions,
+                    maxRetries: maxGenerationRetries,
                     tools: {
                         send_chat_actions: sendChatActionsTool,
                     },
@@ -634,28 +586,19 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 if (parsedToolCallInput?.success) {
                     output = parsedToolCallInput.data.entries;
                 } else {
-                    structuredOutputRecovery = 'fallback_plain_text';
                     logger.warn(
-                        'Structured tool call missing or invalid; retrying in plain text mode',
+                        'Structured tool call missing or invalid after retries',
                         {
                             modelRef,
                             chatId: ctx.chat.id,
                             finishReason: result.finishReason,
-                            rawText: truncateForLog(result.text),
-                            toolCalls: result.toolCalls.map((call) => ({
-                                toolName: call.toolName,
-                                input: truncateForLog(
-                                    JSON.stringify(call.input) ?? '',
-                                ),
-                            })),
-                            steps: result.steps.map((step) => ({
-                                finishReason: step.finishReason,
-                                text: truncateForLog(step.text),
-                            })),
+                            toolCalls: result.toolCalls.map((call) => call.toolName),
                             usage: result.totalUsage,
                         },
                     );
-                    output = await generatePlainTextOutput();
+                    throw new Error(
+                        'Structured tool call missing or invalid after retries',
+                    );
                 }
             } else {
                 output = await generatePlainTextOutput();
@@ -711,13 +654,6 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             (new Date().getTime() - time) / 1000,
             `for "${name}" ${username}. `,
         );
-        if (structuredOutputRecovery !== 'none') {
-            logger.info('Structured output recovery applied', {
-                mode: structuredOutputRecovery,
-                modelRef,
-                chatId: ctx.chat.id,
-            });
-        }
 
         function resolveTargetMessageId(targetRef?: string): number | undefined {
             if (targetRef) {
