@@ -285,6 +285,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         if (ctx.info.isRandom) {
             tags.push('random');
         }
+        const chatName = ctx.chat.first_name ?? ctx.chat.title;
 
         const generatePlainTextOutput = async (): Promise<ChatEntry[]> => {
             const generationPolicy = resolveGenerationPolicy({
@@ -312,6 +313,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     metadata: buildGenerationTelemetryMetadata({
                         sessionId: ctx.chat.id.toString(),
                         userId: ctx.from?.id.toString() ?? '',
+                        chatName,
                         tags,
                         temperature: effectiveConfig.ai.temperature,
                         topK: effectiveConfig.ai.topK,
@@ -359,6 +361,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                         metadata: buildGenerationTelemetryMetadata({
                             sessionId: ctx.chat.id.toString(),
                             userId: ctx.from?.id.toString() ?? '',
+                            chatName,
                             tags,
                             temperature: effectiveConfig.ai.temperature,
                             topK: effectiveConfig.ai.topK,
@@ -442,7 +445,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             return;
         }
 
-        const name = ctx.chat.first_name ?? ctx.chat.title;
+        const name = chatName;
         const username = ctx.chat?.username ? `(@${ctx.chat.username})` : '';
 
         logger.info(

@@ -9,6 +9,7 @@ type TelemetryAttribute =
 interface BuildGenerationTelemetryMetadataInput {
     sessionId: string;
     userId: string;
+    chatName?: string;
     tags: string[];
     temperature: number;
     topK: number;
@@ -41,6 +42,8 @@ export function buildGenerationTelemetryMetadata(
         'llm.top_k': input.topK,
         'llm.top_p': input.topP,
     };
+
+    assignIfDefined(metadata, 'chatName', input.chatName);
 
     assignIfDefined(
         metadata,

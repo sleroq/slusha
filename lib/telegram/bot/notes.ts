@@ -83,6 +83,7 @@ export default function notes(config: Config, botId: number) {
             if (ctx.chat.type === 'private') {
                 tags.push('private');
             }
+            const chatName = ctx.chat.first_name ?? ctx.chat.title;
 
             let response;
             try {
@@ -112,6 +113,7 @@ export default function notes(config: Config, botId: number) {
                             userId: ctx.chat.type === 'private'
                                 ? ctx.from?.id.toString()
                                 : '',
+                            chatName,
                             tags,
                             temperature: effectiveConfig.ai.temperature,
                             topK: effectiveConfig.ai.topK,
@@ -124,8 +126,6 @@ export default function notes(config: Config, botId: number) {
                 logger.error('Could not get summary: ', error);
                 return;
             }
-
-            const chatName = ctx.chat.title ?? ctx.chat.first_name;
 
             logger.info(
                 `Time to generate notes in chat ${chatName}:`,
@@ -307,6 +307,7 @@ export default function notes(config: Config, botId: number) {
             if (ctx.chat.type === 'private') {
                 tags.push('private');
             }
+            const chatName = ctx.chat.first_name ?? ctx.chat.title;
 
             let response;
             try {
@@ -336,6 +337,7 @@ export default function notes(config: Config, botId: number) {
                             userId: ctx.chat.type === 'private'
                                 ? ctx.from?.id.toString()
                                 : '',
+                            chatName,
                             tags,
                             temperature: effectiveConfig.ai.temperature,
                             topK: effectiveConfig.ai.topK,
@@ -348,8 +350,6 @@ export default function notes(config: Config, botId: number) {
                 logger.error('Could not get memory: ', error);
                 return;
             }
-
-            const chatName = ctx.chat.title ?? ctx.chat.first_name;
 
             logger.info(
                 `Time to generate memory in chat ${chatName}:`,
