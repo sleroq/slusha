@@ -2,7 +2,7 @@
 /log
 /data
 /memory.json
-/slusha.sqlite
+/slusha.sqlite*
 /out/
 /tmp/
 /backups/
