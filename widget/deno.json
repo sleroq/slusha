@@ -1,6 +1,7 @@
 {
   "nodeModulesDir": "auto",
   "imports": {
+    "@tma.js/sdk": "npm:@tma.js/sdk@^3.1.7",
     "@tma.js/sdk-svelte": "npm:@tma.js/sdk-svelte@^1.0.16",
     "svelte": "npm:svelte@^5.38.10",
     "@internationalized/date": "npm:@internationalized/date@^3.12.0",
