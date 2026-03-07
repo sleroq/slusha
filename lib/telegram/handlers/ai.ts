@@ -11,13 +11,13 @@ import {
 import { makeHistoryV2 } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
-import { ReplyTo } from '../../memory.ts';
+import { ChatMessage, ReplyTo } from '../../memory.ts';
 import {
     chatActionsToolInputSchema,
     ChatEntry,
-    chatResponseSchema,
     isReactEntry,
     isTextEntry,
+    parseChatEntriesFromUnknown,
 } from '../../ai/schema.ts';
 import {
     canonicalizeReaction,
@@ -44,6 +44,80 @@ function unwrapJsonCodeBlock(text: string): string {
     return fencedMatch?.[1]?.trim() ?? trimmed;
 }
 
+interface TargetRef {
+    ref: string;
+    messageId: number;
+    userId?: number;
+    username?: string;
+    firstName?: string;
+    preview: string;
+}
+
+function normalizeUsername(value?: string): string | undefined {
+    if (!value) return undefined;
+    return value.startsWith('@') ? value : `@${value}`;
+}
+
+function sanitizeInline(text: string, maxLength = 90): string {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (normalized.length <= maxLength) {
+        return normalized;
+    }
+
+    return `${normalized.slice(0, maxLength)}...`;
+}
+
+function buildTargetRefs(
+    history: ChatMessage[],
+    maxTargets: number,
+): TargetRef[] {
+    const candidates = history.filter((message) => !message.isMyself)
+        .slice(-maxTargets)
+        .reverse();
+
+    return candidates.map((message, index) => {
+        const text = message.text ?? '';
+        const preview = text.trim().length > 0
+            ? sanitizeInline(text)
+            : '[non-text message]';
+
+        return {
+            ref: `t${index}`,
+            messageId: message.id,
+            userId: message.info.from?.id,
+            username: normalizeUsername(message.info.from?.username),
+            firstName: message.info.from?.first_name,
+            preview,
+        };
+    });
+}
+
+function buildTargetRefsPrompt(targets: TargetRef[]): string {
+    if (targets.length === 0) {
+        return [
+            '### Reply Target Map ###',
+            '- There are no explicit targets right now.',
+            '- If you reply with text without target_ref, default reply goes to the triggering message.',
+        ].join('\n');
+    }
+
+    const lines = targets.map((target) => {
+        const userPart = target.username ?? target.firstName ?? 'unknown user';
+        const userIdPart = typeof target.userId === 'number'
+            ? `u${target.userId}`
+            : 'u?';
+
+        return `- ${target.ref} -> m${target.messageId}, ${userIdPart}, ${userPart}, text: "${target.preview}"`;
+    });
+
+    return [
+        '### Reply Target Map ###',
+        '- Use target_ref to choose who/what to reply or react to.',
+        '- target_ref must be one of the refs below.',
+        ...lines,
+    ].join('\n');
+}
+
 function tryRecoverChatOutput(rawText: string): ChatEntry[] | undefined {
     const normalizedText = unwrapJsonCodeBlock(rawText);
     if (normalizedText.length === 0) {
@@ -57,13 +131,12 @@ function tryRecoverChatOutput(rawText: string): ChatEntry[] | undefined {
         return undefined;
     }
 
-    const normalized = Array.isArray(parsed) ? parsed : [parsed];
-    const validated = chatResponseSchema.safeParse(normalized);
-    if (!validated.success) {
+    const recovered = parseChatEntriesFromUnknown(parsed);
+    if (!recovered) {
         return undefined;
     }
 
-    return validated.data;
+    return recovered;
 }
 
 function getLanguageName(localeCode: string): string {
@@ -95,24 +168,26 @@ function buildLanguageProtocol(defaultLocale: string): string {
 export default function registerAI(bot: Bot<SlushaContext>) {
     const sendChatActionsTool = tool({
         description:
-            'Submit Telegram actions once per turn. Return an entries array where each entry has text and/or react, with optional reply_to (@username) and offset (0-based). Use Telegram markdown in text without headings. Prefer reply_to over @mentions in text. React only with the reactions explicitly allowed in the system prompt.',
+            'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.',
         inputSchema: chatActionsToolInputSchema,
         inputExamples: [
             {
                 input: {
                     entries: [
                         {
+                            type: 'reply',
                             text: 'first *message* `code`',
-                            reply_to: '@username',
+                            target_ref: 't0',
                         },
                         {
-                            text: 'second message',
-                            reply_to: '@username',
+                            type: 'reply',
+                            text: 'second short message',
+                            target_ref: 't0',
                         },
                         {
+                            type: 'react',
                             react: '❤',
-                            offset: 2,
-                            reply_to: '@username',
+                            target_ref: 't0',
                         },
                     ],
                 },
@@ -121,8 +196,9 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 input: {
                     entries: [
                         {
+                            type: 'react',
                             react: '❤',
-                            reply_to: '@username',
+                            target_ref: 't1',
                         },
                     ],
                 },
@@ -131,8 +207,9 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 input: {
                     entries: [
                         {
+                            type: 'reply',
                             text: 'lorem ipsum',
-                            reply_to: '@username',
+                            target_ref: 't0',
                         },
                     ],
                 },
@@ -141,7 +218,19 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 input: {
                     entries: [
                         {
+                            type: 'reply',
                             text: '',
+                        },
+                    ],
+                },
+            },
+            {
+                input: {
+                    entries: [
+                        {
+                            type: 'reply',
+                            text: 'just a text message with no reactions which is preferred for most cases',
+                            target_ref: 't0',
                         },
                     ],
                 },
@@ -153,10 +242,22 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         const messages: ModelMessage[] = [];
         const chatState = await ctx.m.getChat();
         const effectiveConfig = await ctx.m.getEffectiveConfig();
+        const savedHistory = await ctx.m.getHistory();
 
         const useJsonResponses = effectiveConfig.ai.useJsonResponses;
         const enabledReactions = resolveEnabledReactions(
             effectiveConfig.blacklistedReactions,
+        );
+
+        const messagesToPass = chatState.messagesToPass ??
+            effectiveConfig.ai.messagesToPass;
+        const maxTargetCount = Math.min(
+            Math.max(messagesToPass * 2, 12),
+            40,
+        );
+        const targetRefs = buildTargetRefs(savedHistory, maxTargetCount);
+        const targetRefMap = new Map(
+            targetRefs.map((target) => [target.ref, target.messageId]),
         );
 
         let prompt = '';
@@ -170,8 +271,6 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             prompt = (effectiveConfig.ai.dumbPrePrompt ?? fallbackDumbPre) +
                 '\n\n';
         }
-        const savedHistory = await ctx.m.getHistory();
-
         // TODO: Improve this check
         const isComments = savedHistory.some((m) =>
             m.info.forward_origin?.type === 'channel' &&
@@ -248,6 +347,8 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 prompt +=
                     `\n\n### Reactions ###\n- Allowed reactions for this chat: ${enabledReactions.join(', ')}`;
             }
+
+            prompt += `\n\n${buildTargetRefsPrompt(targetRefs)}`;
         }
 
         messages.push({
@@ -255,8 +356,6 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             content: prompt,
         });
 
-        const messagesToPass = chatState.messagesToPass ??
-            effectiveConfig.ai.messagesToPass;
         const modelRef = chatState.chatModel ?? effectiveConfig.ai.model;
         const parsedModel = parseModelRef(modelRef);
 
@@ -291,7 +390,11 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         let finalPrompt = useJsonResponses
             ? effectiveConfig.ai.finalPrompt
             : (effectiveConfig.ai.dumbFinalPrompt ?? 'Ответь простым текстом.');
-        if (ctx.info.userToReply) {
+        if (useJsonResponses) {
+            finalPrompt +=
+                ' Return only actions array using typed entries and target_ref values from Reply Target Map.';
+        }
+        if (!useJsonResponses && ctx.info.userToReply) {
             finalPrompt += ` Ответь на сообщение от ${ctx.info.userToReply}.`;
         }
 
@@ -355,7 +458,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 return recoveredOutput;
             }
 
-            return [{ text: response.text }];
+            return [{ type: 'reply', text: response.text }];
         };
 
         let output: ChatEntry[];
@@ -500,38 +603,19 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             });
         }
 
-        function resolveTargetMessageId(
-            replyToUsername?: string,
-            offset?: number,
-            fallbackToLast = true,
-        ): number | undefined {
-            const normOffset = typeof offset === 'number' && offset >= 0
-                ? offset
-                : 0;
-            const history = savedHistory;
-            if (history.length === 0) return undefined;
-            const uname = replyToUsername?.startsWith('@')
-                ? replyToUsername.slice(1)
-                : replyToUsername;
-            let candidates = history.filter((m) => !m.isMyself);
-            if (uname) {
-                candidates = history.filter((m) =>
-                    m.info.from?.username === uname
-                );
-                if (candidates.length === 0) {
-                    candidates = history.filter((m) => !m.isMyself);
+        function resolveTargetMessageId(targetRef?: string): number | undefined {
+            if (targetRef) {
+                const fromMap = targetRefMap.get(targetRef);
+                if (fromMap) {
+                    return fromMap;
                 }
+
+                logger.debug('Unknown target_ref, fallback to trigger message', {
+                    targetRef,
+                });
             }
-            const idxFromEnd = Math.max(
-                0,
-                Math.min(normOffset, candidates.length - 1),
-            );
-            const target = candidates[candidates.length - 1 - idxFromEnd];
-            if (target?.id) return target.id;
-            if (fallbackToLast) {
-                return history[history.length - 1]?.id;
-            }
-            return undefined;
+
+            return ctx.msg.message_id;
         }
 
         let lastMsgId: number | undefined = undefined;
@@ -543,11 +627,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             ) {
                 const canon = canonicalizeReaction(res.react.trim());
                 if (canon && enabledReactions.includes(canon)) {
-                    const targetId = resolveTargetMessageId(
-                        res.reply_to,
-                        res.offset,
-                        true,
-                    );
+                    const targetId = resolveTargetMessageId(res.target_ref);
                     if (targetId) {
                         try {
                             await ctx.api.setMessageReaction(
@@ -590,19 +670,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             }
 
             let msgToReply: number | undefined;
-            if (res.reply_to || typeof res.offset === 'number') {
-                msgToReply = resolveTargetMessageId(
-                    res.reply_to,
-                    res.offset,
-                    true,
-                );
-            } else if (!useJsonResponses && ctx.info.userToReply) {
-                msgToReply = resolveTargetMessageId(
-                    ctx.info.userToReply,
-                    undefined,
-                    true,
-                );
-            }
+            msgToReply = resolveTargetMessageId(res.target_ref);
             if (!msgToReply && lastMsgId) {
                 msgToReply = lastMsgId;
             }
