@@ -106,7 +106,20 @@ function readChatSummary(chatId: number, infoRaw: string): AvailableChat {
 async function resolveAvailableChats(
     options: StartWebServerOptions,
     userId: number,
+    includeAllChats: boolean,
 ): Promise<AvailableChat[]> {
+    if (includeAllChats) {
+        const chatRows = await options.memory.db
+            .select({
+                id: chats.id,
+                info: chats.info,
+            })
+            .from(chats)
+            .orderBy(desc(chats.lastUse));
+
+        return chatRows.map((chat) => readChatSummary(chat.id, chat.info));
+    }
+
     const memberRows = await options.memory.db
         .select({
             chatId: chatMembers.chatId,
@@ -281,7 +294,7 @@ export function startWebServer(options: StartWebServerOptions) {
                 );
                 const canViewGlobal = canEditGlobal;
                 const availableChats = userId
-                    ? await resolveAvailableChats(options, userId)
+                    ? await resolveAvailableChats(options, userId, canEditGlobal)
                     : [];
                 const serializedGlobalConfig = JSON.parse(
                     serializeUserConfig(globalConfig),
@@ -299,6 +312,7 @@ export function startWebServer(options: StartWebServerOptions) {
                 if (chatId !== undefined && Number.isFinite(chatId)) {
                     canEditChat = await canEditChatConfig(
                         options.bot,
+                        globalConfig,
                         chatId,
                         userId,
                     );
@@ -389,6 +403,7 @@ export function startWebServer(options: StartWebServerOptions) {
 
                 const allowed = await canEditChatConfig(
                     options.bot,
+                    globalConfig,
                     chatId,
                     userId,
                 );
@@ -403,9 +418,6 @@ export function startWebServer(options: StartWebServerOptions) {
 
                 const parsedOverride = parseChatOverridePayload(
                     JSON.stringify(body.payload),
-                );
-                const globalConfig = await getGlobalUserConfig(
-                    options.memory.db,
                 );
                 const sanitizedOverride = sanitizeChatOverrideForRole(
                     parsedOverride,

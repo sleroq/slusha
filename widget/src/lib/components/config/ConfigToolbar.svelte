@@ -1,5 +1,6 @@
 <script lang="ts">
     import { Button } from '$lib/components/ui/button';
+    import { Input } from '$lib/components/ui/input';
     import { Label } from '$lib/components/ui/label';
     import * as Select from '$lib/components/ui/select';
     import type {
@@ -32,6 +33,8 @@
         isLoading = false,
     }: Props = $props();
 
+    let chatSearch = $state('');
+
     let selectedChatLabel = $derived.by(() => {
         const selected = availableChats.find((chat) => String(chat.id) === chatId);
         if (!selected) {
@@ -41,6 +44,27 @@
         return selected.username
             ? `${selected.title} (@${selected.username})`
             : selected.title;
+    });
+
+    let filteredChats = $derived.by(() => {
+        const query = chatSearch.trim().toLowerCase();
+        if (!query) {
+            return availableChats;
+        }
+
+        const selected = availableChats.find((chat) => String(chat.id) === chatId);
+        const matches = availableChats.filter((chat) => {
+            const title = chat.title.toLowerCase();
+            const username = chat.username?.toLowerCase() ?? '';
+            const id = String(chat.id);
+            return title.includes(query) || username.includes(query) || id.includes(query);
+        });
+
+        if (!selected || matches.some((chat) => chat.id === selected.id)) {
+            return matches;
+        }
+
+        return [selected, ...matches];
     });
 
     const handleChatChange = (nextValue: string): void => {
@@ -82,23 +106,37 @@
                             No chats available
                         </div>
                     {:else}
-                        <Select.Root
-                            type="single"
-                            value={chatId}
-                            onValueChange={handleChatChange}
-                            disabled={isReloading || isLoading}
-                        >
-                            <Select.Trigger id="chat-id" class="w-full" aria-label="Select chat">
-                                <span class="line-clamp-1 text-left">{selectedChatLabel}</span>
-                            </Select.Trigger>
-                            <Select.Content>
-                                {#each availableChats as chat (chat.id)}
-                                    <Select.Item value={String(chat.id)} label={chat.title}>
-                                        {chat.title}{chat.username ? ` (@${chat.username})` : ''}
-                                    </Select.Item>
-                                {/each}
-                            </Select.Content>
-                        </Select.Root>
+                        <Input
+                            type="search"
+                            bind:value={chatSearch}
+                            placeholder="Search chats by name, @username, or id"
+                            autocomplete="off"
+                        />
+                        {#if filteredChats.length === 0}
+                            <div
+                                class="flex h-9 w-full items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground"
+                            >
+                                No chats match this search
+                            </div>
+                        {:else}
+                            <Select.Root
+                                type="single"
+                                value={chatId}
+                                onValueChange={handleChatChange}
+                                disabled={isReloading || isLoading}
+                            >
+                                <Select.Trigger id="chat-id" class="w-full" aria-label="Select chat">
+                                    <span class="line-clamp-1 text-left">{selectedChatLabel}</span>
+                                </Select.Trigger>
+                                <Select.Content>
+                                    {#each filteredChats as chat (chat.id)}
+                                        <Select.Item value={String(chat.id)} label={chat.title}>
+                                            {chat.title}{chat.username ? ` (@${chat.username})` : ''}
+                                        </Select.Item>
+                                    {/each}
+                                </Select.Content>
+                            </Select.Root>
+                        {/if}
                     {/if}
                 </div>
             {/if}

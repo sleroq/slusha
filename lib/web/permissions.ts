@@ -23,10 +23,15 @@ export function canEditGlobalConfig(
 
 export async function canEditChatConfig(
     bot: Bot<SlushaContext>,
+    config: UserConfig,
     chatId: number,
     userId?: number,
 ): Promise<boolean> {
     if (!userId) return false;
+
+    if (canEditGlobalConfig(config, userId)) {
+        return true;
+    }
 
     if (chatId === userId) {
         return true;
