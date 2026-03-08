@@ -68,6 +68,49 @@ scripts/build-widget.bash
 
 - Use `/config` in chat (`/config global` for global config)
 
+## Metrics (Prometheus + Grafana)
+
+- `slusha_http_requests_total`
+- `slusha_http_request_duration_seconds`
+- `slusha_telegram_updates_total`
+- `slusha_telegram_handler_errors_total`
+- `slusha_ai_requests_total`
+- `slusha_ai_request_duration_seconds`
+- `slusha_ai_failures_total`
+- `slusha_ai_finish_reason_total`
+- `slusha_ai_tokens_total`
+- `slusha_rate_limit_exceeded_total`
+- `slusha_usage_downgraded_total`
+- `slusha_process_uptime_seconds`
+- `slusha_process_resident_memory_bytes`
+
+### Prometheus scrape config
+
+Add a target in your `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: slusha
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - localhost:8080
+```
+
+If Slusha runs in Docker or another host, replace `localhost:8080` with the reachable address.
+
+### Grafana dashboard
+
+Import the dashboard JSON from:
+
+- `grafana/slusha-observability-dashboard.json`
+
+In Grafana:
+
+1. Go to Dashboards -> Import
+2. Upload `grafana/slusha-observability-dashboard.json`
+3. Select your Prometheus datasource when prompted
+
 ## Docker Production
 
 ```bash
