@@ -1,7 +1,8 @@
 <script lang="ts">
-    import SourceStateIcon from '$lib/components/config/SourceStateIcon.svelte';
-    import { Label } from '$lib/components/ui/label';
-    import * as Select from '$lib/components/ui/select';
+import SourceStateIcon from '$lib/components/config/SourceStateIcon.svelte';
+import { Label } from '$lib/components/ui/label';
+import * as Select from '$lib/components/ui/select';
+import { useI18n } from '$lib/i18n/context.svelte';
 
     interface SourceState {
         overridden: boolean;
@@ -30,12 +31,14 @@
         sourceState,
     }: Props = $props();
 
+    const t = useI18n();
+
     let selectedLabel = $derived.by(() => {
         if (!value || value.length === 0) {
-            return options.length > 0 ? 'Select an option' : 'No options available';
+            return options.length > 0 ? t('field.selectOption') : t('field.noOptions');
         }
 
-        return options.includes(value) ? value : `Current: ${value}`;
+        return options.includes(value) ? value : t('field.currentValue', { value });
     });
 
     const handleValueChange = (nextValue: string): void => {
@@ -58,7 +61,7 @@
             {id}
             class="flex h-10 w-full items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground"
         >
-            No options available
+            {t('field.noOptions')}
         </div>
     {:else}
         <Select.Root type="single" value={value ?? ''} onValueChange={handleValueChange}>

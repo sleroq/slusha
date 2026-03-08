@@ -4,6 +4,7 @@ import type {
   ChatOverridePayload,
   UserConfigPayload,
 } from "./model";
+import { translate, type WidgetLocale } from "$lib/i18n";
 
 interface ApiResult<T> {
   ok: boolean;
@@ -44,6 +45,7 @@ function errorFromResponse(
 
 async function safeFetch(
   input: string,
+  locale: WidgetLocale,
   init?: RequestInit,
 ): Promise<SafeFetchResult> {
   try {
@@ -52,7 +54,7 @@ async function safeFetch(
   } catch {
     return {
       ok: false,
-      error: "Network request failed",
+      error: translate(locale, "api.networkFailed"),
     };
   }
 }
@@ -60,6 +62,7 @@ async function safeFetch(
 export async function fetchBootstrap(
   chatId: string,
   initDataRaw: string,
+  locale: WidgetLocale,
   signal?: AbortSignal,
 ): Promise<ApiResult<BootstrapResponse>> {
   const query = new URLSearchParams();
@@ -69,6 +72,7 @@ export async function fetchBootstrap(
 
   const request = await safeFetch(
     `/api/config/bootstrap?${query.toString()}`,
+    locale,
     {
       headers: buildHeaders(initDataRaw),
       signal,
@@ -77,7 +81,7 @@ export async function fetchBootstrap(
   if (!request.ok || !request.response) {
     return {
       ok: false,
-      error: request.error ?? "Failed to load",
+      error: request.error ?? translate(locale, "api.failedLoad"),
     };
   }
 
@@ -87,7 +91,7 @@ export async function fetchBootstrap(
   if (!response.ok) {
     return {
       ok: false,
-      error: errorFromResponse(payload, "Failed to load"),
+      error: errorFromResponse(payload, translate(locale, "api.failedLoad")),
     };
   }
 
@@ -100,8 +104,9 @@ export async function fetchBootstrap(
 export async function saveGlobalConfig(
   payload: UserConfigPayload,
   initDataRaw: string,
+  locale: WidgetLocale,
 ): Promise<ApiResult<undefined>> {
-  const request = await safeFetch("/api/config/global", {
+  const request = await safeFetch("/api/config/global", locale, {
     method: "PUT",
     headers: buildHeaders(initDataRaw),
     body: JSON.stringify({ payload }),
@@ -109,7 +114,7 @@ export async function saveGlobalConfig(
   if (!request.ok || !request.response) {
     return {
       ok: false,
-      error: request.error ?? "Failed to save global config",
+      error: request.error ?? translate(locale, "api.failedSaveGlobal"),
     };
   }
 
@@ -119,7 +124,10 @@ export async function saveGlobalConfig(
   if (!response.ok) {
     return {
       ok: false,
-      error: errorFromResponse(body, "Failed to save global config"),
+      error: errorFromResponse(
+        body,
+        translate(locale, "api.failedSaveGlobal"),
+      ),
     };
   }
 
@@ -130,8 +138,9 @@ export async function saveChatConfig(
   chatId: string,
   payload: ChatOverridePayload,
   initDataRaw: string,
+  locale: WidgetLocale,
 ): Promise<ApiResult<undefined>> {
-  const request = await safeFetch(`/api/config/chat/${chatId}`, {
+  const request = await safeFetch(`/api/config/chat/${chatId}`, locale, {
     method: "PUT",
     headers: buildHeaders(initDataRaw),
     body: JSON.stringify({ payload }),
@@ -139,7 +148,7 @@ export async function saveChatConfig(
   if (!request.ok || !request.response) {
     return {
       ok: false,
-      error: request.error ?? "Failed to save chat override",
+      error: request.error ?? translate(locale, "api.failedSaveChat"),
     };
   }
 
@@ -149,7 +158,7 @@ export async function saveChatConfig(
   if (!response.ok) {
     return {
       ok: false,
-      error: errorFromResponse(body, "Failed to save chat override"),
+      error: errorFromResponse(body, translate(locale, "api.failedSaveChat")),
     };
   }
 
@@ -160,16 +169,21 @@ export async function saveChatInternals(
   chatId: string,
   payload: ChatInternalsPayload,
   initDataRaw: string,
+  locale: WidgetLocale,
 ): Promise<ApiResult<undefined>> {
-  const request = await safeFetch(`/api/config/chat/${chatId}/internals`, {
-    method: "PUT",
-    headers: buildHeaders(initDataRaw),
-    body: JSON.stringify({ payload }),
-  });
+  const request = await safeFetch(
+    `/api/config/chat/${chatId}/internals`,
+    locale,
+    {
+      method: "PUT",
+      headers: buildHeaders(initDataRaw),
+      body: JSON.stringify({ payload }),
+    },
+  );
   if (!request.ok || !request.response) {
     return {
       ok: false,
-      error: request.error ?? "Failed to save chat internals",
+      error: request.error ?? translate(locale, "api.failedSaveInternals"),
     };
   }
 
@@ -179,7 +193,10 @@ export async function saveChatInternals(
   if (!response.ok) {
     return {
       ok: false,
-      error: errorFromResponse(body, "Failed to save chat internals"),
+      error: errorFromResponse(
+        body,
+        translate(locale, "api.failedSaveInternals"),
+      ),
     };
   }
 

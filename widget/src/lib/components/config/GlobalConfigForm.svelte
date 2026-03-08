@@ -8,6 +8,7 @@
     import SettingToggleField from '$lib/components/config/fields/SettingToggleField.svelte';
     import { createSectionMatcher } from '$lib/components/config/search';
     import type { GlobalFormText, UserConfigPayload } from '$lib/config/model';
+    import { useI18n } from '$lib/i18n/context.svelte';
 
     interface Props {
         config: UserConfigPayload;
@@ -26,6 +27,8 @@
         isAdmin = false,
         searchQuery = '',
     }: Props = $props();
+
+    const t = useI18n();
 
     let sectionMatcher = $derived(createSectionMatcher(searchQuery));
     let hasSearch = $derived(sectionMatcher.hasSearch);
@@ -146,13 +149,13 @@
 
 <section class="config-form space-y-6">
     <header class="space-y-1 pb-4">
-        <h2 class="text-lg font-semibold">Global Config</h2>
-        <p class="text-sm text-muted-foreground">Admin-only settings and internal prompts.</p>
+        <h2 class="text-lg font-semibold">{t('form.global.title')}</h2>
+        <p class="text-sm text-muted-foreground">{t('form.global.subtitle')}</p>
     </header>
 
     <div class="space-y-5">
         {#if hasSearch && !hasMatches}
-            <p class="text-sm text-muted-foreground">No global settings match "{searchQuery.trim()}".</p>
+            <p class="text-sm text-muted-foreground">{t('form.global.noMatches', { query: searchQuery.trim() })}</p>
         {/if}
 
         {#if showGeneral}

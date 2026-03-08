@@ -5,6 +5,7 @@
     import { Button } from '$lib/components/ui/button';
     import { Input } from '$lib/components/ui/input';
     import { Label } from '$lib/components/ui/label';
+    import { useI18n } from '$lib/i18n/context.svelte';
 
     interface SourceState {
         overridden: boolean;
@@ -34,12 +35,17 @@
         hidden = false,
         containerClass = '',
         sourceState,
-        itemPlaceholder = 'Value',
-        addLabel = 'Add',
+        itemPlaceholder = '',
+        addLabel = '',
         suggestions = [],
         numericOnly = false,
         allowDuplicates = true,
     }: Props = $props();
+
+    const t = useI18n();
+
+    let resolvedItemPlaceholder = $derived(itemPlaceholder || t('field.defaultValue'));
+    let resolvedAddLabel = $derived(addLabel || t('field.add'));
 
     let draft = $state('');
 
@@ -134,7 +140,7 @@
 
     <div class="space-y-2 rounded-md border p-3">
         {#if items.length === 0}
-            <p class="text-xs text-muted-foreground">No items yet.</p>
+            <p class="text-xs text-muted-foreground">{t('field.noItems')}</p>
         {/if}
 
         {#each items as item, index (`${item}-${index}`)}
@@ -142,7 +148,7 @@
                 <Input
                     id={`${id}-${index}`}
                     value={item}
-                    placeholder={itemPlaceholder}
+                    placeholder={resolvedItemPlaceholder}
                     oninput={(event) => updateItem(index, (event.currentTarget as HTMLInputElement).value)}
                 />
                 <Button
@@ -161,18 +167,18 @@
             <Input
                 id={id}
                 bind:value={draft}
-                placeholder={itemPlaceholder}
+                placeholder={resolvedItemPlaceholder}
                 onkeydown={(event) => {
                     if (event.key !== 'Enter') return;
                     event.preventDefault();
                     addDraft();
                 }}
             />
-            <Button type="button" variant="outline" disabled={!draftValid} onclick={addDraft}>{addLabel}</Button>
+            <Button type="button" variant="outline" disabled={!draftValid} onclick={addDraft}>{resolvedAddLabel}</Button>
         </div>
 
         {#if numericOnly}
-            <p class="text-xs text-muted-foreground">Only whole numbers are accepted.</p>
+            <p class="text-xs text-muted-foreground">{t('field.onlyWholeNumbers')}</p>
         {/if}
 
         {#if visibleSuggestions.length > 0}

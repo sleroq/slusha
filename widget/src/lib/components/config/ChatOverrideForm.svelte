@@ -8,6 +8,7 @@
     import SettingTextareaField from '$lib/components/config/fields/SettingTextareaField.svelte';
     import SettingToggleField from '$lib/components/config/fields/SettingToggleField.svelte';
     import { createSectionMatcher } from '$lib/components/config/search';
+    import { useI18n } from '$lib/i18n/context.svelte';
     import type {
         ChatInternalsPayload,
         ChatFormText,
@@ -42,6 +43,8 @@
         overriddenFieldPaths = [],
         searchQuery = '',
     }: Props = $props();
+
+    const t = useI18n();
 
     let sectionMatcher = $derived(createSectionMatcher(searchQuery));
     let hasSearch = $derived(sectionMatcher.hasSearch);
@@ -146,13 +149,13 @@
 
 <section class="config-form space-y-6">
     <header class="space-y-1 pb-4">
-        <h2 class="text-lg font-semibold">Chat Override</h2>
-        <p class="text-sm text-muted-foreground">Role-based chat settings with safe defaults.</p>
+        <h2 class="text-lg font-semibold">{t('form.chat.title')}</h2>
+        <p class="text-sm text-muted-foreground">{t('form.chat.subtitle')}</p>
     </header>
 
     <div class="space-y-5">
         {#if hasSearch && !hasMatches}
-            <p class="text-sm text-muted-foreground">No chat settings match "{searchQuery.trim()}".</p>
+            <p class="text-sm text-muted-foreground">{t('form.chat.noMatches', { query: searchQuery.trim() })}</p>
         {/if}
 
         {#if showCurrentCharacter}

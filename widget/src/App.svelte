@@ -10,8 +10,10 @@
     import { createConfigController } from '$lib/config/controller.svelte';
     import { Button } from '$lib/components/ui/button';
     import { Input } from '$lib/components/ui/input';
+    import { setI18nContext } from '$lib/i18n/context.svelte';
 
     const controller = createConfigController();
+    const t = setI18nContext(() => controller.locale);
 
     type SaveFeedback = {
         kind: 'success' | 'error';
@@ -205,26 +207,25 @@
         <div class="pointer-events-none absolute right-0 top-1/3 h-56 w-56 rounded-full bg-emerald-400/25 blur-3xl"></div>
 
         <section class="relative mx-auto flex max-w-xl flex-col gap-6 py-2">
-            <p class="text-xs uppercase tracking-[0.2em] text-cyan-300/90">Slusha Telegram bot</p>
-            <h1 class="text-3xl font-semibold leading-tight text-white">This page works inside Telegram Mini App</h1>
+            <p class="text-xs uppercase tracking-[0.2em] text-cyan-300/90">{t('app.launchBadge')}</p>
+            <h1 class="text-3xl font-semibold leading-tight text-white">{t('app.launchTitle')}</h1>
             <p class="text-sm leading-6 text-slate-300">
-                Slusha is a Telegram AI bot with per-chat configuration, character support, and rich media handling.
-                Open this widget through Telegram to load your chat-specific settings.
+                {t('app.launchDescription')}
             </p>
 
             <div class="border-y border-amber-300/40 py-3 text-xs text-amber-100">
-                <p class="font-medium">Telegram context was not detected.</p>
+                <p class="font-medium">{t('app.launchContextMissing')}</p>
                 <p class="mt-1 opacity-90">{launchError}</p>
             </div>
 
             <div class="grid gap-2 border-t border-white/10 pt-4 text-sm text-slate-200">
                 <p>
-                    Start bot: <a class="text-cyan-300 underline decoration-cyan-400/70 underline-offset-3 hover:text-cyan-200" href="https://t.me/sl_chatbot" target="_blank" rel="noreferrer">@sl_chatbot</a>
+                    {t('app.launchStartBot')} <a class="text-cyan-300 underline decoration-cyan-400/70 underline-offset-3 hover:text-cyan-200" href="https://t.me/sl_chatbot" target="_blank" rel="noreferrer">@sl_chatbot</a>
                 </p>
                 <p>
-                    Quotes channel: <a class="text-cyan-300 underline decoration-cyan-400/70 underline-offset-3 hover:text-cyan-200" href="https://t.me/s/slushaquotes" target="_blank" rel="noreferrer">@slushaquotes</a>
+                    {t('app.launchQuotes')} <a class="text-cyan-300 underline decoration-cyan-400/70 underline-offset-3 hover:text-cyan-200" href="https://t.me/s/slushaquotes" target="_blank" rel="noreferrer">@slushaquotes</a>
                 </p>
-                <p class="text-slate-400">Then run <span class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.78rem]">/config</span> in your chat.</p>
+                <p class="text-slate-400">{t('app.launchRunConfig')}</p>
             </div>
         </section>
     </main>
@@ -244,12 +245,12 @@
         />
 
         <section class="space-y-3 border-t pt-6">
-            <label class="text-sm font-medium text-muted-foreground" for="settings-search">Search settings</label>
+            <label class="text-sm font-medium text-muted-foreground" for="settings-search">{t('app.searchSettings')}</label>
             <Input
                 id="settings-search"
                 type="search"
                 bind:value={settingsSearch}
-                placeholder="Search by section or setting name"
+                placeholder={t('app.searchSettingsPlaceholder')}
                 autocomplete="off"
             />
         </section>
@@ -261,7 +262,7 @@
                     <div class="h-9 w-full animate-pulse rounded bg-muted/80"></div>
                     <div class="h-9 w-full animate-pulse rounded bg-muted/80"></div>
                     <div class="h-9 w-full animate-pulse rounded bg-muted/80"></div>
-                    <p class="text-sm text-muted-foreground">Loading configuration...</p>
+                    <p class="text-sm text-muted-foreground">{t('app.loadingConfiguration')}</p>
                 </div>
             {:else}
                 {#key controller.scope}
@@ -306,9 +307,9 @@
                 aria-busy={activeIsSaving}
             >
                 {#if activeIsSaving}
-                    {controller.scope === 'global' ? 'Saving global...' : 'Saving chat override...'}
+                    {controller.scope === 'global' ? t('app.savingGlobal') : t('app.savingChat')}
                 {:else}
-                    {controller.scope === 'global' ? 'Save global' : 'Save chat override'}
+                    {controller.scope === 'global' ? t('app.saveGlobal') : t('app.saveChat')}
                 {/if}
             </Button>
         </div>

@@ -2,10 +2,11 @@
     import TrashIcon from '@lucide/svelte/icons/trash';
     import { fade } from 'svelte/transition';
     import SourceStateIcon from '$lib/components/config/SourceStateIcon.svelte';
-    import { Button } from '$lib/components/ui/button';
-    import { Input } from '$lib/components/ui/input';
-    import { Label } from '$lib/components/ui/label';
-    import * as Select from '$lib/components/ui/select';
+import { Button } from '$lib/components/ui/button';
+import { Input } from '$lib/components/ui/input';
+import { Label } from '$lib/components/ui/label';
+import * as Select from '$lib/components/ui/select';
+import { useI18n } from '$lib/i18n/context.svelte';
 
     interface SourceState {
         overridden: boolean;
@@ -37,6 +38,8 @@
         containerClass = '',
         sourceState,
     }: Props = $props();
+
+    const t = useI18n();
 
     let newType = $state<MatcherRow['type']>('literal');
     let newValue = $state('');
@@ -143,7 +146,7 @@
     };
 
     const rowTypeLabel = (type: MatcherRow['type']): string =>
-        type === 'regex' ? 'regex' : 'literal';
+        type === 'regex' ? t('field.regex') : t('field.literal');
 
     let rows = $derived(parseRows(value));
     let canAddRow = $derived(newValue.trim().length > 0);
@@ -165,16 +168,16 @@
             <table class="w-full border-collapse text-sm">
                 <thead class="bg-muted/40 text-xs text-muted-foreground">
                     <tr class="border-b text-left">
-                        <th class="w-28 px-3 py-2 font-medium">Type</th>
-                        <th class="px-3 py-2 font-medium">Value</th>
-                        <th class="w-24 px-3 py-2 font-medium">Flags</th>
+                        <th class="w-28 px-3 py-2 font-medium">{t('field.type')}</th>
+                        <th class="px-3 py-2 font-medium">{t('field.value')}</th>
+                        <th class="w-24 px-3 py-2 font-medium">{t('field.flags')}</th>
                         <th class="w-12 px-3 py-2 font-medium"></th>
                     </tr>
                 </thead>
                 <tbody>
                     {#if rows.length === 0}
                         <tr>
-                            <td class="px-3 py-3 text-xs text-muted-foreground" colspan="4">No patterns yet.</td>
+                            <td class="px-3 py-3 text-xs text-muted-foreground" colspan="4">{t('field.noPatterns')}</td>
                         </tr>
                     {/if}
 
@@ -190,15 +193,15 @@
                                         {rowTypeLabel(row.type)}
                                     </Select.Trigger>
                                     <Select.Content>
-                                        <Select.Item value="literal" label="literal">literal</Select.Item>
-                                        <Select.Item value="regex" label="regex">regex</Select.Item>
+                                        <Select.Item value="literal" label={t('field.literal')}>{t('field.literal')}</Select.Item>
+                                        <Select.Item value="regex" label={t('field.regex')}>{t('field.regex')}</Select.Item>
                                     </Select.Content>
                                 </Select.Root>
                             </td>
                             <td class="px-3 py-2">
-                                <Input
+                                    <Input
                                     value={row.value}
-                                    placeholder={row.type === 'regex' ? 'Pattern' : 'Text value'}
+                                    placeholder={row.type === 'regex' ? t('field.patternPlaceholder') : t('field.textValuePlaceholder')}
                                     class="h-9"
                                     oninput={(event) => updateRow(index, { value: (event.currentTarget as HTMLInputElement).value })}
                                 />
@@ -207,7 +210,7 @@
                                 <Input
                                     value={row.flags}
                                     disabled={row.type !== 'regex'}
-                                    placeholder="gim"
+                                    placeholder={t('field.flags')}
                                     class="h-9"
                                     oninput={(event) => updateRow(index, { flags: (event.currentTarget as HTMLInputElement).value })}
                                 />
@@ -231,15 +234,15 @@
                             <Select.Root type="single" value={newType} onValueChange={(nextValue) => (newType = nextValue as MatcherRow['type'])}>
                                 <Select.Trigger id={id} class="h-9 w-full px-2">{rowTypeLabel(newType)}</Select.Trigger>
                                 <Select.Content>
-                                    <Select.Item value="literal" label="literal">literal</Select.Item>
-                                    <Select.Item value="regex" label="regex">regex</Select.Item>
-                                </Select.Content>
-                            </Select.Root>
-                        </td>
+                                        <Select.Item value="literal" label={t('field.literal')}>{t('field.literal')}</Select.Item>
+                                        <Select.Item value="regex" label={t('field.regex')}>{t('field.regex')}</Select.Item>
+                                    </Select.Content>
+                                </Select.Root>
+                            </td>
                         <td class="px-3 py-2">
                             <Input
                                 value={newValue}
-                                placeholder={newType === 'regex' ? 'Pattern' : 'Text value'}
+                                placeholder={newType === 'regex' ? t('field.patternPlaceholder') : t('field.textValuePlaceholder')}
                                 class="h-9"
                                 oninput={(event) => (newValue = (event.currentTarget as HTMLInputElement).value)}
                                 onkeydown={(event) => {
@@ -253,7 +256,7 @@
                             <Input
                                 value={newFlags}
                                 disabled={newType !== 'regex'}
-                                placeholder="gim"
+                                placeholder={t('field.flags')}
                                 class="h-9"
                                 oninput={(event) => (newFlags = (event.currentTarget as HTMLInputElement).value)}
                             />
@@ -266,7 +269,7 @@
                                 disabled={!canAddRow}
                                 onclick={addRow}
                             >
-                                Add
+                                {t('field.add')}
                             </Button>
                         </td>
                     </tr>
@@ -275,7 +278,7 @@
         </div>
 
         <div class="border-t px-3 py-2">
-            <p class="text-xs text-muted-foreground">Regex format is stored as <code>/pattern/flags</code>.</p>
+            <p class="text-xs text-muted-foreground">{t('field.regexStored')}</p>
         </div>
     </div>
 </div>

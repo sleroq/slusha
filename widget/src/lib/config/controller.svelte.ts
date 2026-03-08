@@ -6,6 +6,12 @@ import {
   saveGlobalConfig,
 } from "./api";
 import {
+  DEFAULT_LOCALE,
+  normalizeLocale,
+  translate,
+  type WidgetLocale,
+} from "$lib/i18n";
+import {
   type AvailableChat,
   type BootstrapResponse,
   buildChatPayload,
@@ -37,21 +43,35 @@ function initialSearchParams(): URLSearchParams {
   return new URLSearchParams(window.location.search);
 }
 
-function parseUserIdFromInitData(rawInitData: string): number | undefined {
+interface ParsedInitUser {
+  id?: number;
+  languageCode?: string;
+}
+
+function parseUserFromInitData(rawInitData: string): ParsedInitUser {
   const userValue = new URLSearchParams(rawInitData).get("user");
   if (!userValue) {
-    return undefined;
+    return {};
   }
 
   try {
-    const parsed = JSON.parse(userValue) as { id?: unknown };
-    return typeof parsed.id === "number" ? parsed.id : undefined;
+    const parsed = JSON.parse(userValue) as {
+      id?: unknown;
+      language_code?: unknown;
+    };
+    return {
+      id: typeof parsed.id === "number" ? parsed.id : undefined,
+      languageCode: typeof parsed.language_code === "string"
+        ? parsed.language_code
+        : undefined,
+    };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
 export class ConfigController {
+  locale = $state<WidgetLocale>(DEFAULT_LOCALE);
   scope = $state<ConfigScope>("chat");
   chatId = $state("");
   bootstrap = $state<BootstrapResponse | undefined>(undefined);
@@ -131,11 +151,16 @@ export class ConfigController {
   }
 
   get isLoading(): boolean {
-    return this.status.startsWith("Loading");
+    return this.status === translate(this.locale, "status.loading");
   }
 
   initialize(): void {
-    this.ensureInitDataRaw();
+    const rawInitData = this.ensureInitDataRaw();
+    if (rawInitData) {
+      const parsedUser = parseUserFromInitData(rawInitData);
+      this.userId = parsedUser.id;
+      this.locale = normalizeLocale(parsedUser.languageCode);
+    }
     void this.loadBootstrap();
   }
 
@@ -228,20 +253,23 @@ export class ConfigController {
         return false;
       }
 
-      this.status = "Waiting for Telegram init data...";
+      this.status = translate(this.locale, "status.waitingInitData");
       this.#scheduleRetry();
       return false;
     }
 
-    this.userId = parseUserIdFromInitData(rawInitData);
+    const parsedUser = parseUserFromInitData(rawInitData);
+    this.userId = parsedUser.id;
+    this.locale = normalizeLocale(parsedUser.languageCode);
 
     this.#clearRetryTimer();
-    this.status = "Loading...";
+    this.status = translate(this.locale, "status.loading");
 
     const requestedChatId = this.chatId.trim();
     const result = await fetchBootstrap(
       requestedChatId,
       rawInitData,
+      this.locale,
       this.#bootstrapAbortController.signal,
     );
     if (requestVersion !== this.#loadRequestVersion) {
@@ -249,7 +277,7 @@ export class ConfigController {
     }
 
     if (!result.ok || !result.data) {
-      this.status = result.error ?? "Failed to load";
+      this.status = result.error ?? translate(this.locale, "status.failedLoad");
       return false;
     }
 
@@ -261,6 +289,7 @@ export class ConfigController {
       const selectedResult = await fetchBootstrap(
         selectedChatId,
         rawInitData,
+        this.locale,
         this.#bootstrapAbortController.signal,
       );
       if (requestVersion !== this.#loadRequestVersion) {
@@ -268,7 +297,8 @@ export class ConfigController {
       }
 
       if (!selectedResult.ok || !selectedResult.data) {
-        this.status = selectedResult.error ?? "Failed to load";
+        this.status = selectedResult.error ??
+          translate(this.locale, "status.failedLoad");
         return false;
       }
 
@@ -277,7 +307,7 @@ export class ConfigController {
     }
 
     if (this.scope === "chat" && this.availableChats.length === 0) {
-      this.status = "No available chats for configuration";
+      this.status = translate(this.locale, "status.noChats");
       return false;
     }
 
@@ -287,78 +317,84 @@ export class ConfigController {
 
   async saveGlobal(): Promise<boolean> {
     if (!this.canSaveGlobal) {
-      this.status = "Global config is read-only for your role";
+      this.status = translate(this.locale, "status.readOnlyGlobal");
       return false;
     }
 
     const rawInitData = this.ensureInitDataRaw();
     if (!rawInitData) {
-      this.status = "Missing Telegram init data";
+      this.status = translate(this.locale, "status.missingInitData");
       return false;
     }
 
-    this.status = "Saving global config...";
+    this.status = translate(this.locale, "status.savingGlobal");
     const payload = buildGlobalPayload(this.globalConfig, this.globalText);
-    const result = await saveGlobalConfig(payload, rawInitData);
+    const result = await saveGlobalConfig(payload, rawInitData, this.locale);
     this.status = result.ok
-      ? "Global config saved"
-      : (result.error ?? "Failed to save global config");
+      ? translate(this.locale, "status.savedGlobal")
+      : (result.error ?? translate(this.locale, "status.failedSaveGlobal"));
     return result.ok;
   }
 
   async saveChat(): Promise<boolean> {
     const chatId = this.chatId.trim();
     if (!chatId) {
-      this.status = "Chat ID is required";
+      this.status = translate(this.locale, "status.chatIdRequired");
       return false;
     }
 
     const rawInitData = this.ensureInitDataRaw();
     if (!rawInitData) {
-      this.status = "Missing Telegram init data";
+      this.status = translate(this.locale, "status.missingInitData");
       return false;
     }
 
-    this.status = "Saving chat override...";
+    this.status = translate(this.locale, "status.savingChat");
     const payload = buildChatPayload(
       this.chatOverrideConfig,
       this.chatText,
       this.chatBaseConfig,
     );
-    const result = await saveChatConfig(chatId, payload, rawInitData);
+    const result = await saveChatConfig(
+      chatId,
+      payload,
+      rawInitData,
+      this.locale,
+    );
     this.status = result.ok
-      ? "Chat override saved"
-      : (result.error ?? "Failed to save chat override");
+      ? translate(this.locale, "status.savedChat")
+      : (result.error ?? translate(this.locale, "status.failedSaveChat"));
     return result.ok;
   }
 
   async saveInternals(): Promise<boolean> {
     const chatId = this.chatId.trim();
     if (!chatId) {
-      this.status = "Chat ID is required";
+      this.status = translate(this.locale, "status.chatIdRequired");
       return false;
     }
 
     if (!this.canEditChatInternals) {
-      this.status = "Chat internals are read-only for your role";
+      this.status = translate(this.locale, "status.readOnlyInternals");
       return false;
     }
 
     const rawInitData = this.ensureInitDataRaw();
     if (!rawInitData) {
-      this.status = "Missing Telegram init data";
+      this.status = translate(this.locale, "status.missingInitData");
       return false;
     }
 
-    this.status = "Saving chat internals...";
+    this.status = translate(this.locale, "status.savingInternals");
     const result = await saveChatInternals(
       chatId,
       this.chatInternals,
       rawInitData,
+      this.locale,
     );
     this.status = result.ok
-      ? "Chat internals saved"
-      : (result.error ?? "Failed to save chat internals");
+      ? translate(this.locale, "status.savedInternals")
+      : (result.error ?? translate(this.locale, "status.failedSaveInternals"));
     return result.ok;
   }
 }

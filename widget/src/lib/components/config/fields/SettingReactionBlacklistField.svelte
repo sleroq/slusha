@@ -2,6 +2,7 @@
     import SourceStateIcon from '$lib/components/config/SourceStateIcon.svelte';
     import { Button } from '$lib/components/ui/button';
     import { Label } from '$lib/components/ui/label';
+    import { useI18n } from '$lib/i18n/context.svelte';
 
     interface SourceState {
         overridden: boolean;
@@ -29,6 +30,8 @@
         containerClass = '',
         sourceState,
     }: Props = $props();
+
+    const t = useI18n();
 
     const parseItems = (raw: string | undefined): string[] =>
         (raw ?? '')
@@ -100,16 +103,15 @@
     <div class="space-y-3 rounded-md border p-3">
         <div class="flex items-center justify-between gap-2">
             <p class="text-xs text-muted-foreground">
-                <span class="font-medium text-foreground">Blocked {blockedItems.length}</span>
-                / {allReactions.length} reactions
+                <span class="font-medium text-foreground">{t('field.blockedCount', { blocked: blockedItems.length, total: allReactions.length })}</span>
             </p>
             {#if blockedItems.length > 0}
-                <Button type="button" variant="ghost" size="sm" onclick={clearBlocked}>Clear blocked</Button>
+                <Button type="button" variant="ghost" size="sm" onclick={clearBlocked}>{t('field.clearBlocked')}</Button>
             {/if}
         </div>
 
         {#if allReactions.length === 0}
-            <p class="text-xs text-muted-foreground">No reactions available.</p>
+            <p class="text-xs text-muted-foreground">{t('field.noReactions')}</p>
         {:else}
             <div id={id} class="flex flex-wrap gap-2">
                 {#each allReactions as reaction (reaction)}
@@ -118,14 +120,16 @@
                         size="sm"
                         variant={isBlocked(reaction) ? 'destructive' : 'outline'}
                         aria-pressed={isBlocked(reaction)}
-                        aria-label={`${reaction} reaction ${isBlocked(reaction) ? 'blocked' : 'allowed'}`}
+                        aria-label={isBlocked(reaction)
+                            ? t('field.reactionBlocked', { reaction })
+                            : t('field.reactionAllowed', { reaction })}
                         onclick={() => toggleReaction(reaction)}
                     >
                         {reaction}
                     </Button>
                 {/each}
             </div>
-            <p class="text-xs text-muted-foreground">Select reactions to block them in this chat.</p>
+            <p class="text-xs text-muted-foreground">{t('field.selectReactionsToBlock')}</p>
         {/if}
     </div>
 </div>
