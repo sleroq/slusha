@@ -173,6 +173,10 @@ export async function handleBootstrapRequest(
         : [];
     const serializedGlobalConfig = JSON.parse(serializeUserConfig(globalConfig)) as UserConfig;
     const globalPayload = projectGlobalConfigForRole(serializedGlobalConfig, role);
+    const chatBasePayload = projectEffectiveConfigForRole(
+        serializedGlobalConfig,
+        role,
+    );
 
     let chatOverridePayload: unknown = undefined;
     let effectiveConfigPayload: unknown = undefined;
@@ -268,6 +272,7 @@ export async function handleBootstrapRequest(
         canEditChatInternals,
         availableChats,
         globalPayload,
+        chatBasePayload,
         chatOverridePayload,
         effectiveConfigPayload,
         currentCharacter,

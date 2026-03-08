@@ -68,6 +68,9 @@ const PLAIN_TEXT_META_CLOSE = '</slusha_meta>';
 const plainTextTargetRefLineRegex = /^@@target_ref=(t\d+)\s*\r?\n([\s\S]*)$/;
 const plainTextMetadataBlockRegex =
     /^<slusha_meta>\s*\r?\n([\s\S]*?)\r?\n<\/slusha_meta>\s*/;
+const reservedMessageTokenRegex = /slusha_meta|target_ref/i;
+const RESERVED_MESSAGE_TOKEN_ERROR =
+    'Generated output contains reserved metadata token';
 
 function parseJsonRecord(text: string): Record<string, unknown> | undefined {
     try {
@@ -294,6 +297,18 @@ function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
     }
 
     return entries;
+}
+
+function hasReservedMessageToken(entries: ChatEntry[]): boolean {
+    return entries.some((entry) =>
+        isTextEntry(entry) && typeof entry.text === 'string' &&
+            reservedMessageTokenRegex.test(entry.text)
+    );
+}
+
+function isReservedMessageTokenError(error: unknown): boolean {
+    return error instanceof Error &&
+        error.message === RESERVED_MESSAGE_TOKEN_ERROR;
 }
 
 function buildTelemetryMetadata(
@@ -1043,11 +1058,15 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             }
 
             try {
-                output = replyMethod === 'json_actions'
+                const generatedOutput = replyMethod === 'json_actions'
                     ? await generateStructuredActionsOutput(attemptMessages)
                     : await generatePlainTextAndReactionsOutput(
                         attemptMessages,
                     );
+                if (hasReservedMessageToken(generatedOutput)) {
+                    throw new Error(RESERVED_MESSAGE_TOKEN_ERROR);
+                }
+                output = generatedOutput;
                 break;
             } catch (error) {
                 generationError = error;
@@ -1056,12 +1075,20 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     historyLimit: attempt.historyLimit,
                     includeBotNotes: attempt.includeBotNotes,
                     replyMethod,
+                    reservedMessageToken: isReservedMessageTokenError(error),
                     error,
                 });
             }
         }
 
         if (!output) {
+            if (isReservedMessageTokenError(generationError)) {
+                logger.warn(
+                    'Could not get response: generated output included reserved metadata tokens',
+                );
+                return;
+            }
+
             let blockReason: string | undefined;
             if (
                 generationError instanceof APICallError &&
