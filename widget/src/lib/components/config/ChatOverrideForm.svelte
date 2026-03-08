@@ -86,6 +86,8 @@
     let showPrompts = $derived(
         matchesSection(
             'prompts',
+            'json-actions chat prompt',
+            'plain-text chat prompt',
             'primary chat prompt',
             'low-context chat prompt',
             'private chat prompt addition',
@@ -423,26 +425,26 @@
                             id="c-ai-prompt"
                             rows={4}
                             containerClass="md:col-span-2"
-                            label="Primary chat prompt"
-                            description="Core behavior and persona instructions for this chat."
+                            label="JSON-actions chat prompt"
+                            description="Core behavior/persona prompt used only when reply method is json_actions."
                             sourceState={{
                                 overridden: isOverridden('ai.prompt'),
                                 label: sourceStateText('ai.prompt'),
                             }}
-                            hidden={!matchesBlockItem('prompts', 'primary chat prompt')}
+                            hidden={!matchesBlockItem('prompts', 'json-actions chat prompt', 'primary chat prompt')}
                             bind:value={config.ai.prompt}
                         />
                         <SettingTextareaField
                             id="c-ai-dumb-prompt"
                             rows={3}
                             containerClass="md:col-span-2"
-                            label="Low-context chat prompt"
-                            description="Prompt used in simplified response mode."
+                            label="Plain-text chat prompt"
+                            description="Core behavior/persona prompt used only when reply method is plain_text_reactions."
                             sourceState={{
                                 overridden: isOverridden('ai.dumbPrompt'),
                                 label: sourceStateText('ai.dumbPrompt'),
                             }}
-                            hidden={!matchesBlockItem('prompts', 'low-context chat prompt', 'dumb prompt')}
+                            hidden={!matchesBlockItem('prompts', 'plain-text chat prompt', 'low-context chat prompt', 'dumb prompt')}
                             bind:value={config.ai.dumbPrompt}
                         />
                         <SettingTextareaField

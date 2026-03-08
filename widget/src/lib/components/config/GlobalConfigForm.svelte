@@ -64,6 +64,10 @@
     let showPrompts = $derived(
         matchesSection(
             'prompts',
+            'json-actions preface prompt',
+            'plain-text preface prompt',
+            'json-actions chat prompt',
+            'plain-text chat prompt',
             'system preface prompt',
             'primary chat prompt',
             'low-context chat prompt',
@@ -72,6 +76,8 @@
             'group chat prompt addition',
             'comment prompt addition',
             'hate mode prompt',
+            'json-actions final prompt wrapper',
+            'plain-text final prompt wrapper',
             'final prompt wrapper',
             'chat actions tool description',
             'plain-text reaction optional step',
@@ -281,37 +287,37 @@
                         id="g-ai-preprompt"
                         rows={4}
                         containerClass="md:col-span-2"
-                        label="System preface prompt"
-                        description="Prepended context before the main prompt."
-                        hidden={!matchesBlockItem('prompts', 'system preface prompt', 'preprompt')}
+                        label="JSON-actions preface prompt"
+                        description="Prepended context used only when reply method is json_actions."
+                        hidden={!matchesBlockItem('prompts', 'json-actions preface prompt', 'system preface prompt', 'preprompt')}
                         bind:value={config.ai.prePrompt}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-dumb-preprompt"
+                        rows={3}
+                        containerClass="md:col-span-2"
+                        label="Plain-text preface prompt"
+                        description="Prepended context used only when reply method is plain_text_reactions."
+                        hidden={!matchesBlockItem('prompts', 'plain-text preface prompt', 'low-context preface prompt', 'dumb preprompt')}
+                        bind:value={config.ai.dumbPrePrompt}
                     />
                     <SettingTextareaField
                         id="g-ai-prompt"
                         rows={4}
                         containerClass="md:col-span-2"
-                        label="Primary chat prompt"
-                        description="Core behavior and persona instructions."
-                        hidden={!matchesBlockItem('prompts', 'primary chat prompt')}
+                        label="JSON-actions chat prompt"
+                        description="Core behavior/persona prompt used only in json_actions mode."
+                        hidden={!matchesBlockItem('prompts', 'json-actions chat prompt', 'primary chat prompt')}
                         bind:value={config.ai.prompt}
                     />
                     <SettingTextareaField
                         id="g-ai-dumb-prompt"
                         rows={3}
                         containerClass="md:col-span-2"
-                        label="Low-context chat prompt"
-                        description="Used when running the simplified response mode."
-                        hidden={!matchesBlockItem('prompts', 'low-context chat prompt', 'dumb prompt')}
+                        label="Plain-text chat prompt"
+                        description="Core behavior/persona prompt used only in plain_text_reactions mode."
+                        hidden={!matchesBlockItem('prompts', 'plain-text chat prompt', 'low-context chat prompt', 'dumb prompt')}
                         bind:value={config.ai.dumbPrompt}
-                    />
-                    <SettingTextareaField
-                        id="g-ai-dumb-preprompt"
-                        rows={3}
-                        containerClass="md:col-span-2"
-                        label="Low-context preface prompt"
-                        description="Preface used with the low-context prompt."
-                        hidden={!matchesBlockItem('prompts', 'low-context preface prompt', 'dumb preprompt')}
-                        bind:value={config.ai.dumbPrePrompt}
                     />
                     <SettingTextareaField
                         id="g-ai-private-addition"
@@ -353,10 +359,19 @@
                         id="g-ai-final-prompt"
                         rows={4}
                         containerClass="md:col-span-2"
-                        label="Final prompt wrapper"
-                        description="Last instruction template before model generation."
-                        hidden={!matchesBlockItem('prompts', 'final prompt wrapper', 'final prompt')}
+                        label="JSON-actions final prompt wrapper"
+                        description="Last instruction template used only in json_actions mode."
+                        hidden={!matchesBlockItem('prompts', 'json-actions final prompt wrapper', 'final prompt wrapper', 'final prompt')}
                         bind:value={config.ai.finalPrompt}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-dumb-final"
+                        rows={3}
+                        containerClass="md:col-span-2"
+                        label="Plain-text final prompt wrapper"
+                        description="Last instruction template used only in plain_text_reactions mode."
+                        hidden={!matchesBlockItem('prompts', 'plain-text final prompt wrapper', 'low-context final wrapper', 'dumb final prompt')}
+                        bind:value={config.ai.dumbFinalPrompt}
                     />
                     <SettingTextareaField
                         id="g-ai-tool-description"
@@ -375,15 +390,6 @@
                         description="Follow-up instruction used to extract reactions after plain-text generation."
                         hidden={!matchesBlockItem('prompts', 'plain-text reaction optional step', 'optional step', 'plainTextReactionOptionalStepPrompt')}
                         bind:value={config.ai.plainTextReactionOptionalStepPrompt}
-                    />
-                    <SettingTextareaField
-                        id="g-ai-dumb-final"
-                        rows={3}
-                        containerClass="md:col-span-2"
-                        label="Low-context final wrapper"
-                        description="Final wrapper used in low-context mode."
-                        hidden={!matchesBlockItem('prompts', 'low-context final wrapper', 'dumb final prompt')}
-                        bind:value={config.ai.dumbFinalPrompt}
                     />
                     <SettingTextareaField
                         id="g-ai-notes-prompt"
