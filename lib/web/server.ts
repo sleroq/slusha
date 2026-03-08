@@ -30,6 +30,7 @@ import logger from '../logger.ts';
 import { type BotCharacter, ChatMemory, Memory } from '../memory.ts';
 import { chatMembers, chats } from '../db/schema.ts';
 import { ALLOWED_REACTIONS } from '../telegram/reactions.ts';
+import { getUsageSnapshot, renderProgressBar } from '../telegram/usage-window.ts';
 
 interface RuntimeConfigAccess {
     getBotToken: () => string;
@@ -62,6 +63,19 @@ interface CurrentCharacterPayload {
 interface ChatInternalsPayload {
     summary: string;
     personalNotes: string;
+}
+
+interface UsageWindowStatusPayload {
+    tier: 'free' | 'trusted';
+    downgraded: boolean;
+    userUsed: number;
+    userMax: number;
+    userWindowMinutes: number;
+    userBar: string;
+    chatUsed: number;
+    chatMax: number;
+    chatWindowMinutes: number;
+    chatBar: string;
 }
 
 function projectCurrentCharacter(
@@ -331,6 +345,7 @@ export function startWebServer(options: StartWebServerOptions) {
                 let canEditChat = false;
                 let canEditChatInternals = false;
                 let chatInternalsPayload: ChatInternalsPayload | undefined;
+                let usageWindowStatus: UsageWindowStatusPayload | undefined;
 
                 if (chatId !== undefined && Number.isFinite(chatId)) {
                     canEditChat = await canEditChatConfig(
@@ -379,6 +394,40 @@ export function startWebServer(options: StartWebServerOptions) {
                             serializedEffectiveConfig,
                             role,
                         );
+
+                        if (userId) {
+                            const usageSnapshot = await getUsageSnapshot(
+                                options.memory.db,
+                                {
+                                    config: globalConfig,
+                                    chatId,
+                                    userId,
+                                    chatOverride,
+                                },
+                            );
+                            usageWindowStatus = {
+                                tier: usageSnapshot.tier,
+                                downgraded: usageSnapshot.downgraded,
+                                userUsed: usageSnapshot.user.used,
+                                userMax: usageSnapshot.user.maxRequests,
+                                userWindowMinutes:
+                                    usageSnapshot.user.windowMinutes,
+                                userBar: renderProgressBar(
+                                    usageSnapshot.user.used,
+                                    usageSnapshot.user.maxRequests,
+                                    16,
+                                ),
+                                chatUsed: usageSnapshot.chat.used,
+                                chatMax: usageSnapshot.chat.maxRequests,
+                                chatWindowMinutes:
+                                    usageSnapshot.chat.windowMinutes,
+                                chatBar: renderProgressBar(
+                                    usageSnapshot.chat.used,
+                                    usageSnapshot.chat.maxRequests,
+                                    16,
+                                ),
+                            };
+                        }
                     }
                 }
 
@@ -399,6 +448,7 @@ export function startWebServer(options: StartWebServerOptions) {
                     effectiveConfigPayload,
                     currentCharacter,
                     chatInternalsPayload,
+                    usageWindowStatus,
                 });
             }
 

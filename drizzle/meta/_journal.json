@@ -43,6 +43,13 @@
             "when": 1772895600000,
             "tag": "0005_history_v3_threads",
             "breakpoints": true
+        },
+        {
+            "idx": 6,
+            "version": "7",
+            "when": 1772978400000,
+            "tag": "0006_request_window_usage",
+            "breakpoints": true
         }
     ]
 }

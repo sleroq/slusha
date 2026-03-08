@@ -140,3 +140,10 @@ export const chatCharacters = sqliteTable('chat_characters', {
     payload: text('payload').notNull(),
     names: text('names').notNull(),
 });
+
+export const requestWindowEvents = sqliteTable('request_window_events', {
+    id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+    chatId: integer('chat_id', { mode: 'number' }).notNull(),
+    userId: integer('user_id', { mode: 'number' }),
+    createdAt: integer('created_at', { mode: 'number' }).notNull(),
+});

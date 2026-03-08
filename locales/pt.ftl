@@ -149,3 +149,10 @@ config-open-widget = Abrir widget de configuração
 config-open-global = Abrir configuração global do bot
 config-open-chat = Abrir configuração do chat atual
 config-widget-unavailable = Widget de configuração indisponível agora
+
+# Usage window
+usage-title = Usage window ({ $tier } tier)
+usage-user-window = Per-user
+usage-chat-window = Per-chat
+usage-downgraded = Cost mode is active. Expensive features are disabled and model switched to { $model }.
+usage-normal = Normal mode is active.

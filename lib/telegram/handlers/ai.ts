@@ -42,6 +42,11 @@ import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { parseModelRef } from '../../ai/model-ref.ts';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
 import { buildLanguageProtocol } from '../../ai/language-protocol.ts';
+import {
+    cleanupUsageEvents,
+    getUsageSnapshot,
+    recordUsageEvent,
+} from '../usage-window.ts';
 
 const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
@@ -544,6 +549,24 @@ export default function registerAI(bot: Bot<SlushaContext>) {
     bot.on('message', async (ctx) => {
         const chatState = await ctx.m.getChat();
         const effectiveConfig = await ctx.m.getEffectiveConfig();
+        const chatOverride = await ctx.m.getChatConfigOverride();
+        await recordUsageEvent(ctx.memory.db, {
+            chatId: ctx.chat.id,
+            userId: ctx.from?.id,
+        });
+        await cleanupUsageEvents(ctx.memory.db, effectiveConfig);
+        const usageSnapshot = await getUsageSnapshot(ctx.memory.db, {
+            config: effectiveConfig,
+            chatId: ctx.chat.id,
+            userId: ctx.from?.id,
+            chatOverride,
+        });
+        const usageConfig = effectiveConfig.requestWindow;
+        const isDowngraded = usageSnapshot.downgraded;
+        const includeNotes = !isDowngraded || !usageConfig.disableNotes;
+        const includeMemory = !isDowngraded || !usageConfig.disableMemory;
+        const includeAttachments = !isDowngraded ||
+            !usageConfig.disableAttachments;
         const sendChatActionsTool = createSendChatActionsTool(
             resolveCustomPrompt(
                 effectiveConfig.ai.chatActionsToolDescription,
@@ -563,8 +586,14 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             effectiveConfig.blacklistedReactions,
         );
 
-        const messagesToPass = chatState.messagesToPass ??
+        const baseMessagesToPass = chatState.messagesToPass ??
             effectiveConfig.ai.messagesToPass;
+        const messagesToPass = isDowngraded && usageConfig.disableLongContext
+            ? Math.min(baseMessagesToPass, usageConfig.downgradeMessagesToPass)
+            : baseMessagesToPass;
+        const bytesLimit = isDowngraded && usageConfig.disableLongContext
+            ? Math.min(effectiveConfig.ai.bytesLimit, usageConfig.downgradeBytesLimit)
+            : effectiveConfig.ai.bytesLimit;
         const maxTargetCount = Math.min(
             Math.max(messagesToPass * 2, 12),
             40,
@@ -588,7 +617,9 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             await ctx.i18n.getLocale();
         const character = chatState.character;
 
-        const modelRef = chatState.chatModel ?? effectiveConfig.ai.model;
+        const modelRef = isDowngraded
+            ? usageConfig.downgradeModel
+            : (chatState.chatModel ?? effectiveConfig.ai.model);
         const parsedModel = parseModelRef(modelRef);
 
         const time = new Date().getTime();
@@ -600,6 +631,9 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         }
         if (ctx.info.isRandom) {
             tags.push('random');
+        }
+        if (isDowngraded) {
+            tags.push('downgraded');
         }
         const chatName = ctx.chat.first_name ?? ctx.chat.title;
 
@@ -660,8 +694,8 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 activeMembers,
                 notes: chatState.notes,
                 memory: chatState.memory,
-                includeNotes: plan.includeBotNotes,
-                includeMemory: plan.includeBotNotes,
+                includeNotes: plan.includeBotNotes && includeNotes,
+                includeMemory: plan.includeBotNotes && includeMemory,
             });
 
             prompt += `\n\n### Chat Info ###\n${chatInfoMsg}`;
@@ -692,12 +726,13 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 savedHistory,
                 {
                     messagesLimit: plan.historyLimit,
-                    bytesLimit: effectiveConfig.ai.bytesLimit,
+                    bytesLimit,
                     symbolLimit: effectiveConfig.ai.messageMaxLength,
                     includeReactions: true,
                     activeMessageId: ctx.msg.message_id,
                     attachments:
                         effectiveConfig.ai.includeAttachmentsInHistory &&
+                        includeAttachments &&
                         parsedModel.provider === 'google',
                 },
             );

@@ -8,6 +8,51 @@ export interface AvailableChat {
   type: "private" | "group" | "supergroup" | "channel";
 }
 
+export interface UsageWindowStatus {
+  tier: "free" | "trusted";
+  downgraded: boolean;
+  userUsed: number;
+  userMax: number;
+  userWindowMinutes: number;
+  userBar: string;
+  chatUsed: number;
+  chatMax: number;
+  chatWindowMinutes: number;
+  chatBar: string;
+}
+
+export interface RequestWindowLimit {
+  maxRequests: number;
+  windowMinutes: number;
+}
+
+export interface RequestWindowTier {
+  perUser: RequestWindowLimit;
+  perChat: RequestWindowLimit;
+}
+
+export interface RequestWindowConfig {
+  free: RequestWindowTier;
+  trusted: RequestWindowTier;
+  downgradeModel: string;
+  disableLongContext: boolean;
+  downgradeMessagesToPass: number;
+  downgradeBytesLimit: number;
+  disableNotes: boolean;
+  disableAttachments: boolean;
+  disableMemory: boolean;
+}
+
+export interface RequestWindowLimitOverride {
+  maxRequests?: number;
+  windowMinutes?: number;
+}
+
+export interface RequestWindowPerChatOverride {
+  free?: RequestWindowLimitOverride;
+  trusted?: RequestWindowLimitOverride;
+}
+
 export interface BootstrapResponse {
   role: ConfigRole;
   categories: string[];
@@ -23,6 +68,7 @@ export interface BootstrapResponse {
   effectiveConfigPayload?: unknown;
   currentCharacter?: unknown;
   chatInternalsPayload?: unknown;
+  usageWindowStatus?: unknown;
 }
 
 export interface CurrentCharacterPayload {
@@ -156,6 +202,7 @@ export interface UserConfigPayload {
   chatLastUseNotes: number;
   chatLastUseMemory: number;
   responseDelay: number;
+  requestWindow: RequestWindowConfig;
 }
 
 export interface ChatOverridePayload {
@@ -169,6 +216,7 @@ export interface ChatOverridePayload {
   blacklistedReactions?: string[];
   nepons?: string[];
   responseDelay?: number;
+  requestWindowPerChat?: RequestWindowPerChatOverride;
 }
 
 function normalizeThinkingConfig(value: unknown): GoogleThinkingConfig {
@@ -247,6 +295,10 @@ export interface ResolvedChatOverridePayload {
   blacklistedReactions: string[];
   nepons: string[];
   responseDelay: number;
+  requestWindowPerChat: {
+    free: RequestWindowLimit;
+    trusted: RequestWindowLimit;
+  };
 }
 
 export interface GlobalFormText {
@@ -390,6 +442,149 @@ export function defaultChatEditableAiConfig(
   };
 }
 
+function defaultRequestWindowLimit(
+  maxRequests: number,
+  windowMinutes: number,
+): RequestWindowLimit {
+  return { maxRequests, windowMinutes };
+}
+
+export function defaultRequestWindowConfig(): RequestWindowConfig {
+  return {
+    free: {
+      perUser: defaultRequestWindowLimit(30, 180),
+      perChat: defaultRequestWindowLimit(120, 180),
+    },
+    trusted: {
+      perUser: defaultRequestWindowLimit(300, 180),
+      perChat: defaultRequestWindowLimit(1200, 180),
+    },
+    downgradeModel: "",
+    disableLongContext: true,
+    downgradeMessagesToPass: 4,
+    downgradeBytesLimit: 1024 * 1024,
+    disableNotes: true,
+    disableAttachments: true,
+    disableMemory: true,
+  };
+}
+
+function normalizeRequestWindowLimit(
+  value: unknown,
+  base: RequestWindowLimit,
+): RequestWindowLimit {
+  if (!value || typeof value !== "object") {
+    return { ...base };
+  }
+
+  const obj = value as Partial<RequestWindowLimit>;
+  return {
+    maxRequests: typeof obj.maxRequests === "number"
+      ? obj.maxRequests
+      : base.maxRequests,
+    windowMinutes: typeof obj.windowMinutes === "number"
+      ? obj.windowMinutes
+      : base.windowMinutes,
+  };
+}
+
+function normalizeRequestWindowConfig(value: unknown): RequestWindowConfig {
+  const base = defaultRequestWindowConfig();
+  if (!value || typeof value !== "object") {
+    return base;
+  }
+
+  const obj = value as Partial<RequestWindowConfig>;
+  return {
+    free: {
+      perUser: normalizeRequestWindowLimit(obj.free?.perUser, base.free.perUser),
+      perChat: normalizeRequestWindowLimit(obj.free?.perChat, base.free.perChat),
+    },
+    trusted: {
+      perUser: normalizeRequestWindowLimit(
+        obj.trusted?.perUser,
+        base.trusted.perUser,
+      ),
+      perChat: normalizeRequestWindowLimit(
+        obj.trusted?.perChat,
+        base.trusted.perChat,
+      ),
+    },
+    downgradeModel: typeof obj.downgradeModel === "string"
+      ? obj.downgradeModel
+      : base.downgradeModel,
+    disableLongContext: typeof obj.disableLongContext === "boolean"
+      ? obj.disableLongContext
+      : base.disableLongContext,
+    downgradeMessagesToPass: typeof obj.downgradeMessagesToPass === "number"
+      ? obj.downgradeMessagesToPass
+      : base.downgradeMessagesToPass,
+    downgradeBytesLimit: typeof obj.downgradeBytesLimit === "number"
+      ? obj.downgradeBytesLimit
+      : base.downgradeBytesLimit,
+    disableNotes: typeof obj.disableNotes === "boolean"
+      ? obj.disableNotes
+      : base.disableNotes,
+    disableAttachments: typeof obj.disableAttachments === "boolean"
+      ? obj.disableAttachments
+      : base.disableAttachments,
+    disableMemory: typeof obj.disableMemory === "boolean"
+      ? obj.disableMemory
+      : base.disableMemory,
+  };
+}
+
+function normalizeRequestWindowPerChatOverride(
+  value: unknown,
+): RequestWindowPerChatOverride {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const obj = value as Partial<RequestWindowPerChatOverride>;
+  const normalizeLimit = (
+    raw: unknown,
+  ): RequestWindowLimitOverride | undefined => {
+    if (!raw || typeof raw !== "object") {
+      return undefined;
+    }
+    const entry = raw as Partial<RequestWindowLimitOverride>;
+    const next: RequestWindowLimitOverride = {};
+    if (typeof entry.maxRequests === "number") {
+      next.maxRequests = entry.maxRequests;
+    }
+    if (typeof entry.windowMinutes === "number") {
+      next.windowMinutes = entry.windowMinutes;
+    }
+    return Object.keys(next).length > 0 ? next : undefined;
+  };
+
+  return {
+    free: normalizeLimit(obj.free),
+    trusted: normalizeLimit(obj.trusted),
+  };
+}
+
+function resolveRequestWindowPerChat(
+  globalConfig: RequestWindowConfig,
+  override?: RequestWindowPerChatOverride,
+): { free: RequestWindowLimit; trusted: RequestWindowLimit } {
+  return {
+    free: {
+      maxRequests: override?.free?.maxRequests ??
+        globalConfig.free.perChat.maxRequests,
+      windowMinutes: override?.free?.windowMinutes ??
+        globalConfig.free.perChat.windowMinutes,
+    },
+    trusted: {
+      maxRequests: override?.trusted?.maxRequests ??
+        globalConfig.trusted.perChat.maxRequests,
+      windowMinutes: override?.trusted?.windowMinutes ??
+        globalConfig.trusted.perChat.windowMinutes,
+    },
+  };
+}
+
 export function defaultGlobalConfig(): UserConfigPayload {
   return {
     ai: defaultAiConfig(),
@@ -411,6 +606,7 @@ export function defaultGlobalConfig(): UserConfigPayload {
     chatLastUseNotes: 3,
     chatLastUseMemory: 2,
     responseDelay: 1,
+    requestWindow: defaultRequestWindowConfig(),
   };
 }
 
@@ -529,6 +725,7 @@ export function fromUnknownGlobal(payload: unknown): UserConfigPayload {
       )
       : [],
     availableModels: normalizeModels(obj.availableModels),
+    requestWindow: normalizeRequestWindowConfig(obj.requestWindow),
   };
 }
 
@@ -541,6 +738,9 @@ export function fromUnknownChatOverride(
     : {};
   const baseAi = defaultChatEditableAiConfig(global.ai);
   const overrideAi = obj.ai ?? {};
+  const requestWindowPerChat = normalizeRequestWindowPerChatOverride(
+    obj.requestWindowPerChat,
+  );
 
   return {
     ai: {
@@ -560,6 +760,10 @@ export function fromUnknownChatOverride(
       global.blacklistedReactions,
     nepons: obj.nepons ?? global.nepons,
     responseDelay: obj.responseDelay ?? global.responseDelay,
+    requestWindowPerChat: resolveRequestWindowPerChat(
+      global.requestWindow,
+      requestWindowPerChat,
+    ),
   };
 }
 
@@ -616,6 +820,44 @@ export function fromUnknownChatInternals(
     personalNotes: typeof obj.personalNotes === "string"
       ? obj.personalNotes
       : base.personalNotes,
+  };
+}
+
+export function fromUnknownUsageWindowStatus(
+  payload: unknown,
+): UsageWindowStatus | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+  const obj = payload as Partial<UsageWindowStatus>;
+  if (obj.tier !== "free" && obj.tier !== "trusted") {
+    return undefined;
+  }
+  if (
+    typeof obj.userUsed !== "number" ||
+    typeof obj.userMax !== "number" ||
+    typeof obj.userWindowMinutes !== "number" ||
+    typeof obj.userBar !== "string" ||
+    typeof obj.chatUsed !== "number" ||
+    typeof obj.chatMax !== "number" ||
+    typeof obj.chatWindowMinutes !== "number" ||
+    typeof obj.chatBar !== "string" ||
+    typeof obj.downgraded !== "boolean"
+  ) {
+    return undefined;
+  }
+
+  return {
+    tier: obj.tier,
+    downgraded: obj.downgraded,
+    userUsed: obj.userUsed,
+    userMax: obj.userMax,
+    userWindowMinutes: obj.userWindowMinutes,
+    userBar: obj.userBar,
+    chatUsed: obj.chatUsed,
+    chatMax: obj.chatMax,
+    chatWindowMinutes: obj.chatWindowMinutes,
+    chatBar: obj.chatBar,
   };
 }
 
@@ -717,6 +959,33 @@ export function buildChatPayload(
     payload.responseDelay = config.responseDelay;
   }
 
+  const requestWindowPerChat: RequestWindowPerChatOverride = {};
+  if (
+    config.requestWindowPerChat.free.maxRequests !==
+      base.requestWindowPerChat.free.maxRequests ||
+    config.requestWindowPerChat.free.windowMinutes !==
+      base.requestWindowPerChat.free.windowMinutes
+  ) {
+    requestWindowPerChat.free = {
+      maxRequests: config.requestWindowPerChat.free.maxRequests,
+      windowMinutes: config.requestWindowPerChat.free.windowMinutes,
+    };
+  }
+  if (
+    config.requestWindowPerChat.trusted.maxRequests !==
+      base.requestWindowPerChat.trusted.maxRequests ||
+    config.requestWindowPerChat.trusted.windowMinutes !==
+      base.requestWindowPerChat.trusted.windowMinutes
+  ) {
+    requestWindowPerChat.trusted = {
+      maxRequests: config.requestWindowPerChat.trusted.maxRequests,
+      windowMinutes: config.requestWindowPerChat.trusted.windowMinutes,
+    };
+  }
+  if (Object.keys(requestWindowPerChat).length > 0) {
+    payload.requestWindowPerChat = requestWindowPerChat;
+  }
+
   const aiPayload: Partial<ChatEditableAiPayload> = {};
   if (config.ai.model !== base.ai.model) aiPayload.model = config.ai.model;
   if (config.ai.temperature !== base.ai.temperature) {
@@ -801,6 +1070,18 @@ export function collectChatOverridePaths(
   if (payload.blacklistedReactions) paths.push("blacklistedReactions");
   if (payload.nepons) paths.push("nepons");
   if (payload.responseDelay !== undefined) paths.push("responseDelay");
+  if (payload.requestWindowPerChat?.free?.maxRequests !== undefined) {
+    paths.push("requestWindowPerChat.free.maxRequests");
+  }
+  if (payload.requestWindowPerChat?.free?.windowMinutes !== undefined) {
+    paths.push("requestWindowPerChat.free.windowMinutes");
+  }
+  if (payload.requestWindowPerChat?.trusted?.maxRequests !== undefined) {
+    paths.push("requestWindowPerChat.trusted.maxRequests");
+  }
+  if (payload.requestWindowPerChat?.trusted?.windowMinutes !== undefined) {
+    paths.push("requestWindowPerChat.trusted.windowMinutes");
+  }
 
   if (!payload.ai) {
     return paths;

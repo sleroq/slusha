@@ -24,6 +24,7 @@
         currentCharacter?: CurrentCharacterPayload;
         canEditChatInternals: boolean;
         canConfigureTrustedSettings: boolean;
+        canEditWindowOverrides: boolean;
         overriddenFieldPaths: string[];
         searchQuery: string;
     }
@@ -37,6 +38,7 @@
         currentCharacter,
         canEditChatInternals,
         canConfigureTrustedSettings,
+        canEditWindowOverrides,
         overriddenFieldPaths = [],
         searchQuery = '',
     }: Props = $props();
@@ -104,6 +106,10 @@
             'reply method',
             'max reply length',
             'attachment byte limit',
+            'free tier per-chat max requests',
+            'free tier per-chat window minutes',
+            'trusted tier per-chat max requests',
+            'trusted tier per-chat window minutes',
             'include attachments in history',
         ),
     );
@@ -579,6 +585,56 @@
                             hidden={!matchesBlockItem('advanced', 'include attachments in history')}
                             bind:checked={config.ai.includeAttachmentsInHistory}
                         />
+                        {#if canEditWindowOverrides}
+                            <SettingInputField
+                                id="c-req-free-chat-max"
+                                type="number"
+                                label="Free tier per-chat max requests"
+                                description="Chat-wide free-tier limit before cost mode."
+                                sourceState={{
+                                    overridden: isOverridden('requestWindowPerChat.free.maxRequests'),
+                                    label: sourceStateText('requestWindowPerChat.free.maxRequests'),
+                                }}
+                                hidden={!matchesBlockItem('advanced', 'free tier per-chat max requests')}
+                                bind:value={config.requestWindowPerChat.free.maxRequests}
+                            />
+                            <SettingInputField
+                                id="c-req-free-chat-window"
+                                type="number"
+                                label="Free tier per-chat window (minutes)"
+                                description="Rolling window for free-tier chat usage."
+                                sourceState={{
+                                    overridden: isOverridden('requestWindowPerChat.free.windowMinutes'),
+                                    label: sourceStateText('requestWindowPerChat.free.windowMinutes'),
+                                }}
+                                hidden={!matchesBlockItem('advanced', 'free tier per-chat window minutes')}
+                                bind:value={config.requestWindowPerChat.free.windowMinutes}
+                            />
+                            <SettingInputField
+                                id="c-req-trusted-chat-max"
+                                type="number"
+                                label="Trusted tier per-chat max requests"
+                                description="Chat-wide trusted-tier limit before cost mode."
+                                sourceState={{
+                                    overridden: isOverridden('requestWindowPerChat.trusted.maxRequests'),
+                                    label: sourceStateText('requestWindowPerChat.trusted.maxRequests'),
+                                }}
+                                hidden={!matchesBlockItem('advanced', 'trusted tier per-chat max requests')}
+                                bind:value={config.requestWindowPerChat.trusted.maxRequests}
+                            />
+                            <SettingInputField
+                                id="c-req-trusted-chat-window"
+                                type="number"
+                                label="Trusted tier per-chat window (minutes)"
+                                description="Rolling window for trusted-tier chat usage."
+                                sourceState={{
+                                    overridden: isOverridden('requestWindowPerChat.trusted.windowMinutes'),
+                                    label: sourceStateText('requestWindowPerChat.trusted.windowMinutes'),
+                                }}
+                                hidden={!matchesBlockItem('advanced', 'trusted tier per-chat window minutes')}
+                                bind:value={config.requestWindowPerChat.trusted.windowMinutes}
+                            />
+                        {/if}
                     </div>
                 </details>
             {/if}

@@ -149,3 +149,10 @@ config-open-widget = कॉन्फिग विजेट खोलो
 config-open-global = बॉट का ग्लोबल कॉन्फिग खोलो
 config-open-chat = इस चैट का कॉन्फिग खोलो
 config-widget-unavailable = कॉन्फिग विजेट अभी उपलब्ध नहीं है
+
+# Usage window
+usage-title = Usage window ({ $tier } tier)
+usage-user-window = Per-user
+usage-chat-window = Per-chat
+usage-downgraded = Cost mode is active. Expensive features are disabled and model switched to { $model }.
+usage-normal = Normal mode is active.

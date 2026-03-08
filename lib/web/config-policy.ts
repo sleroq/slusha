@@ -154,6 +154,9 @@ export function sanitizeChatOverrideForRole(
         blacklistedReactions: override.blacklistedReactions,
         nepons: override.nepons,
         responseDelay: override.responseDelay,
+        requestWindowPerChat: role === 'admin'
+            ? override.requestWindowPerChat
+            : undefined,
     };
 
     if (next.blacklistedReactions) {

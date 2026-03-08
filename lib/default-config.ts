@@ -222,6 +222,35 @@ const defaultConfig = {
     chatLastUseNotes: 2,
     chatLastUseMemory: 2,
     responseDelay: 1,
+    requestWindow: {
+        free: {
+            perUser: {
+                maxRequests: 30,
+                windowMinutes: 180,
+            },
+            perChat: {
+                maxRequests: 120,
+                windowMinutes: 180,
+            },
+        },
+        trusted: {
+            perUser: {
+                maxRequests: 300,
+                windowMinutes: 180,
+            },
+            perChat: {
+                maxRequests: 1200,
+                windowMinutes: 180,
+            },
+        },
+        downgradeModel: 'gemini-3.1-flash-lite-preview',
+        disableLongContext: true,
+        downgradeMessagesToPass: 4,
+        downgradeBytesLimit: 1024 * 1024,
+        disableNotes: true,
+        disableAttachments: true,
+        disableMemory: true,
+    },
 };
 
 export default defaultConfig;
