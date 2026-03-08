@@ -48,12 +48,12 @@ const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
 const DEFAULT_PLAIN_TEXT_OPTIONAL_REACTION_STEP =
     'Optional step: return only react actions (no reply actions) using target_ref from Reply Target Map. If no reaction is needed, return empty actions list.';
 
-const PLAIN_TEXT_META_OPEN = '<<SLUSHA_META>>';
-const PLAIN_TEXT_META_CLOSE = '<</SLUSHA_META>>';
+const PLAIN_TEXT_META_OPEN = '<slusha_meta>';
+const PLAIN_TEXT_META_CLOSE = '</slusha_meta>';
 
 const plainTextTargetRefLineRegex = /^@@target_ref=(t\d+)\s*\r?\n([\s\S]*)$/;
 const plainTextMetadataBlockRegex =
-    /^<<SLUSHA_META>>\s*\r?\n([\s\S]*?)\r?\n<<\/SLUSHA_META>>\s*/;
+    /^<slusha_meta>\s*\r?\n([\s\S]*?)\r?\n<\/slusha_meta>\s*/;
 
 function parseJsonRecord(text: string): Record<string, unknown> | undefined {
     try {
@@ -212,7 +212,7 @@ function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
         }
 
         const visibleText = candidateText
-            .replace(/<<SLUSHA_META>>[\s\S]*?<<\/SLUSHA_META>>/g, '')
+            .replace(/<slusha_meta>[\s\S]*?<\/slusha_meta>/g, '')
             .trim();
         if (!visibleText) {
             continue;

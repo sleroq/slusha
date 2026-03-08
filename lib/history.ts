@@ -26,8 +26,8 @@ interface HistoryCandidate {
     rootIndex: number;
 }
 
-const HISTORY_META_OPEN = '<<SLUSHA_META>>';
-const HISTORY_META_CLOSE = '<</SLUSHA_META>>';
+const HISTORY_META_OPEN = '<slusha_meta>';
+const HISTORY_META_CLOSE = '</slusha_meta>';
 
 function buildHistoryMetadataBlock(metadata: Record<string, unknown>): string {
     return `\n${HISTORY_META_OPEN}\n${JSON.stringify(metadata)}\n${HISTORY_META_CLOSE}`;
