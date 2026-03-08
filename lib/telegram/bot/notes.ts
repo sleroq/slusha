@@ -12,6 +12,45 @@ import {
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
 import { getUsageSnapshot } from '../usage-window.ts';
+import {
+    aiFailuresTotal,
+    aiFinishReasonTotal,
+    aiRequestDurationSeconds,
+    aiRequestsTotal,
+    aiTokensTotal,
+    errorType,
+} from '../../app/metrics.ts';
+
+function tokenCountFromUsage(usage: unknown, key: string): number | undefined {
+    if (typeof usage !== 'object' || usage === null) {
+        return undefined;
+    }
+
+    const raw = Reflect.get(usage, key);
+    return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0
+        ? raw
+        : undefined;
+}
+
+function observeTokenUsage(labels: {
+    task: string;
+    provider: string;
+    model_ref: string;
+}, usage: unknown): void {
+    const inputTokens = tokenCountFromUsage(usage, 'inputTokens');
+    const outputTokens = tokenCountFromUsage(usage, 'outputTokens');
+    const totalTokens = tokenCountFromUsage(usage, 'totalTokens');
+
+    if (inputTokens !== undefined) {
+        aiTokensTotal.inc({ ...labels, token_type: 'input' }, inputTokens);
+    }
+    if (outputTokens !== undefined) {
+        aiTokensTotal.inc({ ...labels, token_type: 'output' }, outputTokens);
+    }
+    if (totalTokens !== undefined) {
+        aiTokensTotal.inc({ ...labels, token_type: 'total' }, totalTokens);
+    }
+}
 
 export default function notes(config: Config, botId: number) {
     const bot = new Composer<SlushaContext>();
@@ -112,35 +151,66 @@ export default function notes(config: Config, botId: number) {
                     task: 'notes',
                     expectsStructuredOutput: false,
                 });
+                const labels = {
+                    task: generationPolicy.telemetry.task,
+                    provider: generationPolicy.telemetry.provider,
+                    model_ref: generationPolicy.telemetry.modelRef,
+                    reply_method: 'notes',
+                    downgraded: usageSnapshot.downgraded ? 'true' : 'false',
+                };
                 const providerOptions = generationPolicy
                     .providerOptions as Parameters<
                         typeof generateText
                     >[0]['providerOptions'];
-                response = await generateText({
-                    model: generationPolicy.model,
-                    providerOptions,
-                    messages,
-                    temperature: effectiveConfig.ai.temperature,
-                    topK: effectiveConfig.ai.topK,
-                    topP: effectiveConfig.ai.topP,
-                    maxOutputTokens: generationPolicy.maxOutputTokens,
-                    experimental_telemetry: {
-                        isEnabled: true,
-                        functionId: 'generate-notes',
-                        metadata: buildGenerationTelemetryMetadata({
-                            sessionId: ctx.chat.id.toString(),
-                            userId: ctx.chat.type === 'private'
-                                ? ctx.from?.id.toString()
-                                : '',
-                            chatName,
-                            tags,
-                            temperature: effectiveConfig.ai.temperature,
-                            topK: effectiveConfig.ai.topK,
-                            topP: effectiveConfig.ai.topP,
-                            policy: generationPolicy,
-                        }),
-                    },
+                aiRequestsTotal.inc(labels);
+                const startedAt = performance.now();
+                try {
+                    response = await generateText({
+                        model: generationPolicy.model,
+                        providerOptions,
+                        messages,
+                        temperature: effectiveConfig.ai.temperature,
+                        topK: effectiveConfig.ai.topK,
+                        topP: effectiveConfig.ai.topP,
+                        maxOutputTokens: generationPolicy.maxOutputTokens,
+                        experimental_telemetry: {
+                            isEnabled: true,
+                            functionId: 'generate-notes',
+                            metadata: buildGenerationTelemetryMetadata({
+                                sessionId: ctx.chat.id.toString(),
+                                userId: ctx.chat.type === 'private'
+                                    ? ctx.from?.id.toString()
+                                    : '',
+                                chatName,
+                                tags,
+                                temperature: effectiveConfig.ai.temperature,
+                                topK: effectiveConfig.ai.topK,
+                                topP: effectiveConfig.ai.topP,
+                                policy: generationPolicy,
+                            }),
+                        },
+                    });
+                } catch (error) {
+                    aiFailuresTotal.inc({
+                        ...labels,
+                        error_type: errorType(error),
+                    });
+                    throw error;
+                } finally {
+                    aiRequestDurationSeconds.observe(
+                        labels,
+                        (performance.now() - startedAt) / 1000,
+                    );
+                }
+                aiFinishReasonTotal.inc({
+                    ...labels,
+                    finish_reason: response.finishReason,
                 });
+                observeTokenUsage({
+                    task: generationPolicy.telemetry.task,
+                    provider: generationPolicy.telemetry.provider,
+                    model_ref: generationPolicy.telemetry.modelRef,
+                }, response.totalUsage);
             } catch (error) {
                 logger.error('Could not get summary: ', error);
                 return;
@@ -328,35 +398,66 @@ export default function notes(config: Config, botId: number) {
                     task: 'memory',
                     expectsStructuredOutput: false,
                 });
+                const labels = {
+                    task: generationPolicy.telemetry.task,
+                    provider: generationPolicy.telemetry.provider,
+                    model_ref: generationPolicy.telemetry.modelRef,
+                    reply_method: 'memory',
+                    downgraded: usageSnapshot.downgraded ? 'true' : 'false',
+                };
                 const providerOptions = generationPolicy
                     .providerOptions as Parameters<
                         typeof generateText
                     >[0]['providerOptions'];
-                response = await generateText({
-                    model: generationPolicy.model,
-                    providerOptions,
-                    messages,
-                    temperature: effectiveConfig.ai.temperature,
-                    topK: effectiveConfig.ai.topK,
-                    topP: effectiveConfig.ai.topP,
-                    maxOutputTokens: generationPolicy.maxOutputTokens,
-                    experimental_telemetry: {
-                        isEnabled: true,
-                        functionId: 'generate-memory',
-                        metadata: buildGenerationTelemetryMetadata({
-                            sessionId: ctx.chat.id.toString(),
-                            userId: ctx.chat.type === 'private'
-                                ? ctx.from?.id.toString()
-                                : '',
-                            chatName,
-                            tags,
-                            temperature: effectiveConfig.ai.temperature,
-                            topK: effectiveConfig.ai.topK,
-                            topP: effectiveConfig.ai.topP,
-                            policy: generationPolicy,
-                        }),
-                    },
+                aiRequestsTotal.inc(labels);
+                const startedAt = performance.now();
+                try {
+                    response = await generateText({
+                        model: generationPolicy.model,
+                        providerOptions,
+                        messages,
+                        temperature: effectiveConfig.ai.temperature,
+                        topK: effectiveConfig.ai.topK,
+                        topP: effectiveConfig.ai.topP,
+                        maxOutputTokens: generationPolicy.maxOutputTokens,
+                        experimental_telemetry: {
+                            isEnabled: true,
+                            functionId: 'generate-memory',
+                            metadata: buildGenerationTelemetryMetadata({
+                                sessionId: ctx.chat.id.toString(),
+                                userId: ctx.chat.type === 'private'
+                                    ? ctx.from?.id.toString()
+                                    : '',
+                                chatName,
+                                tags,
+                                temperature: effectiveConfig.ai.temperature,
+                                topK: effectiveConfig.ai.topK,
+                                topP: effectiveConfig.ai.topP,
+                                policy: generationPolicy,
+                            }),
+                        },
+                    });
+                } catch (error) {
+                    aiFailuresTotal.inc({
+                        ...labels,
+                        error_type: errorType(error),
+                    });
+                    throw error;
+                } finally {
+                    aiRequestDurationSeconds.observe(
+                        labels,
+                        (performance.now() - startedAt) / 1000,
+                    );
+                }
+                aiFinishReasonTotal.inc({
+                    ...labels,
+                    finish_reason: response.finishReason,
                 });
+                observeTokenUsage({
+                    task: generationPolicy.telemetry.task,
+                    provider: generationPolicy.telemetry.provider,
+                    model_ref: generationPolicy.telemetry.modelRef,
+                }, response.totalUsage);
             } catch (error) {
                 logger.error('Could not get memory: ', error);
                 return;

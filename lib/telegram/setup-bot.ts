@@ -12,6 +12,11 @@ import {
 import { sequentialize } from '@grammyjs/runner';
 import { canMemberSendTextMessages } from './reply-rights.ts';
 import { Message } from 'grammy_types';
+import {
+    errorType,
+    telegramHandlerErrorsTotal,
+    telegramUpdatesTotal,
+} from '../app/metrics.ts';
 
 interface RequestInfo {
     isRandom: boolean;
@@ -131,6 +136,40 @@ function isSameTopic(left: Message, right: Message): boolean {
     return leftTopic === rightTopic;
 }
 
+function resolveUpdateType(update: unknown): string {
+    if (typeof update !== 'object' || update === null) {
+        return 'unknown';
+    }
+
+    const record = update as Record<string, unknown>;
+    const knownTypes = [
+        'message',
+        'edited_message',
+        'channel_post',
+        'edited_channel_post',
+        'inline_query',
+        'chosen_inline_result',
+        'callback_query',
+        'shipping_query',
+        'pre_checkout_query',
+        'poll',
+        'poll_answer',
+        'my_chat_member',
+        'chat_member',
+        'chat_join_request',
+        'message_reaction',
+        'message_reaction_count',
+    ];
+
+    for (const type of knownTypes) {
+        if (record[type] !== undefined) {
+            return type;
+        }
+    }
+
+    return 'unknown';
+}
+
 async function resolveThreadForIncomingMessage(
     memory: ChatMemory,
     incoming: Message,
@@ -205,12 +244,24 @@ export default async function setupBot(config: Config, memory: Memory) {
 
     const bot = new Bot<SlushaContext>(config.botToken);
 
-    bot.catch((error) =>
+    bot.catch((error) => {
+        const updateType = resolveUpdateType(error.ctx?.update);
+        telegramHandlerErrorsTotal.inc({
+            update_type: updateType,
+            error_type: errorType(error.error),
+        });
         logger.error({
             ...error,
             ctx: { ...error.ctx, m: undefined, memory: undefined },
-        })
-    );
+        });
+    });
+
+    bot.use(async (ctx, next) => {
+        telegramUpdatesTotal.inc({
+            update_type: resolveUpdateType(ctx.update),
+        });
+        await next();
+    });
 
     // Make sure messages are handled sequentially
     bot.use(sequentialize((ctx) => {

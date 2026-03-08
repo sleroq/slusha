@@ -1,4 +1,5 @@
 import { limit } from 'grammy_ratelimiter';
+import { rateLimitExceededTotal } from '../../app/metrics.ts';
 
 type RedisClient = {
     incr(key: string): Promise<number>;
@@ -16,7 +17,10 @@ export function shortBurstLimiter() {
         timeFrame: 2000,
         limit: 1,
         onLimitExceeded: () => {
-            // no-op
+            rateLimitExceededTotal.inc({
+                limiter: 'short_burst',
+                scope: 'chat_or_user',
+            });
         },
         keyGenerator: (ctx) => {
             if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
@@ -32,6 +36,10 @@ export function rollingLimiter() {
         timeFrame: 1 * 60 * 1000,
         limit: 20,
         onLimitExceeded: (ctx) => {
+            rateLimitExceededTotal.inc({
+                limiter: 'rolling',
+                scope: 'chat_or_user',
+            });
             if (ctx.chat?.id && ctx.reply) {
                 return ctx.reply('Рейтлимитим тебя');
             }

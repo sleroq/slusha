@@ -2,6 +2,11 @@ import { and, eq, gte, lt, sql } from 'drizzle-orm';
 import { ChatConfigOverride, UserConfig } from '../config.ts';
 import { DbClient } from '../db/client.ts';
 import { requestWindowEvents } from '../db/schema.ts';
+import {
+    usageCleanupRunsTotal,
+    usageDowngradedTotal,
+    usageEventsRecordedTotal,
+} from '../app/metrics.ts';
 
 export type UsageTier = 'free' | 'trusted';
 
@@ -48,7 +53,10 @@ function mergeLimit(
     };
 }
 
-export function resolveUsageTier(config: UserConfig, userId?: number): UsageTier {
+export function resolveUsageTier(
+    config: UserConfig,
+    userId?: number,
+): UsageTier {
     if (userId && config.trustedIds.includes(userId)) {
         return 'trusted';
     }
@@ -85,6 +93,7 @@ export async function cleanupUsageEvents(
     await db.delete(requestWindowEvents).where(
         lt(requestWindowEvents.createdAt, cutoff),
     );
+    usageCleanupRunsTotal.inc();
 }
 
 export async function recordUsageEvent(
@@ -95,6 +104,9 @@ export async function recordUsageEvent(
         chatId: input.chatId,
         userId: input.userId,
         createdAt: input.now ?? Date.now(),
+    });
+    usageEventsRecordedTotal.inc({
+        has_user_id: input.userId ? 'true' : 'false',
     });
 }
 
@@ -111,7 +123,11 @@ export async function getUsageSnapshot(
     const now = input.now ?? Date.now();
     const tier = resolveUsageTier(input.config, input.userId);
     const userLimit = resolvePerUserLimit(input.config, tier);
-    const chatLimit = resolvePerChatLimit(input.config, tier, input.chatOverride);
+    const chatLimit = resolvePerChatLimit(
+        input.config,
+        tier,
+        input.chatOverride,
+    );
 
     const userWindowStart = now - userLimit.windowMinutes * 60 * 1000;
     const chatWindowStart = now - chatLimit.windowMinutes * 60 * 1000;
@@ -149,6 +165,13 @@ export async function getUsageSnapshot(
         : chatExceeded
         ? 'chat'
         : 'none';
+
+    if (downgradeReason !== 'none') {
+        usageDowngradedTotal.inc({
+            tier,
+            reason: downgradeReason,
+        });
+    }
 
     return {
         tier,
