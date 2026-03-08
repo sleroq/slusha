@@ -76,20 +76,18 @@ async function dispatchApiConfigRoute(
     options: StartWebServerOptions,
 ): Promise<Response> {
     const { pathname } = url;
+    const context = await resolveRequestContext(req, options);
 
     if (pathname === '/api/config/bootstrap') {
-        const context = await resolveRequestContext(req, options);
         return await handleBootstrapRequest(req, url, options, context);
     }
 
     if (pathname === '/api/config/global' && req.method === 'PUT') {
-        const context = await resolveRequestContext(req, options);
         return await handlePutGlobalConfigRequest(req, options, context);
     }
 
     const internalsChatId = parseChatInternalsChatId(pathname);
     if (internalsChatId !== undefined && req.method === 'PUT') {
-        const context = await resolveRequestContext(req, options);
         return await handlePutChatInternalsRequest(
             req,
             options,
@@ -100,7 +98,6 @@ async function dispatchApiConfigRoute(
 
     const chatConfigId = parseChatConfigChatId(pathname);
     if (chatConfigId !== undefined && req.method === 'PUT') {
-        const context = await resolveRequestContext(req, options);
         return await handlePutChatConfigRequest(
             req,
             options,
