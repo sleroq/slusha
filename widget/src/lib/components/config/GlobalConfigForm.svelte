@@ -439,7 +439,7 @@
                         id="g-max-messages"
                         type="number"
                         label="Max messages to store"
-                        description="Conversation history cap kept in storage."
+                        description="Conversation history cap kept in storage (up to 10000)."
                         hidden={!matchesBlockItem('advanced', 'max messages to store')}
                         bind:value={config.maxMessagesToStore}
                     />

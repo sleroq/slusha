@@ -167,7 +167,7 @@ export const configSchema = z.object({
             'gemini-3.1-flash-lite-preview',
         ]),
     maxNotesToStore: boundedPositiveInt(1, 200).default(5),
-    maxMessagesToStore: boundedPositiveInt(1, 2000).default(100),
+    maxMessagesToStore: boundedPositiveInt(1, 10000).default(100),
     chatLastUseNotes: boundedPositiveInt(1, 100).default(3),
     chatLastUseMemory: boundedPositiveInt(1, 100).default(2),
     responseDelay: z.number().min(0).max(120).default(1),

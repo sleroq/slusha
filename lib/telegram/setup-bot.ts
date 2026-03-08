@@ -131,19 +131,13 @@ function isSameTopic(left: Message, right: Message): boolean {
     return leftTopic === rightTopic;
 }
 
-function resolveThreadForIncomingMessage(
-    history: Array<{
-        id: number;
-        isMyself: boolean;
-        info: Message;
-        threadId?: string;
-        threadRootMessageId?: number;
-    }>,
+async function resolveThreadForIncomingMessage(
+    memory: ChatMemory,
     incoming: Message,
     replyToId?: number,
-): ThreadResolution {
+): Promise<ThreadResolution> {
     if (typeof replyToId === 'number') {
-        const parent = history.find((msg) => msg.id === replyToId);
+        const parent = await memory.getMessageById(replyToId);
         const inheritedRoot = parent?.threadRootMessageId ?? replyToId;
         const inheritedThread = parent?.threadId ?? `thread:${inheritedRoot}`;
 
@@ -161,37 +155,26 @@ function resolveThreadForIncomingMessage(
     const maxInterveningMessages = 6;
 
     if (typeof incomingAuthorId === 'number') {
-        let interleaving = 0;
-        for (let i = history.length - 1; i >= 0; i--) {
-            const candidate = history[i];
-            if (!isSameTopic(candidate.info, incoming)) {
-                continue;
-            }
+        const candidate = await memory.getLastMessageByAuthorInTopic(
+            incomingAuthorId,
+            incoming.message_thread_id,
+            maxInterveningMessages + 1,
+        );
 
-            if (candidate.info.from?.id === incomingAuthorId) {
-                const candidateDate = candidate.info.date;
-                const secondsSince = incomingDate - candidateDate;
-                if (
-                    secondsSince <= maxGapSeconds &&
-                    interleaving <= maxInterveningMessages
-                ) {
-                    const inheritedRoot = candidate.threadRootMessageId ??
-                        candidate.id;
-                    const inheritedThread = candidate.threadId ??
-                        `thread:${inheritedRoot}`;
-                    return {
-                        threadId: inheritedThread,
-                        threadRootMessageId: inheritedRoot,
-                        threadParentMessageId: candidate.id,
-                        threadSource: 'implicit_same_author',
-                    };
-                }
-                break;
-            }
-
-            interleaving += 1;
-            if (interleaving > maxInterveningMessages) {
-                break;
+        if (candidate && isSameTopic(candidate.info, incoming)) {
+            const candidateDate = candidate.info.date;
+            const secondsSince = incomingDate - candidateDate;
+            if (secondsSince <= maxGapSeconds) {
+                const inheritedRoot = candidate.threadRootMessageId ??
+                    candidate.id;
+                const inheritedThread = candidate.threadId ??
+                    `thread:${inheritedRoot}`;
+                return {
+                    threadId: inheritedThread,
+                    threadRootMessageId: inheritedRoot,
+                    threadParentMessageId: candidate.id,
+                    threadSource: 'implicit_same_author',
+                };
             }
         }
     }
@@ -322,8 +305,6 @@ export default async function setupBot(config: Config, memory: Memory) {
             return next();
         }
 
-        const history = await ctx.m.getHistory();
-
         // Save all messages to memory
         let replyTo: ReplyTo | undefined;
         let replyToId: number | undefined;
@@ -338,8 +319,8 @@ export default async function setupBot(config: Config, memory: Memory) {
             };
         }
 
-        const threadResolution = resolveThreadForIncomingMessage(
-            history,
+        const threadResolution = await resolveThreadForIncomingMessage(
+            ctx.m,
             ctx.msg,
             replyToId,
         );

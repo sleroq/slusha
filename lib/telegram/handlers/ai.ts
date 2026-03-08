@@ -544,7 +544,6 @@ export default function registerAI(bot: Bot<SlushaContext>) {
     bot.on('message', async (ctx) => {
         const chatState = await ctx.m.getChat();
         const effectiveConfig = await ctx.m.getEffectiveConfig();
-        const savedHistory = await ctx.m.getHistory();
         const sendChatActionsTool = createSendChatActionsTool(
             resolveCustomPrompt(
                 effectiveConfig.ai.chatActionsToolDescription,
@@ -570,6 +569,15 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             Math.max(messagesToPass * 2, 12),
             40,
         );
+        const attempts = getGenerationFallbackPlans(messagesToPass);
+        const maxAttemptHistoryLimit = attempts.reduce(
+            (maxLimit, attempt) => Math.max(maxLimit, attempt.historyLimit),
+            0,
+        );
+        const savedHistory = await ctx.m.getRecentHistory(
+            Math.max(maxTargetCount, maxAttemptHistoryLimit),
+        );
+
         const targetRefs = buildTargetRefs(savedHistory, maxTargetCount);
         const targetRefMap = new Map(
             targetRefs.map((target) => [target.ref, target.messageId]),
@@ -861,7 +869,6 @@ export default function registerAI(bot: Bot<SlushaContext>) {
 
         let output: ChatEntry[] | undefined;
         let generationError: unknown;
-        const attempts = getGenerationFallbackPlans(messagesToPass);
 
         for (const attempt of attempts) {
             let attemptMessages: ModelMessage[];

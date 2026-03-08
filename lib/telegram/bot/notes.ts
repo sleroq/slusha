@@ -21,7 +21,7 @@ export default function notes(config: Config, botId: number) {
             const effectiveConfig = await ctx.m.getEffectiveConfig();
             const frequency = effectiveConfig.ai.notesFrequency;
             const chat = await ctx.m.getChat();
-            const history = await ctx.m.getHistory();
+            const history = await ctx.m.getRecentHistory(frequency);
 
             if (
                 chat.lastUse <
@@ -175,7 +175,7 @@ export default function notes(config: Config, botId: number) {
             const effectiveConfig = await ctx.m.getEffectiveConfig();
             const frequency = effectiveConfig.ai.memoryFrequency;
             const chat = await ctx.m.getChat();
-            const history = await ctx.m.getHistory();
+            const history = await ctx.m.getRecentHistory(frequency);
 
             if (
                 chat.lastUse <
@@ -237,8 +237,7 @@ export default function notes(config: Config, botId: number) {
 
             prompt += '\n\n';
 
-            const currentChat = await ctx.m.getChat();
-            const character = currentChat.character;
+            const character = chat.character;
             if (character) {
                 prompt += '### Character ###\n' + character.description;
             } else {
@@ -260,11 +259,11 @@ export default function notes(config: Config, botId: number) {
             prompt += '\n\n' + chatInfoMsg;
 
             let memPrompt = effectiveConfig.ai.memoryPrompt;
-            if (currentChat.memory) {
+            if (chat.memory) {
                 memPrompt += '\n\n' +
                     effectiveConfig.ai.memoryPromptRepeat +
                     '\n' +
-                    currentChat.memory;
+                    chat.memory;
             }
 
             prompt += '\n\n' + effectiveConfig.ai.memoryPrompt;

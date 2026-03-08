@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Chat as TgChat, Message, User } from 'grammy_types';
 import { Character } from './charhub/api.ts';
 import {
@@ -159,6 +159,71 @@ function buildMessageFromRow(
     };
 }
 
+async function loadMessageReactions(
+    db: DbClient,
+    chatId: number,
+    messageIds?: number[],
+): Promise<Map<number, MessageReactions>> {
+    if (messageIds && messageIds.length === 0) {
+        return new Map();
+    }
+
+    const reactionWhere = messageIds
+        ? and(
+            eq(messageReactions.chatId, chatId),
+            inArray(messageReactions.messageId, messageIds),
+        )
+        : eq(messageReactions.chatId, chatId);
+
+    const reactionRows = await db
+        .select()
+        .from(messageReactions)
+        .where(reactionWhere);
+
+    const keys = reactionRows.map((
+        r: typeof messageReactions.$inferSelect,
+    ) => r.reactionKey);
+    const usersRows = keys.length === 0
+        ? []
+        : await db
+            .select()
+            .from(messageReactionUsers)
+            .where(and(
+                eq(messageReactionUsers.chatId, chatId),
+                inArray(messageReactionUsers.reactionKey, keys),
+                messageIds
+                    ? inArray(messageReactionUsers.messageId, messageIds)
+                    : undefined,
+            ));
+
+    const usersByReaction = new Map<string, ReactionBy[]>();
+    for (const row of usersRows) {
+        const key = `${row.messageId}:${row.reactionKey}`;
+        const users = usersByReaction.get(key) ?? [];
+        users.push({
+            id: row.userId,
+            username: row.username ?? undefined,
+            name: row.name,
+        });
+        usersByReaction.set(key, users);
+    }
+
+    const reactionsByMessage = new Map<number, MessageReactions>();
+    for (const row of reactionRows) {
+        const bucket = reactionsByMessage.get(row.messageId) ?? {};
+        bucket[row.reactionKey] = {
+            type: row.type,
+            emoji: row.emoji ?? undefined,
+            customEmojiId: row.customEmojiId ?? undefined,
+            by: usersByReaction.get(`${row.messageId}:${row.reactionKey}`) ?? [],
+            count: row.count,
+        };
+        reactionsByMessage.set(row.messageId, bucket);
+    }
+
+    return reactionsByMessage;
+}
+
 export class Memory {
     db: DbClient;
 
@@ -179,53 +244,6 @@ export class Memory {
             .onConflictDoNothing();
     }
 
-    private async getMessageReactions(chatId: number) {
-        const reactionRows = await this.db
-            .select()
-            .from(messageReactions)
-            .where(eq(messageReactions.chatId, chatId));
-
-        const keys = reactionRows.map((
-            r: typeof messageReactions.$inferSelect,
-        ) => r.reactionKey);
-        const usersRows = keys.length === 0 ? [] : await this.db
-            .select()
-            .from(messageReactionUsers)
-            .where(and(
-                eq(messageReactionUsers.chatId, chatId),
-                inArray(messageReactionUsers.reactionKey, keys),
-            ));
-
-        const usersByReaction = new Map<string, ReactionBy[]>();
-        for (const row of usersRows) {
-            const key = `${row.messageId}:${row.reactionKey}`;
-            const users = usersByReaction.get(key) ?? [];
-            users.push({
-                id: row.userId,
-                username: row.username ?? undefined,
-                name: row.name,
-            });
-            usersByReaction.set(key, users);
-        }
-
-        const reactionsByMessage = new Map<number, MessageReactions>();
-        for (const row of reactionRows) {
-            const bucket = reactionsByMessage.get(row.messageId) ?? {};
-            bucket[row.reactionKey] = {
-                type: row.type,
-                emoji: row.emoji ?? undefined,
-                customEmojiId: row.customEmojiId ?? undefined,
-                by: usersByReaction.get(
-                    `${row.messageId}:${row.reactionKey}`,
-                ) ?? [],
-                count: row.count,
-            };
-            reactionsByMessage.set(row.messageId, bucket);
-        }
-
-        return reactionsByMessage;
-    }
-
     async getChatById(chatId: number): Promise<Chat | undefined> {
         const chatRow = await this.db.query.chats.findFirst({
             where: eq(chats.id, chatId),
@@ -239,9 +257,7 @@ export class Memory {
             notesRows,
             membersRows,
             optOutRows,
-            messagesRows,
             characterRow,
-            reactionsByMessage,
             configOverrideRow,
         ] = await Promise.all([
             this.db
@@ -258,15 +274,9 @@ export class Memory {
                 .select()
                 .from(chatOptOutUsers)
                 .where(eq(chatOptOutUsers.chatId, chatId)),
-            this.db
-                .select()
-                .from(chatMessages)
-                .where(eq(chatMessages.chatId, chatId))
-                .orderBy(asc(chatMessages.messageId)),
             this.db.query.chatCharacters.findFirst({
                 where: eq(chatCharacters.chatId, chatId),
             }),
-            this.getMessageReactions(chatId),
             this.db.query.chatConfigOverrides.findFirst({
                 where: eq(chatConfigOverrides.chatId, chatId),
             }),
@@ -280,9 +290,7 @@ export class Memory {
             notes: notesRows.map((n: typeof chatNotes.$inferSelect) => n.text),
             lastNotes: chatRow.lastNotes,
             lastMemory: chatRow.lastMemory,
-            history: messagesRows.map((m: typeof chatMessages.$inferSelect) =>
-                buildMessageFromRow(m, reactionsByMessage.get(m.messageId))
-            ),
+            history: [],
             memory: chatRow.memory ?? undefined,
             lastUse: chatRow.lastUse,
             info: parseJson<TgChat>(chatRow.info),
@@ -496,7 +504,55 @@ export class ChatMemory {
     }
 
     async getHistory() {
-        return (await this.getChat()).history;
+        const rows = await this.memory.db
+            .select()
+            .from(chatMessages)
+            .where(eq(chatMessages.chatId, this.chatInfo.id))
+            .orderBy(asc(chatMessages.messageId));
+
+        if (rows.length === 0) {
+            return [];
+        }
+
+        const messageIds = rows.map((row) => row.messageId);
+        const reactionsByMessage = await loadMessageReactions(
+            this.memory.db,
+            this.chatInfo.id,
+            messageIds,
+        );
+
+        return rows.map((row) =>
+            buildMessageFromRow(row, reactionsByMessage.get(row.messageId))
+        );
+    }
+
+    async getRecentHistory(limit: number) {
+        if (limit <= 0) {
+            return [];
+        }
+
+        const rows = await this.memory.db
+            .select()
+            .from(chatMessages)
+            .where(eq(chatMessages.chatId, this.chatInfo.id))
+            .orderBy(desc(chatMessages.messageId))
+            .limit(limit);
+
+        if (rows.length === 0) {
+            return [];
+        }
+
+        rows.reverse();
+        const messageIds = rows.map((row) => row.messageId);
+        const reactionsByMessage = await loadMessageReactions(
+            this.memory.db,
+            this.chatInfo.id,
+            messageIds,
+        );
+
+        return rows.map((row) =>
+            buildMessageFromRow(row, reactionsByMessage.get(row.messageId))
+        );
     }
 
     async clear() {
@@ -562,25 +618,45 @@ export class ChatMemory {
     }
 
     async removeOldMessages(maxLength: number) {
-        const history = await this.getHistory();
-        if (history.length <= maxLength) return;
+        const countRows = await this.memory.db
+            .select({ total: sql<number>`count(*)` })
+            .from(chatMessages)
+            .where(eq(chatMessages.chatId, this.chatInfo.id));
+        const total = countRows[0]?.total ?? 0;
+        const overflow = total - maxLength;
 
-        const toDelete = history.slice(0, history.length - maxLength).map((m) =>
-            m.id
-        );
+        if (overflow <= 0) return;
+
+        const oldestRows = await this.memory.db
+            .select({ messageId: chatMessages.messageId })
+            .from(chatMessages)
+            .where(eq(chatMessages.chatId, this.chatInfo.id))
+            .orderBy(asc(chatMessages.messageId))
+            .limit(overflow);
+        const toDelete = oldestRows.map((row) => row.messageId);
+
+        if (toDelete.length === 0) return;
+
+        const chunks: number[][] = [];
+        for (let i = 0; i < toDelete.length; i += 500) {
+            chunks.push(toDelete.slice(i, i + 500));
+        }
+
         await this.memory.db.transaction(async (tx: Tx) => {
-            await tx.delete(messageReactionUsers).where(and(
-                eq(messageReactionUsers.chatId, this.chatInfo.id),
-                inArray(messageReactionUsers.messageId, toDelete),
-            ));
-            await tx.delete(messageReactions).where(and(
-                eq(messageReactions.chatId, this.chatInfo.id),
-                inArray(messageReactions.messageId, toDelete),
-            ));
-            await tx.delete(chatMessages).where(and(
-                eq(chatMessages.chatId, this.chatInfo.id),
-                inArray(chatMessages.messageId, toDelete),
-            ));
+            for (const messageIds of chunks) {
+                await tx.delete(messageReactionUsers).where(and(
+                    eq(messageReactionUsers.chatId, this.chatInfo.id),
+                    inArray(messageReactionUsers.messageId, messageIds),
+                ));
+                await tx.delete(messageReactions).where(and(
+                    eq(messageReactions.chatId, this.chatInfo.id),
+                    inArray(messageReactions.messageId, messageIds),
+                ));
+                await tx.delete(chatMessages).where(and(
+                    eq(chatMessages.chatId, this.chatInfo.id),
+                    inArray(chatMessages.messageId, messageIds),
+                ));
+            }
         });
     }
 
@@ -842,7 +918,44 @@ export class ChatMemory {
     }
 
     async getMessageById(messageId: number) {
-        return (await this.getHistory()).find((m) => m.id === messageId);
+        const row = await this.memory.db.query.chatMessages.findFirst({
+            where: and(
+                eq(chatMessages.chatId, this.chatInfo.id),
+                eq(chatMessages.messageId, messageId),
+            ),
+        });
+        if (!row) {
+            return undefined;
+        }
+
+        const reactionsByMessage = await loadMessageReactions(
+            this.memory.db,
+            this.chatInfo.id,
+            [messageId],
+        );
+        return buildMessageFromRow(row, reactionsByMessage.get(messageId));
+    }
+
+    async getLastMessageByAuthorInTopic(
+        authorId: number,
+        topicId: number | undefined,
+        lookbackLimit: number,
+    ) {
+        const history = await this.getRecentHistory(lookbackLimit);
+
+        for (let i = history.length - 1; i >= 0; i--) {
+            const message = history[i];
+            if (message.info.from?.id !== authorId) {
+                continue;
+            }
+            if (message.info.message_thread_id !== topicId) {
+                continue;
+            }
+
+            return message;
+        }
+
+        return undefined;
     }
 
     async addEmojiReaction(
