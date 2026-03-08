@@ -31,8 +31,8 @@ const finalPrompt =
 const chatActionsToolDescription =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
 
-const plainTextReactionOptionalStepPrompt =
-    'Optional step: return only react actions (no reply actions) using target_ref from Reply Target Map. If no reaction is needed, return empty actions list.';
+const chatReactionsToolDescription =
+    'Submit Telegram reactions once per turn. Return entries containing only {"type":"react","react":"❤","target_ref":"tN"}. Do not include reply text.';
 
 const notesPrompt =
     'Напиши краткое обзор важных событий в трех-пяти пунктах без нумирации. Твой ответ должен содержать только пункты событий чата.';
@@ -105,7 +105,7 @@ const defaultConfig = {
         memoryPromptRepeat,
         finalPrompt,
         chatActionsToolDescription,
-        plainTextReactionOptionalStepPrompt,
+        chatReactionsToolDescription,
         dumbFinalPrompt: 'Ответь одним коротким сообщением простым текстом.',
         temperature: 0.55,
         topK: 32,

@@ -80,7 +80,7 @@
             'plain-text final prompt wrapper',
             'final prompt wrapper',
             'chat actions tool description',
-            'plain-text reaction optional step',
+            'chat reactions tool description',
             'low-context final wrapper',
             'notes extraction prompt',
             'memory prompt',
@@ -383,13 +383,13 @@
                         bind:value={config.ai.chatActionsToolDescription}
                     />
                     <SettingTextareaField
-                        id="g-ai-plain-reaction-optional-step"
+                        id="g-ai-chat-reactions"
                         rows={3}
                         containerClass="md:col-span-2"
-                        label="Plain-text reaction optional step"
-                        description="Follow-up instruction used to extract reactions after plain-text generation."
-                        hidden={!matchesBlockItem('prompts', 'plain-text reaction optional step', 'optional step', 'plainTextReactionOptionalStepPrompt')}
-                        bind:value={config.ai.plainTextReactionOptionalStepPrompt}
+                        label="Chat reactions tool description"
+                        description="Tool description for send_chat_reactions used in plain_text_reactions mode to add reactions after text replies."
+                        hidden={!matchesBlockItem('prompts', 'chat reactions tool description', 'reactions tool', 'chatReactionsToolDescription')}
+                        bind:value={config.ai.chatReactionsToolDescription}
                     />
                     <SettingTextareaField
                         id="g-ai-notes-prompt"

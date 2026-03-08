@@ -95,9 +95,9 @@ export const configSchema = z.object({
          */
         chatActionsToolDescription: z.string().max(20000).optional(),
         /**
-         * Optional prompt for plain-text reaction extraction pass.
+         * Optional override for send_chat_reactions tool description in plain_text_reactions mode.
          */
-        plainTextReactionOptionalStepPrompt: z.string().max(20000).optional(),
+        chatReactionsToolDescription: z.string().max(20000).optional(),
         /**
          * Optional alternative final prompt for dumb models (plain text)
          */

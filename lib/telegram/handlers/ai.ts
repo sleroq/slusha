@@ -497,7 +497,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         );
         const sendChatReactionsTool = createSendChatReactionsTool(
             resolveCustomPrompt(
-                effectiveConfig.ai.plainTextReactionOptionalStepPrompt,
+                effectiveConfig.ai.chatReactionsToolDescription,
                 DEFAULT_CHAT_REACTIONS_TOOL_DESCRIPTION,
             ),
         );
