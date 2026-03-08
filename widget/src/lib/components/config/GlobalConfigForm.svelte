@@ -647,10 +647,11 @@
                         hidden={!matchesBlockItem('usage limits', 'trusted user per-chat window minutes')}
                         bind:value={config.requestWindow.trusted.perChat.windowMinutes}
                     />
-                    <SettingInputField
+                    <SettingSelectField
                         id="g-req-downgrade-model"
                         label="Downgrade model"
                         description="Model used when either window limit is exhausted."
+                        options={availableModels}
                         hidden={!matchesBlockItem('usage limits', 'downgrade model')}
                         bind:value={config.requestWindow.downgradeModel}
                     />
