@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { hapticFeedback } from '@tma.js/sdk';
+    import { hapticFeedback, themeParams } from '@tma.js/sdk';
     import { init } from '@tma.js/sdk-svelte';
     import { fade, fly } from 'svelte/transition';
     import { onDestroy, onMount, untrack } from 'svelte';
@@ -30,6 +30,72 @@
     let isSavingGlobal = $state(false);
     let isSavingChat = $state(false);
     let isReloading = $state(false);
+    let detachThemeListener: (() => void) | undefined;
+
+    type TelegramWebApp = {
+        colorScheme?: 'light' | 'dark';
+        onEvent?: (eventType: 'themeChanged', callback: () => void) => void;
+        offEvent?: (eventType: 'themeChanged', callback: () => void) => void;
+    };
+
+    const getTelegramWebApp = (): TelegramWebApp | undefined => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        return (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
+    };
+
+    const isDarkFromHexColor = (color: string): boolean => {
+        const normalized = color.trim();
+        if (!/^#([A-Fa-f\d]{6})$/.test(normalized)) {
+            return false;
+        }
+
+        const red = Number.parseInt(normalized.slice(1, 3), 16);
+        const green = Number.parseInt(normalized.slice(3, 5), 16);
+        const blue = Number.parseInt(normalized.slice(5, 7), 16);
+        const luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
+        return luminance < 0.5;
+    };
+
+    const syncDarkClass = (): void => {
+        const telegramWebApp = getTelegramWebApp();
+        if (telegramWebApp?.colorScheme) {
+            document.documentElement.classList.toggle('dark', telegramWebApp.colorScheme === 'dark');
+            return;
+        }
+
+        const backgroundColor = getComputedStyle(document.documentElement)
+            .getPropertyValue('--tg-theme-bg-color')
+            .trim();
+        document.documentElement.classList.toggle('dark', isDarkFromHexColor(backgroundColor));
+    };
+
+    const setupTelegramTheme = (): void => {
+        try {
+            themeParams.mount();
+            themeParams.bindCssVars();
+        } catch {
+            // Keep defaults when theme API is unavailable.
+        }
+
+        syncDarkClass();
+
+        const telegramWebApp = getTelegramWebApp();
+        if (!telegramWebApp?.onEvent || !telegramWebApp.offEvent) {
+            return;
+        }
+
+        const handleThemeChanged = (): void => {
+            syncDarkClass();
+        };
+
+        telegramWebApp.onEvent('themeChanged', handleThemeChanged);
+        detachThemeListener = () => {
+            telegramWebApp.offEvent?.('themeChanged', handleThemeChanged);
+        };
+    };
 
     const hapticsSupported = () => hapticFeedback.isSupported();
 
@@ -188,6 +254,7 @@
         try {
             init();
             controller.initialize();
+            setupTelegramTheme();
         } catch (error) {
             launchError = error instanceof Error
                 ? error.message
@@ -196,36 +263,35 @@
     });
 
     onDestroy(() => {
+        detachThemeListener?.();
+        detachThemeListener = undefined;
         clearSaveFeedbackTimer();
         controller.dispose();
     });
 </script>
 
 {#if launchError}
-    <main class="relative isolate min-h-screen overflow-hidden bg-slate-950 px-4 py-10 text-slate-100">
-        <div class="pointer-events-none absolute -top-28 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-cyan-500/35 blur-3xl"></div>
-        <div class="pointer-events-none absolute right-0 top-1/3 h-56 w-56 rounded-full bg-emerald-400/25 blur-3xl"></div>
-
-        <section class="relative mx-auto flex max-w-xl flex-col gap-6 py-2">
-            <p class="text-xs uppercase tracking-[0.2em] text-cyan-300/90">{t('app.launchBadge')}</p>
-            <h1 class="text-3xl font-semibold leading-tight text-white">{t('app.launchTitle')}</h1>
-            <p class="text-sm leading-6 text-slate-300">
+    <main class="min-h-screen bg-background px-4 py-10 text-foreground">
+        <section class="mx-auto flex max-w-xl flex-col gap-6 rounded-xl border bg-card p-6 shadow-xs">
+            <p class="text-xs uppercase tracking-[0.16em] text-muted-foreground">{t('app.launchBadge')}</p>
+            <h1 class="text-3xl font-semibold leading-tight text-foreground">{t('app.launchTitle')}</h1>
+            <p class="text-sm leading-6 text-muted-foreground">
                 {t('app.launchDescription')}
             </p>
 
-            <div class="border-y border-amber-300/40 py-3 text-xs text-amber-100">
-                <p class="font-medium">{t('app.launchContextMissing')}</p>
-                <p class="mt-1 opacity-90">{launchError}</p>
+            <div class="rounded-md border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                <p class="font-medium text-foreground">{t('app.launchContextMissing')}</p>
+                <p class="mt-1">{launchError}</p>
             </div>
 
-            <div class="grid gap-2 border-t border-white/10 pt-4 text-sm text-slate-200">
+            <div class="grid gap-2 border-t border-border pt-4 text-sm text-foreground">
                 <p>
-                    {t('app.launchStartBot')} <a class="text-cyan-300 underline decoration-cyan-400/70 underline-offset-3 hover:text-cyan-200" href="https://t.me/sl_chatbot" target="_blank" rel="noreferrer">@sl_chatbot</a>
+                    {t('app.launchStartBot')} <a class="text-primary underline decoration-primary/60 underline-offset-3 hover:text-primary/85" href="https://t.me/sl_chatbot" target="_blank" rel="noreferrer">@sl_chatbot</a>
                 </p>
                 <p>
-                    {t('app.launchQuotes')} <a class="text-cyan-300 underline decoration-cyan-400/70 underline-offset-3 hover:text-cyan-200" href="https://t.me/s/slushaquotes" target="_blank" rel="noreferrer">@slushaquotes</a>
+                    {t('app.launchQuotes')} <a class="text-primary underline decoration-primary/60 underline-offset-3 hover:text-primary/85" href="https://t.me/s/slushaquotes" target="_blank" rel="noreferrer">@slushaquotes</a>
                 </p>
-                <p class="text-slate-400">{t('app.launchRunConfig')}</p>
+                <p class="text-muted-foreground">{t('app.launchRunConfig')}</p>
             </div>
         </section>
     </main>
@@ -319,7 +385,7 @@
 {#if saveFeedback}
     <div class="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4" transition:fade={{ duration: 180 }}>
         <div
-            class={`pointer-events-auto w-full max-w-md rounded-md border px-4 py-3 text-sm shadow-lg ${saveFeedback.kind === 'success' ? 'border-emerald-500/40 bg-emerald-50 text-emerald-900' : 'border-rose-500/40 bg-rose-50 text-rose-900'}`}
+            class={`pointer-events-auto w-full max-w-md rounded-md border px-4 py-3 text-sm shadow-lg ${saveFeedback.kind === 'success' ? 'border-[var(--success-border)] bg-[var(--success-bg)] text-foreground' : 'border-[var(--danger-border)] bg-[var(--danger-bg)] text-foreground'}`}
             role="status"
             aria-live="polite"
         >

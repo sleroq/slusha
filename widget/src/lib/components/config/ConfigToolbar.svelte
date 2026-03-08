@@ -97,7 +97,7 @@
                             {t('toolbar.usage', { tier: usageWindowStatus.tier })}
                         </span>
                         {#if usageWindowStatus.downgraded}
-                            <span class="rounded bg-amber-500/20 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                            <span class="rounded bg-destructive/12 px-2 py-0.5 text-[11px] font-medium text-destructive">
                                 {t('toolbar.costMode')}
                             </span>
                         {/if}
