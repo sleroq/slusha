@@ -229,7 +229,8 @@ export default function notes(config: Config, botId: number) {
                 isComments,
                 privateChatPromptAddition:
                     effectiveConfig.ai.privateChatPromptAddition,
-                commentsPromptAddition: effectiveConfig.ai.commentsPromptAddition,
+                commentsPromptAddition:
+                    effectiveConfig.ai.commentsPromptAddition,
                 groupChatPromptAddition:
                     effectiveConfig.ai.groupChatPromptAddition,
             });

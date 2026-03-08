@@ -81,7 +81,6 @@ export interface AiPayload {
   prePrompt: string;
   prompt: string;
   dumbPrompt?: string;
-  useJsonResponses: boolean;
   replyMethod?: ReplyMethod;
   dumbPrePrompt?: string;
   privateChatPromptAddition?: string;
@@ -127,7 +126,6 @@ export interface ChatEditableAiPayload {
   groupChatPromptAddition?: string;
   commentsPromptAddition?: string;
   hateModePrompt?: string;
-  useJsonResponses: boolean;
   replyMethod?: ReplyMethod;
   messagesToPass: number;
   messageMaxLength: number;
@@ -278,7 +276,6 @@ export function defaultAiConfig(): AiPayload {
     prePrompt: "",
     prompt: "",
     dumbPrompt: "",
-    useJsonResponses: true,
     replyMethod: "json_actions",
     dumbPrePrompt: "",
     privateChatPromptAddition: "",
@@ -368,16 +365,10 @@ export function defaultChatEditableAiConfig(
     hateModePrompt: typeof base.hateModePrompt === "string"
       ? base.hateModePrompt
       : "",
-    useJsonResponses: typeof base.useJsonResponses === "boolean"
-      ? base.useJsonResponses
-      : true,
     replyMethod: base.replyMethod === "plain_text_reactions" ||
         base.replyMethod === "json_actions"
       ? base.replyMethod
-      : (typeof base.useJsonResponses === "boolean" &&
-          !base.useJsonResponses
-        ? "plain_text_reactions"
-        : "json_actions"),
+      : "json_actions",
     messagesToPass: typeof base.messagesToPass === "number"
       ? base.messagesToPass
       : 5,
@@ -755,9 +746,6 @@ export function buildChatPayload(
   if ((config.ai.hateModePrompt ?? "") !== (base.ai.hateModePrompt ?? "")) {
     aiPayload.hateModePrompt = config.ai.hateModePrompt;
   }
-  if (config.ai.useJsonResponses !== base.ai.useJsonResponses) {
-    aiPayload.useJsonResponses = config.ai.useJsonResponses;
-  }
   if ((config.ai.replyMethod ?? "") !== (base.ai.replyMethod ?? "")) {
     aiPayload.replyMethod = config.ai.replyMethod;
   }
@@ -827,9 +815,6 @@ export function collectChatOverridePaths(
   }
   if (payload.ai.hateModePrompt !== undefined) {
     paths.push("ai.hateModePrompt");
-  }
-  if (payload.ai.useJsonResponses !== undefined) {
-    paths.push("ai.useJsonResponses");
   }
   if (payload.ai.replyMethod !== undefined) paths.push("ai.replyMethod");
   if (payload.ai.messagesToPass !== undefined) {

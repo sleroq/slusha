@@ -98,7 +98,6 @@
             'memory update frequency',
             'max reply length',
             'attachment byte limit',
-            'use json responses',
             'include attachments in history',
         ),
     );
@@ -524,13 +523,6 @@
                         description="Maximum attachment size included in processing."
                         hidden={!matchesBlockItem('advanced', 'attachment byte limit', 'bytes limit')}
                         bind:value={config.ai.bytesLimit}
-                    />
-                    <SettingToggleField
-                        id="g-ai-json"
-                        label="Use JSON responses"
-                        description="Request structured JSON output from the model."
-                        hidden={!matchesBlockItem('advanced', 'use json responses')}
-                        bind:checked={config.ai.useJsonResponses}
                     />
                     <SettingSelectField
                         id="g-ai-reply-method"

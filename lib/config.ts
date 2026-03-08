@@ -75,11 +75,6 @@ export const configSchema = z.object({
         prompt: z.string().max(20000),
         dumbPrompt: z.string().max(10000).optional(),
         /**
-         * When false, bot will not expect JSON array output and will
-         * generate a single plain text message instead. Reactions are disabled.
-         */
-        useJsonResponses: z.boolean().default(true),
-        /**
          * Selects chat reply strategy for message generation and tool usage.
          */
         replyMethod: replyMethodSchema.optional(),
@@ -190,7 +185,6 @@ const chatOverrideAiSchema = z.object({
     commentsPromptAddition: configSchema.shape.ai.shape.commentsPromptAddition
         .optional(),
     hateModePrompt: configSchema.shape.ai.shape.hateModePrompt.optional(),
-    useJsonResponses: configSchema.shape.ai.shape.useJsonResponses.optional(),
     replyMethod: configSchema.shape.ai.shape.replyMethod.optional(),
     messagesToPass: configSchema.shape.ai.shape.messagesToPass.optional(),
     messageMaxLength: configSchema.shape.ai.shape.messageMaxLength.optional(),

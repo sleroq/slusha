@@ -10,7 +10,7 @@ import { sliceMessage } from '../../helpers.ts';
 import { ChatMemory } from '../../memory.ts';
 import logger from '../../logger.ts';
 import { InlineQueryResultArticle } from 'grammy_types';
-import { generateObject, generateText } from 'ai';
+import { generateObject } from 'ai';
 import z from 'zod';
 import { limit } from 'grammy_ratelimiter';
 import DOMPurify from 'isomorphic-dompurify';
@@ -414,108 +414,44 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     // TODO: Allow to set different model for generating character names
     const model = chat.chatModel ?? config.model;
 
-    const useJsonResponses = config.useJsonResponses;
     let names: string[] = [];
     try {
-        if (useJsonResponses) {
-            const generationPolicy = resolveGenerationPolicy({
-                modelRef: model,
-                config,
-                task: 'character',
-                expectsStructuredOutput: true,
-            });
-            const providerOptions = generationPolicy
-                .providerOptions as Parameters<
-                    typeof generateObject
-                >[0]['providerOptions'];
-            const result = await generateObject({
-                model: generationPolicy.model,
-                providerOptions,
-                schema: z.array(z.string()),
-                temperature: config.temperature,
-                topK: config.topK,
-                topP: config.topP,
-                maxOutputTokens: generationPolicy.maxOutputTokens,
-                prompt:
-                    `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
-                    'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.',
-                experimental_telemetry: {
-                    isEnabled: true,
-                    functionId: 'character-names',
-                    metadata: buildGenerationTelemetryMetadata({
-                        sessionId: chatId.toString(),
-                        userId: '',
-                        tags: ['character'],
-                        temperature: config.temperature,
-                        topK: config.topK,
-                        topP: config.topP,
-                        policy: generationPolicy,
-                    }),
-                },
-            });
-            names = result.object;
-        } else {
-            const generationPolicy = resolveGenerationPolicy({
-                modelRef: model,
-                config,
-                task: 'character',
-                expectsStructuredOutput: false,
-            });
-            const providerOptions = generationPolicy
-                .providerOptions as Parameters<
-                    typeof generateText
-                >[0]['providerOptions'];
-            const response = await generateText({
-                model: generationPolicy.model,
-                providerOptions,
-                temperature: config.temperature,
-                topK: config.topK,
-                topP: config.topP,
-                maxOutputTokens: generationPolicy.maxOutputTokens,
-                prompt:
-                    `Напиши варианты имени "${character.name}" (русские и английские, уменьшительные и очевидные похожие формы). ` +
-                    'Верни только список вариантов через запятую или с новой строки, без пояснений.',
-                experimental_telemetry: {
-                    isEnabled: true,
-                    functionId: 'character-names-dumb',
-                    metadata: buildGenerationTelemetryMetadata({
-                        sessionId: chatId.toString(),
-                        userId: '',
-                        tags: ['character'],
-                        temperature: config.temperature,
-                        topK: config.topK,
-                        topP: config.topP,
-                        policy: generationPolicy,
-                    }),
-                },
-            });
-
-            const raw = response.text.trim();
-            const split = raw
-                .split(/\n|,|;|•|·|\u2022/g)
-                .map((s) => s.trim())
-                .map((s) => s.replace(/^[-*•·]\s*/, ''))
-                .map((s) => s.replace(/^"|"$/g, ''))
-                .filter((s) => s.length > 0 && s.length < 64);
-
-            const dedup = new Set<string>();
-            for (const s of split) {
-                const k = s.toLowerCase();
-                if (!dedup.has(k)) dedup.add(k);
-            }
-            names = Array.from(dedup).map((k) => {
-                // Recover original casing by finding first occurrence in split
-                const orig = split.find((s) => s.toLowerCase() === k);
-                return orig ?? k;
-            });
-
-            if (names.length === 0) {
-                names = [character.name];
-            }
-            if (names.length > 20) {
-                names = names.slice(0, 20);
-            }
-        }
+        const generationPolicy = resolveGenerationPolicy({
+            modelRef: model,
+            config,
+            task: 'character',
+            expectsStructuredOutput: true,
+        });
+        const providerOptions = generationPolicy
+            .providerOptions as Parameters<
+                typeof generateObject
+            >[0]['providerOptions'];
+        const result = await generateObject({
+            model: generationPolicy.model,
+            providerOptions,
+            schema: z.array(z.string()),
+            temperature: config.temperature,
+            topK: config.topK,
+            topP: config.topP,
+            maxOutputTokens: generationPolicy.maxOutputTokens,
+            prompt:
+                `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
+                'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.',
+            experimental_telemetry: {
+                isEnabled: true,
+                functionId: 'character-names',
+                metadata: buildGenerationTelemetryMetadata({
+                    sessionId: chatId.toString(),
+                    userId: '',
+                    tags: ['character'],
+                    temperature: config.temperature,
+                    topK: config.topK,
+                    topP: config.topP,
+                    policy: generationPolicy,
+                }),
+            },
+        });
+        names = result.object;
     } catch (error) {
         logger.error(error, 'Error getting names for character');
         return await ctx.reply(ctx.t('character-names-error'));

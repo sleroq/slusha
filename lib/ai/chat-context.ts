@@ -67,7 +67,9 @@ export function buildChatInfoBlock(params: BuildChatInfoBlockParams): string {
     let text = `Date and time right now: ${nowText}`;
 
     if (chatType === 'private') {
-        text += `\nЛичный чат с ${userFirstName ?? 'User'} (@${userUsername ?? 'unknown'})`;
+        text += `\nЛичный чат с ${userFirstName ?? 'User'} (@${
+            userUsername ?? 'unknown'
+        })`;
     } else if (activeMembers.length > 0) {
         const prettyMembersList = activeMembers.map((member) => {
             let line = `- ${member.first_name}`;
@@ -77,7 +79,9 @@ export function buildChatInfoBlock(params: BuildChatInfoBlockParams): string {
             return line;
         }).join('\n');
 
-        text += `\nChat: ${chatTitle ?? 'Unknown chat'}, Active members:\n${prettyMembersList}`;
+        text += `\nChat: ${
+            chatTitle ?? 'Unknown chat'
+        }, Active members:\n${prettyMembersList}`;
     }
 
     if (includeNotes && notes.length > 0) {

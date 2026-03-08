@@ -82,7 +82,6 @@ const defaultConfig = {
     startMessage: 'Привет! Я Слюша, бот-гений.',
     ai: {
         model: 'gemini-3.1-flash-lite-preview',
-        useJsonResponses: true,
         replyMethod: 'json_actions',
         notesModel: 'gemini-3.1-flash-lite-preview',
         memoryModel: 'gemini-3.1-flash-lite-preview',

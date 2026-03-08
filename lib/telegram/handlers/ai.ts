@@ -14,8 +14,8 @@ import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
 import { ReplyTo } from '../../memory.ts';
 import {
     chatActionsToolInputSchema,
-    chatReactionsToolInputSchema,
     ChatEntry,
+    chatReactionsToolInputSchema,
     isReactEntry,
     isTextEntry,
 } from '../../ai/schema.ts';
@@ -25,11 +25,11 @@ import {
     buildTargetRefsPrompt,
 } from '../../ai/target-refs.ts';
 import {
+    type GenerationAttemptPlan,
     getGenerationFallbackPlans,
     resolveCustomPrompt,
     resolveReplyMethod,
     splitTextByTwoLines,
-    type GenerationAttemptPlan,
 } from '../../ai/chat-generation.ts';
 import {
     buildChatInfoBlock,
@@ -66,7 +66,6 @@ function parseJsonRecord(text: string): Record<string, unknown> | undefined {
         return undefined;
     }
 }
-
 
 function createSendChatActionsTool(description: string) {
     return tool({
@@ -220,7 +219,9 @@ function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
         let targetRef: string | undefined;
 
         while (true) {
-            const metadataMatch = candidateText.match(plainTextMetadataBlockRegex);
+            const metadataMatch = candidateText.match(
+                plainTextMetadataBlockRegex,
+            );
             if (!metadataMatch) {
                 break;
             }
@@ -238,7 +239,8 @@ function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
                 }
             }
 
-            candidateText = candidateText.slice(metadataMatch[0].length).trimStart();
+            candidateText = candidateText.slice(metadataMatch[0].length)
+                .trimStart();
         }
 
         const targetMatch = candidateText.match(plainTextTargetRefLineRegex);
@@ -285,7 +287,9 @@ function buildTelemetryMetadata(
     ctx: SlushaContext,
     chatName: string,
     tags: string[],
-    effectiveConfig: Awaited<ReturnType<SlushaContext['m']['getEffectiveConfig']>>,
+    effectiveConfig: Awaited<
+        ReturnType<SlushaContext['m']['getEffectiveConfig']>
+    >,
     policy: ReturnType<typeof resolveGenerationPolicy>,
 ) {
     return buildGenerationTelemetryMetadata({
@@ -300,7 +304,9 @@ function buildTelemetryMetadata(
     });
 }
 
-type EffectiveConfig = Awaited<ReturnType<SlushaContext['m']['getEffectiveConfig']>>;
+type EffectiveConfig = Awaited<
+    ReturnType<SlushaContext['m']['getEffectiveConfig']>
+>;
 
 async function sendGeneratedOutput(params: {
     bot: Bot<SlushaContext>;
@@ -351,7 +357,9 @@ async function sendGeneratedOutput(params: {
                     try {
                         const chatId = ctx.chat?.id;
                         if (!chatId) {
-                            logger.debug('Reaction chat context missing, skipping');
+                            logger.debug(
+                                'Reaction chat context missing, skipping',
+                            );
                             continue;
                         }
                         await ctx.api.setMessageReaction(
@@ -493,10 +501,8 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 DEFAULT_CHAT_REACTIONS_TOOL_DESCRIPTION,
             ),
         );
-        const useJsonResponses = effectiveConfig.ai.useJsonResponses;
         const replyMethod = resolveReplyMethod(
             effectiveConfig.ai.replyMethod,
-            useJsonResponses,
         );
         const enabledReactions = resolveEnabledReactions(
             effectiveConfig.blacklistedReactions,
@@ -559,7 +565,8 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 isComments,
                 privateChatPromptAddition:
                     effectiveConfig.ai.privateChatPromptAddition,
-                commentsPromptAddition: effectiveConfig.ai.commentsPromptAddition,
+                commentsPromptAddition:
+                    effectiveConfig.ai.commentsPromptAddition,
                 groupChatPromptAddition:
                     effectiveConfig.ai.groupChatPromptAddition,
             });

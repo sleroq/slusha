@@ -36,20 +36,26 @@ Deno.test('isTelegramCommentsHistory detects telegram comments', () => {
 });
 
 Deno.test('buildChatPromptAddition resolves by chat mode', () => {
-    assertEquals(buildChatPromptAddition({
-        chatType: 'private',
-        isComments: false,
-        privateChatPromptAddition: 'private',
-        commentsPromptAddition: 'comments',
-        groupChatPromptAddition: 'group',
-    }), 'private');
-    assertEquals(buildChatPromptAddition({
-        chatType: 'group',
-        isComments: true,
-        privateChatPromptAddition: 'private',
-        commentsPromptAddition: 'comments',
-        groupChatPromptAddition: 'group',
-    }), 'comments');
+    assertEquals(
+        buildChatPromptAddition({
+            chatType: 'private',
+            isComments: false,
+            privateChatPromptAddition: 'private',
+            commentsPromptAddition: 'comments',
+            groupChatPromptAddition: 'group',
+        }),
+        'private',
+    );
+    assertEquals(
+        buildChatPromptAddition({
+            chatType: 'group',
+            isComments: true,
+            privateChatPromptAddition: 'private',
+            commentsPromptAddition: 'comments',
+            groupChatPromptAddition: 'group',
+        }),
+        'comments',
+    );
 });
 
 Deno.test('buildChatInfoBlock renders active members and notes', () => {

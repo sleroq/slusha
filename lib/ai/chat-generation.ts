@@ -13,7 +13,6 @@ export type GenerationAttemptPlan = {
 
 export function resolveReplyMethod(
     configuredMethod: string | undefined,
-    useJsonResponses: boolean,
 ): ReplyMethod {
     if (configuredMethod === 'json_actions') {
         return 'json_actions';
@@ -22,7 +21,7 @@ export function resolveReplyMethod(
         return 'plain_text_reactions';
     }
 
-    return useJsonResponses ? 'json_actions' : 'plain_text_reactions';
+    return 'json_actions';
 }
 
 export function splitTextByTwoLines(text: string): string[] {

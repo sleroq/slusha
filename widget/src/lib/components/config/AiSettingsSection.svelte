@@ -29,7 +29,6 @@
         <div class="space-y-2"><Label for={`${prefix}-ai-memory-freq`}>ai.memoryFrequency</Label><Input id={`${prefix}-ai-memory-freq`} type="number" bind:value={ai.memoryFrequency} /></div>
         <div class="space-y-2"><Label for={`${prefix}-ai-max-len`}>ai.messageMaxLength</Label><Input id={`${prefix}-ai-max-len`} type="number" bind:value={ai.messageMaxLength} /></div>
         <div class="space-y-2"><Label for={`${prefix}-ai-bytes`}>ai.bytesLimit</Label><Input id={`${prefix}-ai-bytes`} type="number" bind:value={ai.bytesLimit} /></div>
-        <div class="flex items-center justify-between rounded-md border p-3"><Label for={`${prefix}-ai-json`}>ai.useJsonResponses</Label><Switch id={`${prefix}-ai-json`} bind:checked={ai.useJsonResponses} /></div>
         <div class="flex items-center justify-between rounded-md border p-3"><Label for={`${prefix}-ai-attachments`}>ai.includeAttachmentsInHistory</Label><Switch id={`${prefix}-ai-attachments`} bind:checked={ai.includeAttachmentsInHistory} /></div>
     </div>
 

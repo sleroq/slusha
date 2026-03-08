@@ -6,9 +6,13 @@ import {
     splitTextByTwoLines,
 } from './chat-generation.ts';
 
-Deno.test('resolveReplyMethod falls back to useJsonResponses', () => {
-    assertEquals(resolveReplyMethod(undefined, true), 'json_actions');
-    assertEquals(resolveReplyMethod(undefined, false), 'plain_text_reactions');
+Deno.test('resolveReplyMethod falls back to json_actions', () => {
+    assertEquals(resolveReplyMethod(undefined), 'json_actions');
+    assertEquals(resolveReplyMethod('unknown'), 'json_actions');
+    assertEquals(
+        resolveReplyMethod('plain_text_reactions'),
+        'plain_text_reactions',
+    );
 });
 
 Deno.test('splitTextByTwoLines splits by blank lines', () => {
