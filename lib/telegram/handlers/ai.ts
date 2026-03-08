@@ -578,7 +578,13 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             Math.max(maxTargetCount, maxAttemptHistoryLimit),
         );
 
-        const targetRefs = buildTargetRefs(savedHistory, maxTargetCount);
+        const activeMessageThreadId = typeof ctx.msg.message_thread_id ===
+                'number'
+            ? ctx.msg.message_thread_id
+            : undefined;
+        const targetRefs = buildTargetRefs(savedHistory, maxTargetCount, {
+            activeMessageThreadId,
+        });
         const targetRefMap = new Map(
             targetRefs.map((target) => [target.ref, target.messageId]),
         );

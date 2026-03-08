@@ -13,6 +13,7 @@ function createChatMessage(
     text: string,
     isMyself = false,
     from?: { id?: number; username?: string; first_name?: string },
+    messageThreadId?: number,
 ): ChatMessage {
     return {
         id,
@@ -20,6 +21,7 @@ function createChatMessage(
         isMyself,
         info: {
             from,
+            message_thread_id: messageThreadId,
         } as unknown as Message,
     };
 }
@@ -49,6 +51,20 @@ Deno.test('buildTargetRefs builds refs from latest external messages', () => {
 Deno.test('buildTargetRefsPrompt returns fallback when no targets', () => {
     const prompt = buildTargetRefsPrompt([]);
     assertStringIncludes(prompt, 'There are no explicit targets right now');
+});
+
+Deno.test('buildTargetRefs filters refs by active topic', () => {
+    const history: ChatMessage[] = [
+        createChatMessage(20, 'topic 1 old', false, { id: 1, first_name: 'A' }, 1),
+        createChatMessage(21, 'topic 2', false, { id: 2, first_name: 'B' }, 2),
+        createChatMessage(22, 'topic 1 new', false, { id: 3, first_name: 'C' }, 1),
+    ];
+
+    const refs = buildTargetRefs(history, 5, {
+        activeMessageThreadId: 1,
+    });
+
+    assertEquals(refs.map((r) => r.messageId), [22, 20]);
 });
 
 Deno.test('annotateHistoryWithTargetRefs annotates history meta block', () => {

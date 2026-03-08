@@ -32,8 +32,19 @@ function sanitizeInline(text: string, maxLength = 90): string {
 export function buildTargetRefs(
     history: ChatMessage[],
     maxTargets: number,
+    options?: {
+        activeMessageThreadId?: number;
+    },
 ): TargetRef[] {
+    const activeMessageThreadId = options?.activeMessageThreadId;
     const candidates = history.filter((message) => !message.isMyself)
+        .filter((message) => {
+            if (typeof activeMessageThreadId !== 'number') {
+                return true;
+            }
+
+            return message.info.message_thread_id === activeMessageThreadId;
+        })
         .slice(-maxTargets)
         .reverse();
 
