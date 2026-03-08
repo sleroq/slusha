@@ -24,6 +24,10 @@ const matcherSchema = z.union([
 ]);
 
 const thinkingLevelSchema = z.enum(['minimal', 'low', 'medium', 'high']);
+const replyMethodSchema = z.enum([
+    'json_actions',
+    'plain_text_reactions',
+]);
 const googleThinkingConfigSchema = z.object({
     thinkingLevel: thinkingLevelSchema.optional(),
     thinkingBudget: z.number().int().min(0).max(65536).optional(),
@@ -75,6 +79,10 @@ export const configSchema = z.object({
          * generate a single plain text message instead. Reactions are disabled.
          */
         useJsonResponses: z.boolean().default(true),
+        /**
+         * Selects chat reply strategy for message generation and tool usage.
+         */
+        replyMethod: replyMethodSchema.optional(),
         /**
          * Optional alternative pre-prompt for dumb models that don't output JSON
          */
@@ -175,6 +183,7 @@ const chatOverrideAiSchema = z.object({
         .optional(),
     hateModePrompt: configSchema.shape.ai.shape.hateModePrompt.optional(),
     useJsonResponses: configSchema.shape.ai.shape.useJsonResponses.optional(),
+    replyMethod: configSchema.shape.ai.shape.replyMethod.optional(),
     messagesToPass: configSchema.shape.ai.shape.messagesToPass.optional(),
     messageMaxLength: configSchema.shape.ai.shape.messageMaxLength.optional(),
     includeAttachmentsInHistory: configSchema.shape.ai.shape

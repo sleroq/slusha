@@ -30,6 +30,75 @@ import { parseModelRef } from '../../ai/model-ref.ts';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
 import { buildLanguageProtocol } from '../../ai/language-protocol.ts';
 
+type ReplyMethod = 'json_actions' | 'plain_text_reactions';
+
+type GenerationFallbackLevel =
+    | 'full'
+    | 'short_history'
+    | 'short_history_no_notes';
+
+type GenerationAttemptPlan = {
+    level: GenerationFallbackLevel;
+    historyLimit: number;
+    includeBotNotes: boolean;
+};
+
+function resolveReplyMethod(
+    configuredMethod: string | undefined,
+    useJsonResponses: boolean,
+): ReplyMethod {
+    if (configuredMethod === 'json_actions') {
+        return 'json_actions';
+    }
+    if (configuredMethod === 'plain_text_reactions') {
+        return 'plain_text_reactions';
+    }
+
+    return useJsonResponses ? 'json_actions' : 'plain_text_reactions';
+}
+
+function splitTextByTwoLines(text: string): string[] {
+    const lines = text
+        .split('\n')
+        .map((line) => line.trimEnd());
+    const chunks: string[] = [];
+
+    for (let i = 0; i < lines.length; i += 2) {
+        const chunk = lines.slice(i, i + 2)
+            .join('\n')
+            .trim();
+        if (chunk.length > 0) {
+            chunks.push(chunk);
+        }
+    }
+
+    return chunks;
+}
+
+function getGenerationFallbackPlans(
+    messagesToPass: number,
+): GenerationAttemptPlan[] {
+    const shortHistoryLimit = Math.max(2, Math.floor(messagesToPass / 2));
+
+    return [
+        {
+            level: 'full',
+            historyLimit: messagesToPass,
+            includeBotNotes: true,
+        },
+        {
+            level: 'short_history',
+            historyLimit: shortHistoryLimit,
+            includeBotNotes: true,
+        },
+        {
+            level: 'short_history_no_notes',
+            historyLimit: shortHistoryLimit,
+            includeBotNotes: false,
+        },
+    ];
+}
+
 export default function registerAI(bot: Bot<SlushaContext>) {
     const sendChatActionsTool = tool({
         description:
@@ -105,12 +174,15 @@ export default function registerAI(bot: Bot<SlushaContext>) {
     });
 
     bot.on('message', async (ctx) => {
-        const messages: ModelMessage[] = [];
         const chatState = await ctx.m.getChat();
         const effectiveConfig = await ctx.m.getEffectiveConfig();
         const savedHistory = await ctx.m.getHistory();
 
         const useJsonResponses = effectiveConfig.ai.useJsonResponses;
+        const replyMethod = resolveReplyMethod(
+            effectiveConfig.ai.replyMethod,
+            useJsonResponses,
+        );
         const enabledReactions = resolveEnabledReactions(
             effectiveConfig.blacklistedReactions,
         );
@@ -126,154 +198,17 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             targetRefs.map((target) => [target.ref, target.messageId]),
         );
 
-        let prompt = '';
-        if (useJsonResponses) {
-            prompt = (effectiveConfig.ai.prePrompt ?? '') + '\n\n';
-        } else {
-            const fallbackDumbPre =
-                'Отвечай одним сообщением простым текстом без какого-либо JSON.' +
-                '\nНе используй реакции. Пиши кратко и по делу.' +
-                '\nИспользуй Telegram markdown, но без заголовков.';
-            prompt = (effectiveConfig.ai.dumbPrePrompt ?? fallbackDumbPre) +
-                '\n\n';
-        }
         // TODO: Improve this check
         const isComments = savedHistory.some((m) =>
             m.info.forward_origin?.type === 'channel' &&
             m.info.from?.first_name === 'Telegram'
         );
-
-        if (ctx.chat.type === 'private') {
-            if (effectiveConfig.ai.privateChatPromptAddition) {
-                prompt += effectiveConfig.ai.privateChatPromptAddition;
-            }
-        } else if (isComments && effectiveConfig.ai.commentsPromptAddition) {
-            prompt += effectiveConfig.ai.commentsPromptAddition;
-        } else if (effectiveConfig.ai.groupChatPromptAddition) {
-            prompt += effectiveConfig.ai.groupChatPromptAddition;
-        }
-
-        if (chatState.hateMode && effectiveConfig.ai.hateModePrompt) {
-            prompt += '\n' + effectiveConfig.ai.hateModePrompt;
-        }
-
-        prompt += '\n\n';
-
         const currentLocale = chatState.locale ??
             await ctx.i18n.getLocale();
-        prompt += buildLanguageProtocol(currentLocale) + '\n\n';
-
         const character = chatState.character;
-        if (character) {
-            prompt += '### Character ###\n' + character.description;
-        } else {
-            prompt += useJsonResponses
-                ? effectiveConfig.ai.prompt
-                : (effectiveConfig.ai.dumbPrompt ?? effectiveConfig.ai.prompt);
-        }
-
-        let chatInfoMsg = `Date and time right now: ${prettyDate()}`;
-
-        if (ctx.chat.type === 'private') {
-            chatInfoMsg +=
-                `\nЛичный чат с ${ctx.from.first_name} (@${ctx.from.username})`;
-        } else {
-            const activeMembers = await ctx.m.getActiveMembers();
-            if (activeMembers.length > 0) {
-                const prettyMembersList = activeMembers.map((m) => {
-                    let text = `- ${m.first_name}`;
-                    if (m.username) {
-                        text += ` (@${m.username})`;
-                    }
-                    return text;
-                }).join('\n');
-
-                chatInfoMsg +=
-                    `\nChat: ${ctx.chat.title}, Active members:\n${prettyMembersList}`;
-            }
-        }
-
-        // If we have notes, add them to messages
-        if (chatState.notes.length > 0) {
-            chatInfoMsg += `\n\nChat notes:\n${chatState.notes.join('\n')}`;
-        }
-
-        if (chatState.memory) {
-            chatInfoMsg +=
-                `\n\nMY OWN PERSONAL NOTES AND MEMORY:\n${chatState.memory}`;
-        }
-
-        prompt += `\n\n### Chat Info ###\n${chatInfoMsg}`;
-
-        if (useJsonResponses) {
-            if (enabledReactions.length === 0) {
-                prompt +=
-                    '\n\n### Reactions ###\n- Reactions are disabled for this chat. Do not output react actions.';
-            } else {
-                prompt +=
-                    `\n\n### Reactions ###\n- Allowed reactions for this chat: ${
-                        enabledReactions.join(', ')
-                    }`;
-            }
-
-            prompt += `\n\n${buildTargetRefsPrompt(targetRefs)}`;
-        }
-
-        messages.push({
-            role: 'system',
-            content: prompt,
-        });
 
         const modelRef = chatState.chatModel ?? effectiveConfig.ai.model;
         const parsedModel = parseModelRef(modelRef);
-
-        let history: ModelMessage[] = [];
-        try {
-            history = await makeHistoryV2(
-                { token: bot.token, id: bot.botInfo.id },
-                bot.api,
-                logger,
-                savedHistory,
-                {
-                    messagesLimit: messagesToPass,
-                    bytesLimit: effectiveConfig.ai.bytesLimit,
-                    symbolLimit: effectiveConfig.ai.messageMaxLength,
-                    includeReactions: true,
-                    attachments:
-                        effectiveConfig.ai.includeAttachmentsInHistory &&
-                        parsedModel.provider === 'google',
-                },
-            );
-        } catch (error) {
-            logger.error('Could not get history: ', error);
-
-            if (!ctx.info.isRandom) {
-                await ctx.reply(getRandomNepon(effectiveConfig));
-            }
-            return;
-        }
-
-        const annotatedHistory = annotateHistoryWithTargetRefs(
-            history,
-            targetRefs,
-        );
-        messages.push(...annotatedHistory);
-
-        let finalPrompt = useJsonResponses
-            ? effectiveConfig.ai.finalPrompt
-            : (effectiveConfig.ai.dumbFinalPrompt ?? 'Ответь простым текстом.');
-        if (useJsonResponses) {
-            finalPrompt +=
-                ' Return only actions array using typed entries and target_ref values from Reply Target Map.';
-        }
-        if (!useJsonResponses && ctx.info.userToReply) {
-            finalPrompt += ` Ответь на сообщение от ${ctx.info.userToReply}.`;
-        }
-
-        messages.push({
-            role: 'user',
-            content: finalPrompt,
-        });
 
         const time = new Date().getTime();
         const maxGenerationRetries = 2;
@@ -287,7 +222,144 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         }
         const chatName = ctx.chat.first_name ?? ctx.chat.title;
 
-        const generatePlainTextOutput = async (): Promise<ChatEntry[]> => {
+        const activeMembers = ctx.chat.type === 'private'
+            ? []
+            : await ctx.m.getActiveMembers();
+
+        const buildMessagesForAttempt = async (
+            plan: GenerationAttemptPlan,
+        ): Promise<ModelMessage[]> => {
+            const messages: ModelMessage[] = [];
+
+            let prompt = '';
+            if (replyMethod === 'json_actions') {
+                prompt = (effectiveConfig.ai.prePrompt ?? '') + '\n\n';
+            } else {
+                const fallbackDumbPre =
+                    'Отвечай простым текстом без какого-либо JSON.' +
+                    '\nНе описывай действия и не пиши служебные команды.' +
+                    '\nИспользуй Telegram markdown, но без заголовков.';
+                prompt = (effectiveConfig.ai.dumbPrePrompt ?? fallbackDumbPre) +
+                    '\n\n';
+            }
+
+            if (ctx.chat.type === 'private') {
+                if (effectiveConfig.ai.privateChatPromptAddition) {
+                    prompt += effectiveConfig.ai.privateChatPromptAddition;
+                }
+            } else if (
+                isComments &&
+                effectiveConfig.ai.commentsPromptAddition
+            ) {
+                prompt += effectiveConfig.ai.commentsPromptAddition;
+            } else if (effectiveConfig.ai.groupChatPromptAddition) {
+                prompt += effectiveConfig.ai.groupChatPromptAddition;
+            }
+
+            if (chatState.hateMode && effectiveConfig.ai.hateModePrompt) {
+                prompt += '\n' + effectiveConfig.ai.hateModePrompt;
+            }
+
+            prompt += '\n\n';
+            prompt += buildLanguageProtocol(currentLocale) + '\n\n';
+
+            if (character) {
+                prompt += '### Character ###\n' + character.description;
+            } else {
+                prompt += replyMethod === 'json_actions'
+                    ? effectiveConfig.ai.prompt
+                    : (effectiveConfig.ai.dumbPrompt ??
+                        effectiveConfig.ai.prompt);
+            }
+
+            let chatInfoMsg = `Date and time right now: ${prettyDate()}`;
+            if (ctx.chat.type === 'private') {
+                chatInfoMsg +=
+                    `\nЛичный чат с ${ctx.from.first_name} (@${ctx.from.username})`;
+            } else if (activeMembers.length > 0) {
+                const prettyMembersList = activeMembers.map((m) => {
+                    let text = `- ${m.first_name}`;
+                    if (m.username) {
+                        text += ` (@${m.username})`;
+                    }
+                    return text;
+                }).join('\n');
+
+                chatInfoMsg +=
+                    `\nChat: ${ctx.chat.title}, Active members:\n${prettyMembersList}`;
+            }
+
+            if (plan.includeBotNotes && chatState.notes.length > 0) {
+                chatInfoMsg += `\n\nChat notes:\n${chatState.notes.join('\n')}`;
+            }
+            if (plan.includeBotNotes && chatState.memory) {
+                chatInfoMsg +=
+                    `\n\nMY OWN PERSONAL NOTES AND MEMORY:\n${chatState.memory}`;
+            }
+
+            prompt += `\n\n### Chat Info ###\n${chatInfoMsg}`;
+            if (enabledReactions.length === 0) {
+                prompt +=
+                    '\n\n### Reactions ###\n- Reactions are disabled for this chat. Do not output react actions.';
+            } else {
+                prompt +=
+                    `\n\n### Reactions ###\n- Allowed reactions for this chat: ${
+                        enabledReactions.join(', ')
+                    }`;
+            }
+            prompt += `\n\n${buildTargetRefsPrompt(targetRefs)}`;
+
+            messages.push({
+                role: 'system',
+                content: prompt,
+            });
+
+            const history = await makeHistoryV2(
+                { token: bot.token, id: bot.botInfo.id },
+                bot.api,
+                logger,
+                savedHistory,
+                {
+                    messagesLimit: plan.historyLimit,
+                    bytesLimit: effectiveConfig.ai.bytesLimit,
+                    symbolLimit: effectiveConfig.ai.messageMaxLength,
+                    includeReactions: true,
+                    attachments:
+                        effectiveConfig.ai.includeAttachmentsInHistory &&
+                        parsedModel.provider === 'google',
+                },
+            );
+
+            const annotatedHistory = annotateHistoryWithTargetRefs(
+                history,
+                targetRefs,
+            );
+            messages.push(...annotatedHistory);
+
+            let finalPrompt = replyMethod === 'json_actions'
+                ? effectiveConfig.ai.finalPrompt
+                : (effectiveConfig.ai.dumbFinalPrompt ??
+                    'Ответь простым текстом.');
+            if (replyMethod === 'json_actions') {
+                finalPrompt +=
+                    ' Return only actions array using typed entries and target_ref values from Reply Target Map.';
+            }
+            if (replyMethod !== 'json_actions' && ctx.info.userToReply) {
+                finalPrompt +=
+                    ` Ответь на сообщение от ${ctx.info.userToReply}.`;
+            }
+
+            messages.push({
+                role: 'user',
+                content: finalPrompt,
+            });
+
+            return messages;
+        };
+
+        const generatePlainTextAndReactionsOutput = async (
+            messages: ModelMessage[],
+        ): Promise<ChatEntry[]> => {
             const generationPolicy = resolveGenerationPolicy({
                 modelRef,
                 config: effectiveConfig.ai,
@@ -322,25 +394,31 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     }),
                 },
             });
-            return [{ type: 'reply', text: response.text }];
-        };
 
-        let output: ChatEntry[];
-        try {
-            if (useJsonResponses) {
-                const generationPolicy = resolveGenerationPolicy({
-                    modelRef,
-                    config: effectiveConfig.ai,
-                    task: 'chat',
-                    expectsStructuredOutput: true,
-                });
-                const providerOptions = generationPolicy
-                    .providerOptions as Parameters<
-                        typeof generateText
-                    >[0]['providerOptions'];
-                const result = await generateText({
-                    model: generationPolicy.model,
-                    providerOptions,
+            const plainTextResponse = response.text.trim();
+            const splitReplies = splitTextByTwoLines(plainTextResponse);
+            const replyEntries: ChatEntry[] = splitReplies.length > 0
+                ? splitReplies.map((text) => ({ type: 'reply', text }))
+                : [{ type: 'reply', text: plainTextResponse }];
+
+            if (enabledReactions.length === 0) {
+                return replyEntries;
+            }
+
+            const structuredPolicy = resolveGenerationPolicy({
+                modelRef,
+                config: effectiveConfig.ai,
+                task: 'chat',
+                expectsStructuredOutput: true,
+            });
+            const structuredProviderOptions = structuredPolicy
+                .providerOptions as Parameters<
+                    typeof generateText
+                >[0]['providerOptions'];
+            try {
+                const reactionResult = await generateText({
+                    model: structuredPolicy.model,
+                    providerOptions: structuredProviderOptions,
                     maxRetries: maxGenerationRetries,
                     tools: {
                         send_chat_actions: sendChatActionsTool,
@@ -353,11 +431,22 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     temperature: effectiveConfig.ai.temperature,
                     topK: effectiveConfig.ai.topK,
                     topP: effectiveConfig.ai.topP,
-                    maxOutputTokens: generationPolicy.maxOutputTokens,
-                    messages,
+                    maxOutputTokens: structuredPolicy.maxOutputTokens,
+                    messages: [
+                        ...messages,
+                        {
+                            role: 'assistant',
+                            content: plainTextResponse,
+                        },
+                        {
+                            role: 'user',
+                            content:
+                                'Optional step: return only react actions (no reply actions) using target_ref from Reply Target Map. If no reaction is needed, return empty actions list.',
+                        },
+                    ],
                     experimental_telemetry: {
                         isEnabled: true,
-                        functionId: 'user-message',
+                        functionId: 'user-message-plain-reactions',
                         metadata: buildGenerationTelemetryMetadata({
                             sessionId: ctx.chat.id.toString(),
                             userId: ctx.from?.id.toString() ?? '',
@@ -366,47 +455,161 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                             temperature: effectiveConfig.ai.temperature,
                             topK: effectiveConfig.ai.topK,
                             topP: effectiveConfig.ai.topP,
-                            policy: generationPolicy,
+                            policy: structuredPolicy,
                         }),
                     },
                 });
 
-                const chatActionsToolCall = result.toolCalls.find((call) =>
+                const reactionToolCall = reactionResult.toolCalls.find((call) =>
                     call.toolName === 'send_chat_actions'
                 );
-                const parsedToolCallInput = chatActionsToolCall
+                const parsedReactionToolInput = reactionToolCall
                     ? chatActionsToolInputSchema.safeParse(
-                        chatActionsToolCall.input,
+                        reactionToolCall.input,
                     )
                     : undefined;
 
-                if (parsedToolCallInput?.success) {
-                    output = parsedToolCallInput.data.entries;
-                } else {
-                    logger.warn(
-                        'Structured tool call missing or invalid after retries',
-                        {
-                            modelRef,
-                            chatId: ctx.chat.id,
-                            finishReason: result.finishReason,
-                            toolCalls: result.toolCalls.map((call) =>
-                                call.toolName
-                            ),
-                            usage: result.totalUsage,
-                        },
-                    );
-                    throw new Error(
-                        'Structured tool call missing or invalid after retries',
-                    );
+                if (!parsedReactionToolInput?.success) {
+                    return replyEntries;
                 }
-            } else {
-                output = await generatePlainTextOutput();
+
+                const reactionEntries = parsedReactionToolInput.data.entries
+                    .filter((entry) => isReactEntry(entry));
+
+                return [...replyEntries, ...reactionEntries];
+            } catch (error) {
+                logger.warn(
+                    'Could not generate reactions for plain-text method, keeping text reply only',
+                    error,
+                );
+                return replyEntries;
             }
-        } catch (error) {
+        };
+
+        const generateStructuredActionsOutput = async (
+            messages: ModelMessage[],
+        ): Promise<ChatEntry[]> => {
+            const generationPolicy = resolveGenerationPolicy({
+                modelRef,
+                config: effectiveConfig.ai,
+                task: 'chat',
+                expectsStructuredOutput: true,
+            });
+            const providerOptions = generationPolicy
+                .providerOptions as Parameters<
+                    typeof generateText
+                >[0]['providerOptions'];
+            const result = await generateText({
+                model: generationPolicy.model,
+                providerOptions,
+                maxRetries: maxGenerationRetries,
+                tools: {
+                    send_chat_actions: sendChatActionsTool,
+                },
+                toolChoice: {
+                    type: 'tool',
+                    toolName: 'send_chat_actions',
+                },
+                stopWhen: hasToolCall('send_chat_actions'),
+                temperature: effectiveConfig.ai.temperature,
+                topK: effectiveConfig.ai.topK,
+                topP: effectiveConfig.ai.topP,
+                maxOutputTokens: generationPolicy.maxOutputTokens,
+                messages,
+                experimental_telemetry: {
+                    isEnabled: true,
+                    functionId: 'user-message',
+                    metadata: buildGenerationTelemetryMetadata({
+                        sessionId: ctx.chat.id.toString(),
+                        userId: ctx.from?.id.toString() ?? '',
+                        chatName,
+                        tags,
+                        temperature: effectiveConfig.ai.temperature,
+                        topK: effectiveConfig.ai.topK,
+                        topP: effectiveConfig.ai.topP,
+                        policy: generationPolicy,
+                    }),
+                },
+            });
+
+            const chatActionsToolCall = result.toolCalls.find((call) =>
+                call.toolName === 'send_chat_actions'
+            );
+            const parsedToolCallInput = chatActionsToolCall
+                ? chatActionsToolInputSchema.safeParse(
+                    chatActionsToolCall.input,
+                )
+                : undefined;
+
+            if (parsedToolCallInput?.success) {
+                return parsedToolCallInput.data.entries;
+            } else {
+                logger.warn(
+                    'Structured tool call missing or invalid after retries',
+                    {
+                        modelRef,
+                        chatId: ctx.chat.id,
+                        finishReason: result.finishReason,
+                        toolCalls: result.toolCalls.map((call) =>
+                            call.toolName
+                        ),
+                        usage: result.totalUsage,
+                    },
+                );
+                throw new Error(
+                    'Structured tool call missing or invalid after retries',
+                );
+            }
+        };
+
+        let output: ChatEntry[] | undefined;
+        let generationError: unknown;
+        const attempts = getGenerationFallbackPlans(messagesToPass);
+
+        for (const attempt of attempts) {
+            let attemptMessages: ModelMessage[];
+            try {
+                attemptMessages = await buildMessagesForAttempt(attempt);
+            } catch (error) {
+                generationError = error;
+                logger.warn('Could not get history for generation attempt', {
+                    level: attempt.level,
+                    historyLimit: attempt.historyLimit,
+                    includeBotNotes: attempt.includeBotNotes,
+                    error,
+                });
+                continue;
+            }
+
+            try {
+                output = replyMethod === 'json_actions'
+                    ? await generateStructuredActionsOutput(attemptMessages)
+                    : await generatePlainTextAndReactionsOutput(
+                        attemptMessages,
+                    );
+                break;
+            } catch (error) {
+                generationError = error;
+                logger.warn('Generation attempt failed', {
+                    level: attempt.level,
+                    historyLimit: attempt.historyLimit,
+                    includeBotNotes: attempt.includeBotNotes,
+                    replyMethod,
+                    error,
+                });
+            }
+        }
+
+        if (!output) {
             let blockReason: string | undefined;
-            if (error instanceof APICallError && error.responseBody) {
+            if (
+                generationError instanceof APICallError &&
+                generationError.responseBody
+            ) {
                 try {
-                    const parsedError = JSON.parse(error.responseBody);
+                    const parsedError = JSON.parse(
+                        generationError.responseBody,
+                    );
                     if (
                         typeof parsedError?.promptFeedback?.blockReason ===
                             'string'
@@ -432,7 +635,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 );
             }
 
-            logger.error('Could not get response: ', error);
+            logger.error('Could not get response: ', generationError);
             if (blockReason) {
                 return ctx.reply(
                     blockedByProviderMessage +

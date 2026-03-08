@@ -69,6 +69,8 @@ export interface GenerationTaskConfig {
   maxOutputTokens?: number;
 }
 
+export type ReplyMethod = "json_actions" | "plain_text_reactions";
+
 export interface AiPayload {
   model: string;
   notesModel?: string;
@@ -80,6 +82,7 @@ export interface AiPayload {
   prompt: string;
   dumbPrompt?: string;
   useJsonResponses: boolean;
+  replyMethod?: ReplyMethod;
   dumbPrePrompt?: string;
   privateChatPromptAddition?: string;
   groupChatPromptAddition?: string;
@@ -123,6 +126,7 @@ export interface ChatEditableAiPayload {
   commentsPromptAddition?: string;
   hateModePrompt?: string;
   useJsonResponses: boolean;
+  replyMethod?: ReplyMethod;
   messagesToPass: number;
   messageMaxLength: number;
   includeAttachmentsInHistory: boolean;
@@ -246,6 +250,7 @@ export interface GlobalFormText {
   names: string;
   tendToReply: string;
   tendToIgnore: string;
+  blacklistedReactions: string;
   nepons: string;
   adminIds: string;
   trustedIds: string;
@@ -272,6 +277,7 @@ export function defaultAiConfig(): AiPayload {
     prompt: "",
     dumbPrompt: "",
     useJsonResponses: true,
+    replyMethod: "json_actions",
     dumbPrePrompt: "",
     privateChatPromptAddition: "",
     groupChatPromptAddition: "",
@@ -290,8 +296,14 @@ export function defaultAiConfig(): AiPayload {
     bytesLimit: 20 * 1024 * 1024,
     google: {
       safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        {
+          category: "HARM_CATEGORY_HARASSMENT",
+          threshold: "BLOCK_NONE",
+        },
+        {
+          category: "HARM_CATEGORY_HATE_SPEECH",
+          threshold: "BLOCK_NONE",
+        },
         {
           category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
           threshold: "BLOCK_NONE",
@@ -355,6 +367,13 @@ export function defaultChatEditableAiConfig(
     useJsonResponses: typeof base.useJsonResponses === "boolean"
       ? base.useJsonResponses
       : true,
+    replyMethod: base.replyMethod === "plain_text_reactions" ||
+        base.replyMethod === "json_actions"
+      ? base.replyMethod
+      : (typeof base.useJsonResponses === "boolean" &&
+          !base.useJsonResponses
+        ? "plain_text_reactions"
+        : "json_actions"),
     messagesToPass: typeof base.messagesToPass === "number"
       ? base.messagesToPass
       : 5,
@@ -607,6 +626,9 @@ export function globalTextFromConfig(
     names: matcherListToTextarea(config.names),
     tendToReply: matcherListToTextarea(config.tendToReply),
     tendToIgnore: matcherListToTextarea(config.tendToIgnore),
+    blacklistedReactions: stringListToTextarea(
+      config.blacklistedReactions ?? [],
+    ),
     nepons: stringListToTextarea(config.nepons),
     adminIds: stringListToTextarea((config.adminIds ?? []).map(String)),
     trustedIds: stringListToTextarea((config.trustedIds ?? []).map(String)),
@@ -637,6 +659,7 @@ export function buildGlobalPayload(
     names: matcherTextareaToList(text.names),
     tendToReply: matcherTextareaToList(text.tendToReply),
     tendToIgnore: matcherTextareaToList(text.tendToIgnore),
+    blacklistedReactions: textareaToStringList(text.blacklistedReactions),
     nepons: textareaToStringList(text.nepons),
     adminIds: textareaToNumberList(text.adminIds),
     trustedIds: textareaToNumberList(text.trustedIds),
@@ -664,7 +687,9 @@ export function buildChatPayload(
   const names = matcherTextareaToList(text.names);
   const tendToReply = matcherTextareaToList(text.tendToReply);
   const tendToIgnore = matcherTextareaToList(text.tendToIgnore);
-  const blacklistedReactions = textareaToStringList(text.blacklistedReactions);
+  const blacklistedReactions = textareaToStringList(
+    text.blacklistedReactions,
+  );
   const nepons = textareaToStringList(text.nepons);
 
   const payload: ChatOverridePayload = {};
@@ -728,6 +753,9 @@ export function buildChatPayload(
   }
   if (config.ai.useJsonResponses !== base.ai.useJsonResponses) {
     aiPayload.useJsonResponses = config.ai.useJsonResponses;
+  }
+  if ((config.ai.replyMethod ?? "") !== (base.ai.replyMethod ?? "")) {
+    aiPayload.replyMethod = config.ai.replyMethod;
   }
   if (config.ai.messagesToPass !== base.ai.messagesToPass) {
     aiPayload.messagesToPass = config.ai.messagesToPass;
@@ -799,6 +827,7 @@ export function collectChatOverridePaths(
   if (payload.ai.useJsonResponses !== undefined) {
     paths.push("ai.useJsonResponses");
   }
+  if (payload.ai.replyMethod !== undefined) paths.push("ai.replyMethod");
   if (payload.ai.messagesToPass !== undefined) {
     paths.push("ai.messagesToPass");
   }

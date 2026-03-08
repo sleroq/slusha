@@ -1,6 +1,7 @@
 <script lang="ts">
     import SettingInputField from '$lib/components/config/fields/SettingInputField.svelte';
     import SettingMatcherListField from '$lib/components/config/fields/SettingMatcherListField.svelte';
+    import SettingReactionBlacklistField from '$lib/components/config/fields/SettingReactionBlacklistField.svelte';
     import SettingSelectField from '$lib/components/config/fields/SettingSelectField.svelte';
     import SettingStringListField from '$lib/components/config/fields/SettingStringListField.svelte';
     import SettingTextareaField from '$lib/components/config/fields/SettingTextareaField.svelte';
@@ -12,6 +13,8 @@
         config: UserConfigPayload;
         text: GlobalFormText;
         availableModels: string[];
+        availableReactions: string[];
+        isAdmin: boolean;
         searchQuery: string;
     }
 
@@ -19,6 +22,8 @@
         config = $bindable(),
         text = $bindable(),
         availableModels = [],
+        availableReactions = [],
+        isAdmin = false,
         searchQuery = '',
     }: Props = $props();
 
@@ -82,7 +87,9 @@
             'recent messages for notes',
             'recent messages for memory',
             'messages passed to ai',
+            'reply method',
             'max output tokens',
+            'notes max output tokens',
             'thinking budget',
             'reasoning max tokens',
             'notes update frequency',
@@ -100,6 +107,7 @@
             'trusted user ids',
             'allowed model names',
             'model selector',
+            'blacklisted reactions',
         ),
     );
     let hasMatches = $derived(
@@ -442,6 +450,14 @@
                         bind:value={config.ai.generation.chat.maxOutputTokens}
                     />
                     <SettingInputField
+                        id="g-ai-notes-max-output-tokens"
+                        type="number"
+                        label="Notes max output tokens"
+                        description="Hard cap for generated tokens in notes updates."
+                        hidden={!matchesBlockItem('advanced', 'notes max output tokens')}
+                        bind:value={config.ai.generation.notes.maxOutputTokens}
+                    />
+                    <SettingInputField
                         id="g-ai-thinking-budget"
                         type="number"
                         label="Thinking budget"
@@ -496,6 +512,14 @@
                         hidden={!matchesBlockItem('advanced', 'use json responses')}
                         bind:checked={config.ai.useJsonResponses}
                     />
+                    <SettingSelectField
+                        id="g-ai-reply-method"
+                        label="Reply method"
+                        description="Chooses how replies and reactions are generated."
+                        options={['json_actions', 'plain_text_reactions']}
+                        hidden={!matchesBlockItem('advanced', 'reply method', 'ai.replyMethod')}
+                        bind:value={config.ai.replyMethod}
+                    />
                     <SettingToggleField
                         id="g-ai-attachments"
                         label="Include attachments in history"
@@ -511,6 +535,16 @@
             <details class="quick-details border-t pt-4" open={hasSearch}>
                 <summary class="cursor-pointer font-medium">Admin</summary>
                 <div class="mt-4 space-y-3">
+                    {#if isAdmin}
+                        <SettingReactionBlacklistField
+                            id="g-blacklisted-reactions"
+                            label="Blacklisted reactions"
+                            description="Select reactions to block globally."
+                            reactions={availableReactions}
+                            hidden={!matchesBlockItem('admin', 'blacklisted reactions', 'reactions')}
+                            bind:value={text.blacklistedReactions}
+                        />
+                    {/if}
                     <SettingStringListField
                         id="g-admin-ids"
                         label="Admin user IDs"

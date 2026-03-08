@@ -98,6 +98,7 @@
         matchesSection(
             'advanced',
             'messages passed to ai',
+            'reply method',
             'max reply length',
             'attachment byte limit',
             'use json responses',
@@ -551,6 +552,18 @@
                             }}
                             hidden={!matchesBlockItem('advanced', 'use json responses')}
                             bind:checked={config.ai.useJsonResponses}
+                        />
+                        <SettingSelectField
+                            id="c-ai-reply-method"
+                            label="Reply method"
+                            description="Chooses how replies and reactions are generated in this chat."
+                            options={['json_actions', 'plain_text_reactions']}
+                            sourceState={{
+                                overridden: isOverridden('ai.replyMethod'),
+                                label: sourceStateText('ai.replyMethod'),
+                            }}
+                            hidden={!matchesBlockItem('advanced', 'reply method', 'ai.replyMethod')}
+                            bind:value={config.ai.replyMethod}
                         />
                         <SettingToggleField
                             id="c-ai-attachments"
