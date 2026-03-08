@@ -198,7 +198,7 @@ export const configSchema = z.object({
         disableNotes: z.boolean().default(true),
         disableAttachments: z.boolean().default(true),
         disableMemory: z.boolean().default(true),
-    }),
+    }).default(defaultConfig.requestWindow),
 });
 
 const chatOverrideAiSchema = z.object({
