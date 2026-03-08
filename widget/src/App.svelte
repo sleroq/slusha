@@ -270,6 +270,8 @@
                                 bind:config={controller.globalConfig}
                                 bind:text={controller.globalText}
                                 availableModels={controller.availableModels}
+                                availableReactions={controller.availableReactions}
+                                isAdmin={controller.role === 'admin'}
                                 searchQuery={settingsSearch}
                             />
                         {:else}

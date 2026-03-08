@@ -70,6 +70,7 @@ export class ConfigController {
     names: "",
     tendToReply: "",
     tendToIgnore: "",
+    blacklistedReactions: "",
     nepons: "",
     adminIds: "",
     trustedIds: "",
@@ -171,8 +172,12 @@ export class ConfigController {
       baseConfig,
     );
     this.chatText = chatTextFromConfig(this.chatOverrideConfig);
-    this.currentCharacter = fromUnknownCurrentCharacter(data.currentCharacter);
-    this.chatInternals = fromUnknownChatInternals(data.chatInternalsPayload);
+    this.currentCharacter = fromUnknownCurrentCharacter(
+      data.currentCharacter,
+    );
+    this.chatInternals = fromUnknownChatInternals(
+      data.chatInternalsPayload,
+    );
 
     if (!this.canViewGlobal && this.scope === "global") {
       this.scope = "chat";
