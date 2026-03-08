@@ -284,7 +284,7 @@
                 <p class="mt-1">{launchError}</p>
             </div>
 
-            <div class="grid gap-2 border-t border-border pt-4 text-sm text-foreground">
+            <div class="grid gap-2 pt-4 text-sm text-foreground">
                 <p>
                     {t('app.launchStartBot')} <a class="text-primary underline decoration-primary/60 underline-offset-3 hover:text-primary/85" href="https://t.me/sl_chatbot" target="_blank" rel="noreferrer">@sl_chatbot</a>
                 </p>
@@ -310,7 +310,7 @@
             isLoading={controller.isLoading}
         />
 
-        <section class="space-y-3 border-t pt-6">
+        <section class="space-y-3 pt-6">
             <label class="text-sm font-medium text-muted-foreground" for="settings-search">{t('app.searchSettings')}</label>
             <Input
                 id="settings-search"
@@ -321,7 +321,7 @@
             />
         </section>
 
-        <section class="border-t pt-6" aria-busy={isBusy}>
+        <section class="pt-6" aria-busy={isBusy}>
             {#if controller.isLoading && !controller.bootstrap}
                 <div class="space-y-4 rounded-lg border bg-muted/20 p-4" role="status" aria-live="polite">
                     <div class="h-5 w-44 animate-pulse rounded bg-muted"></div>

@@ -171,7 +171,7 @@
         {/if}
 
         {#if showCurrentCharacter}
-            <details class="quick-details border-t pt-4" open={hasSearch || Boolean(currentCharacter)}>
+            <details class="quick-details pt-4" open={hasSearch || Boolean(currentCharacter)}>
                 <summary class="cursor-pointer select-none font-medium">Current Character</summary>
                 <div class="mt-4 space-y-4">
                 {#if currentCharacter}
@@ -244,7 +244,7 @@
         {/if}
 
         {#if showGeneral}
-            <details open class="quick-details border-t pt-4">
+            <details open class="quick-details pt-4">
                 <summary class="cursor-pointer select-none font-medium">General</summary>
                 <div class="mt-4 space-y-6">
                     <div class="grid gap-3 md:grid-cols-2">
@@ -370,7 +370,7 @@
         {/if}
 
         {#if canEditChatInternals && showInternals}
-            <details class="quick-details border-t pt-4" open={hasSearch}>
+            <details class="quick-details pt-4" open={hasSearch}>
                 <summary class="cursor-pointer select-none font-medium">Internal</summary>
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
                     <SettingTextareaField
@@ -397,7 +397,7 @@
 
         {#if canConfigureTrustedSettings}
             {#if showModel}
-                <details class="quick-details border-t pt-4" open={hasSearch}>
+                <details class="quick-details pt-4" open={hasSearch}>
                     <summary class="cursor-pointer select-none font-medium">Model</summary>
                     <div class="mt-4 grid gap-3 md:grid-cols-2">
                         <SettingSelectField
@@ -449,7 +449,7 @@
             {/if}
 
             {#if showPrompts}
-                <details class="quick-details border-t pt-4" open={hasSearch}>
+                <details class="quick-details pt-4" open={hasSearch}>
                     <summary class="cursor-pointer select-none font-medium">Prompts</summary>
                     <div class="mt-4 grid gap-3 md:grid-cols-2">
                         <SettingTextareaField
@@ -529,7 +529,7 @@
             {/if}
 
             {#if showAdvanced}
-                <details class="quick-details border-t pt-4" open={hasSearch}>
+                <details class="quick-details pt-4" open={hasSearch}>
                     <summary class="cursor-pointer select-none font-medium">Advanced</summary>
                     <div class="mt-4 grid gap-3 md:grid-cols-2">
                         <SettingInputField
@@ -591,7 +591,7 @@
             {/if}
 
             {#if showUsageLimits && canEditWindowOverrides}
-                <details class="quick-details border-t pt-4" open={hasSearch}>
+                <details class="quick-details pt-4" open={hasSearch}>
                     <summary class="cursor-pointer select-none font-medium">Usage Limits</summary>
                     <div class="mt-4 grid gap-3 md:grid-cols-2">
                         <SettingInputField
