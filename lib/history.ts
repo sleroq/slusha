@@ -26,6 +26,13 @@ interface HistoryCandidate {
     rootIndex: number;
 }
 
+const HISTORY_META_OPEN = '<<SLUSHA_META>>';
+const HISTORY_META_CLOSE = '<</SLUSHA_META>>';
+
+function buildHistoryMetadataBlock(metadata: Record<string, unknown>): string {
+    return `\n${HISTORY_META_OPEN}\n${JSON.stringify(metadata)}\n${HISTORY_META_CLOSE}`;
+}
+
 function collectReplyThread(
     history: ChatMessage[],
     msg: ChatMessage,
@@ -403,25 +410,34 @@ async function constructMsg(
         includeReactions && msg.reactions &&
         Object.keys(msg.reactions).length > 0
     ) {
-        const parts: string[] = [];
+        const reactions: Array<Record<string, unknown>> = [];
         for (const rec of Object.values(msg.reactions)) {
-            let label = '';
-            if (rec.type === 'emoji' && rec.emoji) label = rec.emoji;
-            else if (rec.type === 'custom' && rec.customEmojiId) {
-                label = `custom:${rec.customEmojiId}`;
-            } else continue;
+            if (rec.type === 'emoji' && rec.emoji) {
+                reactions.push({
+                    type: 'emoji',
+                    emoji: rec.emoji,
+                    count: rec.count,
+                    by: rec.by.map((user) => user.username ? `@${user.username}` : user.name),
+                });
+                continue;
+            }
 
-            if (rec.by && rec.by.length > 0) {
-                const users = rec.by.map((u) =>
-                    u.username ? `@${u.username}` : u.name
-                ).join(', ');
-                parts.push(`${label} by ${users}`);
-            } else if (rec.count && rec.count > 0) {
-                parts.push(`${label} x${rec.count}`);
+            if (rec.type === 'custom' && rec.customEmojiId) {
+                reactions.push({
+                    type: 'custom',
+                    custom_emoji_id: rec.customEmojiId,
+                    count: rec.count,
+                    by: rec.by.map((user) => user.username ? `@${user.username}` : user.name),
+                });
             }
         }
-        if (parts.length > 0) {
-            prettyInputMessage += ` <reactions: ${parts.join(', ')}>`;
+
+        if (reactions.length > 0) {
+            prettyInputMessage += buildHistoryMetadataBlock({
+                kind: 'history_message_meta',
+                message_id: msg.id,
+                reactions,
+            });
         }
     }
 

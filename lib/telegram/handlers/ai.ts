@@ -48,6 +48,24 @@ const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
 const DEFAULT_PLAIN_TEXT_OPTIONAL_REACTION_STEP =
     'Optional step: return only react actions (no reply actions) using target_ref from Reply Target Map. If no reaction is needed, return empty actions list.';
 
+const PLAIN_TEXT_META_OPEN = '<<SLUSHA_META>>';
+const PLAIN_TEXT_META_CLOSE = '<</SLUSHA_META>>';
+
+const plainTextTargetRefLineRegex = /^@@target_ref=(t\d+)\s*\r?\n([\s\S]*)$/;
+const plainTextMetadataBlockRegex =
+    /^<<SLUSHA_META>>\s*\r?\n([\s\S]*?)\r?\n<<\/SLUSHA_META>>\s*/;
+
+function parseJsonRecord(text: string): Record<string, unknown> | undefined {
+    try {
+        const parsed = JSON.parse(text);
+        return parsed && typeof parsed === 'object'
+            ? parsed as Record<string, unknown>
+            : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 
 function createSendChatActionsTool(description: string) {
     return tool({
@@ -152,9 +170,34 @@ function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
             continue;
         }
 
-        const targetMatch = trimmed.match(/^@@target_ref=(t\d+)\s*\r?\n([\s\S]*)$/);
+        let candidateText = trimmed;
+        let targetRef: string | undefined;
+
+        while (true) {
+            const metadataMatch = candidateText.match(plainTextMetadataBlockRegex);
+            if (!metadataMatch) {
+                break;
+            }
+
+            const metadataPayload = metadataMatch[1].trim();
+            const metadata = parseJsonRecord(metadataPayload);
+            if (
+                !targetRef &&
+                metadata &&
+                typeof metadata.target_ref === 'string'
+            ) {
+                const parsedTargetRef = metadata.target_ref;
+                if (/^t\d+$/.test(parsedTargetRef)) {
+                    targetRef = parsedTargetRef;
+                }
+            }
+
+            candidateText = candidateText.slice(metadataMatch[0].length).trimStart();
+        }
+
+        const targetMatch = candidateText.match(plainTextTargetRefLineRegex);
         if (targetMatch) {
-            const targetRef = targetMatch[1];
+            targetRef = targetMatch[1];
             const text = targetMatch[2].trim();
             if (!text) {
                 continue;
@@ -168,9 +211,17 @@ function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
             continue;
         }
 
+        const visibleText = candidateText
+            .replace(/<<SLUSHA_META>>[\s\S]*?<<\/SLUSHA_META>>/g, '')
+            .trim();
+        if (!visibleText) {
+            continue;
+        }
+
         entries.push({
             type: 'reply',
-            text: trimmed,
+            text: visibleText,
+            target_ref: targetRef,
         });
     }
 
@@ -541,7 +592,9 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             }
             if (replyMethod !== 'json_actions') {
                 finalPrompt +=
-                    ' If you need to reply to a specific message from Reply Target Map, start that reply block with "@@target_ref=tN" on the first line, then put reply text on the next line.';
+                    ` If you need to reply to a specific message from Reply Target Map, start that reply block with ${PLAIN_TEXT_META_OPEN} on a separate line, then a one-line JSON object like {"target_ref":"tN"}, then ${PLAIN_TEXT_META_CLOSE}, then put reply text on the next line.`;
+                finalPrompt +=
+                    ` Never include ${PLAIN_TEXT_META_OPEN}...${PLAIN_TEXT_META_CLOSE} in user-facing text body. It is machine-only metadata.`;
             }
 
             messages.push({
