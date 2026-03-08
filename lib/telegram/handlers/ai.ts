@@ -43,6 +43,12 @@ type GenerationAttemptPlan = {
     includeBotNotes: boolean;
 };
 
+const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
+    'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
+
+const DEFAULT_PLAIN_TEXT_OPTIONAL_REACTION_STEP =
+    'Optional step: return only react actions (no reply actions) using target_ref from Reply Target Map. If no reaction is needed, return empty actions list.';
+
 function resolveReplyMethod(
     configuredMethod: string | undefined,
     useJsonResponses: boolean,
@@ -99,10 +105,17 @@ function getGenerationFallbackPlans(
     ];
 }
 
-export default function registerAI(bot: Bot<SlushaContext>) {
-    const sendChatActionsTool = tool({
-        description:
-            'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.',
+function resolveCustomPrompt(
+    configured: string | undefined,
+    fallback: string,
+): string {
+    const trimmed = configured?.trim();
+    return trimmed && trimmed.length > 0 ? trimmed : fallback;
+}
+
+function createSendChatActionsTool(description: string) {
+    return tool({
+        description,
         inputSchema: chatActionsToolInputSchema,
         inputExamples: [
             {
@@ -172,11 +185,237 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             },
         ],
     });
+}
 
+function parseSendChatActionsEntries(
+    toolCalls: Array<{ toolName: string; input: unknown }>,
+): ChatEntry[] | undefined {
+    const chatActionsToolCall = toolCalls.find((call) =>
+        call.toolName === 'send_chat_actions'
+    );
+    const parsedToolCallInput = chatActionsToolCall
+        ? chatActionsToolInputSchema.safeParse(
+            chatActionsToolCall.input,
+        )
+        : undefined;
+
+    if (parsedToolCallInput?.success) {
+        return parsedToolCallInput.data.entries;
+    }
+
+    return undefined;
+}
+
+function buildTelemetryMetadata(
+    ctx: SlushaContext,
+    chatName: string,
+    tags: string[],
+    effectiveConfig: Awaited<ReturnType<SlushaContext['m']['getEffectiveConfig']>>,
+    policy: ReturnType<typeof resolveGenerationPolicy>,
+) {
+    return buildGenerationTelemetryMetadata({
+        sessionId: ctx.chat?.id.toString() ?? '',
+        userId: ctx.from?.id.toString() ?? '',
+        chatName,
+        tags,
+        temperature: effectiveConfig.ai.temperature,
+        topK: effectiveConfig.ai.topK,
+        topP: effectiveConfig.ai.topP,
+        policy,
+    });
+}
+
+type EffectiveConfig = Awaited<ReturnType<SlushaContext['m']['getEffectiveConfig']>>;
+
+async function sendGeneratedOutput(params: {
+    bot: Bot<SlushaContext>;
+    ctx: SlushaContext;
+    output: ChatEntry[];
+    targetRefMap: Map<string, number>;
+    enabledReactions: string[];
+    effectiveConfig: EffectiveConfig;
+}): Promise<boolean> {
+    const {
+        bot,
+        ctx,
+        output,
+        targetRefMap,
+        enabledReactions,
+        effectiveConfig,
+    } = params;
+
+    function resolveTargetMessageId(targetRef?: string): number | undefined {
+        if (targetRef) {
+            const fromMap = targetRefMap.get(targetRef);
+            if (fromMap) {
+                return fromMap;
+            }
+
+            logger.debug(
+                'Unknown target_ref, fallback to trigger message',
+                {
+                    targetRef,
+                },
+            );
+        }
+
+        return ctx.msg?.message_id;
+    }
+
+    let lastMsgId: number | undefined = undefined;
+    for (let i = 0; i < output.length; i++) {
+        const res = output[i];
+        if (
+            isReactEntry(res) && typeof res.react === 'string' &&
+            res.react.trim().length > 0
+        ) {
+            const canon = canonicalizeReaction(res.react.trim());
+            if (canon && enabledReactions.includes(canon)) {
+                const targetId = resolveTargetMessageId(res.target_ref);
+                if (targetId) {
+                    try {
+                        const chatId = ctx.chat?.id;
+                        if (!chatId) {
+                            logger.debug('Reaction chat context missing, skipping');
+                            continue;
+                        }
+                        await ctx.api.setMessageReaction(
+                            chatId,
+                            targetId,
+                            [{ type: 'emoji', emoji: canon }],
+                        );
+                        await ctx.m.addEmojiReaction(targetId, canon, {
+                            id: bot.botInfo.id,
+                            username: bot.botInfo.username,
+                            first_name: bot.botInfo.first_name ?? 'Slusha',
+                        });
+                    } catch (error) {
+                        logger.warn('Could not set reaction: ', error);
+                    }
+                } else {
+                    logger.debug('Reaction target not found, skipping');
+                }
+            } else {
+                logger.debug(
+                    'Reaction blocked or not allowed, dropping: ' +
+                        res.react,
+                );
+            }
+        }
+
+        if (!isTextEntry(res)) {
+            continue;
+        }
+
+        let replyText = (res.text ?? '').trim();
+        if (replyText.length === 0) {
+            logger.info('Empty response from AI');
+            continue;
+        }
+
+        if (replyText.startsWith('* ')) {
+            replyText = replyText.slice(1);
+            replyText = '-' + replyText;
+        }
+
+        let msgToReply: number | undefined;
+        msgToReply = resolveTargetMessageId(res.target_ref);
+        if (!msgToReply && lastMsgId) {
+            msgToReply = lastMsgId;
+        }
+
+        let replyInfo;
+        try {
+            if (ctx.chat?.type === 'private') {
+                replyInfo = await replyGeneric(
+                    ctx,
+                    replyText,
+                    false,
+                    'Markdown',
+                );
+            } else {
+                replyInfo = await replyWithMarkdownId(
+                    ctx,
+                    replyText,
+                    msgToReply,
+                );
+            }
+        } catch (error) {
+            if (
+                ctx.chat?.type !== 'private' &&
+                isMissingSendTextRightsError(error)
+            ) {
+                await ctx.m.setDisableRepliesDueToRights(true);
+                await ctx.m.setDisabledReplyRightsLastProbeAt(Date.now());
+                logger.warn(
+                    'Disabled replies in chat due to missing send rights',
+                );
+                return false;
+            }
+
+            logger.error('Could not reply to user: ', error);
+            if (!ctx.info.isRandom) {
+                await ctx.reply(getRandomNepon(effectiveConfig));
+            }
+            return false;
+        }
+
+        lastMsgId = replyInfo.message_id;
+
+        let replyTo: ReplyTo | undefined;
+        if (replyInfo.reply_to_message) {
+            replyTo = {
+                id: replyInfo.reply_to_message.message_id,
+                text: replyInfo.reply_to_message.text ??
+                    replyInfo.reply_to_message.caption ?? '',
+                isMyself: false,
+                info: replyInfo.reply_to_message,
+            };
+        }
+
+        await ctx.m.addMessage({
+            id: replyInfo.message_id,
+            text: replyText,
+            isMyself: true,
+            info: replyInfo,
+            replyTo,
+        });
+
+        if (i === output.length - 1) {
+            break;
+        }
+
+        const typingSpeed = 1200; // symbol per minute
+        const next = output[i + 1];
+        const nextLen =
+            next && isTextEntry(next) && typeof next.text === 'string'
+                ? next.text.length
+                : 0;
+        let msToWait = nextLen / typingSpeed * 60 * 1000;
+        if (msToWait > 5000) {
+            msToWait = 5000;
+        }
+        await new Promise((resolve) => setTimeout(resolve, msToWait));
+    }
+
+    return true;
+}
+
+export default function registerAI(bot: Bot<SlushaContext>) {
     bot.on('message', async (ctx) => {
         const chatState = await ctx.m.getChat();
         const effectiveConfig = await ctx.m.getEffectiveConfig();
         const savedHistory = await ctx.m.getHistory();
+        const sendChatActionsTool = createSendChatActionsTool(
+            resolveCustomPrompt(
+                effectiveConfig.ai.chatActionsToolDescription,
+                DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION,
+            ),
+        );
+        const plainTextReactionOptionalStepPrompt = resolveCustomPrompt(
+            effectiveConfig.ai.plainTextReactionOptionalStepPrompt,
+            DEFAULT_PLAIN_TEXT_OPTIONAL_REACTION_STEP,
+        );
 
         const useJsonResponses = effectiveConfig.ai.useJsonResponses;
         const replyMethod = resolveReplyMethod(
@@ -382,16 +621,13 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 experimental_telemetry: {
                     isEnabled: true,
                     functionId: 'user-message-dumb',
-                    metadata: buildGenerationTelemetryMetadata({
-                        sessionId: ctx.chat.id.toString(),
-                        userId: ctx.from?.id.toString() ?? '',
+                    metadata: buildTelemetryMetadata(
+                        ctx,
                         chatName,
                         tags,
-                        temperature: effectiveConfig.ai.temperature,
-                        topK: effectiveConfig.ai.topK,
-                        topP: effectiveConfig.ai.topP,
-                        policy: generationPolicy,
-                    }),
+                        effectiveConfig,
+                        generationPolicy,
+                    ),
                 },
             });
 
@@ -440,43 +676,33 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                         },
                         {
                             role: 'user',
-                            content:
-                                'Optional step: return only react actions (no reply actions) using target_ref from Reply Target Map. If no reaction is needed, return empty actions list.',
+                            content: plainTextReactionOptionalStepPrompt,
                         },
                     ],
                     experimental_telemetry: {
                         isEnabled: true,
                         functionId: 'user-message-plain-reactions',
-                        metadata: buildGenerationTelemetryMetadata({
-                            sessionId: ctx.chat.id.toString(),
-                            userId: ctx.from?.id.toString() ?? '',
+                        metadata: buildTelemetryMetadata(
+                            ctx,
                             chatName,
                             tags,
-                            temperature: effectiveConfig.ai.temperature,
-                            topK: effectiveConfig.ai.topK,
-                            topP: effectiveConfig.ai.topP,
-                            policy: structuredPolicy,
-                        }),
+                            effectiveConfig,
+                            structuredPolicy,
+                        ),
                     },
                 });
 
-                const reactionToolCall = reactionResult.toolCalls.find((call) =>
-                    call.toolName === 'send_chat_actions'
+                const reactionEntries = parseSendChatActionsEntries(
+                    reactionResult.toolCalls,
                 );
-                const parsedReactionToolInput = reactionToolCall
-                    ? chatActionsToolInputSchema.safeParse(
-                        reactionToolCall.input,
-                    )
-                    : undefined;
-
-                if (!parsedReactionToolInput?.success) {
+                if (!reactionEntries) {
                     return replyEntries;
                 }
 
-                const reactionEntries = parsedReactionToolInput.data.entries
+                const filteredReactionEntries = reactionEntries
                     .filter((entry) => isReactEntry(entry));
 
-                return [...replyEntries, ...reactionEntries];
+                return [...replyEntries, ...filteredReactionEntries];
             } catch (error) {
                 logger.warn(
                     'Could not generate reactions for plain-text method, keeping text reply only',
@@ -519,30 +745,19 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 experimental_telemetry: {
                     isEnabled: true,
                     functionId: 'user-message',
-                    metadata: buildGenerationTelemetryMetadata({
-                        sessionId: ctx.chat.id.toString(),
-                        userId: ctx.from?.id.toString() ?? '',
+                    metadata: buildTelemetryMetadata(
+                        ctx,
                         chatName,
                         tags,
-                        temperature: effectiveConfig.ai.temperature,
-                        topK: effectiveConfig.ai.topK,
-                        topP: effectiveConfig.ai.topP,
-                        policy: generationPolicy,
-                    }),
+                        effectiveConfig,
+                        generationPolicy,
+                    ),
                 },
             });
 
-            const chatActionsToolCall = result.toolCalls.find((call) =>
-                call.toolName === 'send_chat_actions'
-            );
-            const parsedToolCallInput = chatActionsToolCall
-                ? chatActionsToolInputSchema.safeParse(
-                    chatActionsToolCall.input,
-                )
-                : undefined;
-
-            if (parsedToolCallInput?.success) {
-                return parsedToolCallInput.data.entries;
+            const entries = parseSendChatActionsEntries(result.toolCalls);
+            if (entries) {
+                return entries;
             } else {
                 logger.warn(
                     'Structured tool call missing or invalid after retries',
@@ -657,155 +872,13 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             `for "${name}" ${username}. `,
         );
 
-        function resolveTargetMessageId(
-            targetRef?: string,
-        ): number | undefined {
-            if (targetRef) {
-                const fromMap = targetRefMap.get(targetRef);
-                if (fromMap) {
-                    return fromMap;
-                }
-
-                logger.debug(
-                    'Unknown target_ref, fallback to trigger message',
-                    {
-                        targetRef,
-                    },
-                );
-            }
-
-            return ctx.msg.message_id;
-        }
-
-        let lastMsgId: number | undefined = undefined;
-        for (let i = 0; i < output.length; i++) {
-            const res = output[i];
-            if (
-                isReactEntry(res) && typeof res.react === 'string' &&
-                res.react.trim().length > 0
-            ) {
-                const canon = canonicalizeReaction(res.react.trim());
-                if (canon && enabledReactions.includes(canon)) {
-                    const targetId = resolveTargetMessageId(res.target_ref);
-                    if (targetId) {
-                        try {
-                            await ctx.api.setMessageReaction(
-                                ctx.chat.id,
-                                targetId,
-                                [{ type: 'emoji', emoji: canon }],
-                            );
-                            await ctx.m.addEmojiReaction(targetId, canon, {
-                                id: bot.botInfo.id,
-                                username: bot.botInfo.username,
-                                first_name: bot.botInfo.first_name ?? 'Slusha',
-                            });
-                        } catch (error) {
-                            logger.warn('Could not set reaction: ', error);
-                        }
-                    } else {
-                        logger.debug('Reaction target not found, skipping');
-                    }
-                } else {
-                    logger.debug(
-                        'Reaction blocked or not allowed, dropping: ' +
-                            res.react,
-                    );
-                }
-            }
-
-            if (!isTextEntry(res)) {
-                continue;
-            }
-
-            let replyText = (res.text ?? '').trim();
-            if (replyText.length === 0) {
-                logger.info('Empty response from AI');
-                continue;
-            }
-
-            if (replyText.startsWith('* ')) {
-                replyText = replyText.slice(1);
-                replyText = '-' + replyText;
-            }
-
-            let msgToReply: number | undefined;
-            msgToReply = resolveTargetMessageId(res.target_ref);
-            if (!msgToReply && lastMsgId) {
-                msgToReply = lastMsgId;
-            }
-
-            let replyInfo;
-            try {
-                if (ctx.chat.type === 'private') {
-                    replyInfo = await replyGeneric(
-                        ctx,
-                        replyText,
-                        false,
-                        'Markdown',
-                    );
-                } else {
-                    replyInfo = await replyWithMarkdownId(
-                        ctx,
-                        replyText,
-                        msgToReply,
-                    );
-                }
-            } catch (error) {
-                if (
-                    ctx.chat.type !== 'private' &&
-                    isMissingSendTextRightsError(error)
-                ) {
-                    await ctx.m.setDisableRepliesDueToRights(true);
-                    await ctx.m.setDisabledReplyRightsLastProbeAt(Date.now());
-                    logger.warn(
-                        'Disabled replies in chat due to missing send rights',
-                    );
-                    return;
-                }
-
-                logger.error('Could not reply to user: ', error);
-                if (!ctx.info.isRandom) {
-                    await ctx.reply(getRandomNepon(effectiveConfig));
-                }
-                return;
-            }
-
-            lastMsgId = replyInfo.message_id;
-
-            let replyTo: ReplyTo | undefined;
-            if (replyInfo.reply_to_message) {
-                replyTo = {
-                    id: replyInfo.reply_to_message.message_id,
-                    text: replyInfo.reply_to_message.text ??
-                        replyInfo.reply_to_message.caption ?? '',
-                    isMyself: false,
-                    info: replyInfo.reply_to_message,
-                };
-            }
-
-            await ctx.m.addMessage({
-                id: replyInfo.message_id,
-                text: replyText,
-                isMyself: true,
-                info: replyInfo,
-                replyTo,
-            });
-
-            if (i === output.length - 1) {
-                break;
-            }
-
-            const typingSpeed = 1200; // symbol per minute
-            const next = output[i + 1];
-            const nextLen =
-                next && isTextEntry(next) && typeof next.text === 'string'
-                    ? next.text.length
-                    : 0;
-            let msToWait = nextLen / typingSpeed * 60 * 1000;
-            if (msToWait > 5000) {
-                msToWait = 5000;
-            }
-            await new Promise((resolve) => setTimeout(resolve, msToWait));
-        }
+        await sendGeneratedOutput({
+            bot,
+            ctx,
+            output,
+            targetRefMap,
+            enabledReactions,
+            effectiveConfig,
+        });
     });
 }

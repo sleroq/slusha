@@ -89,6 +89,8 @@ export interface AiPayload {
   commentsPromptAddition?: string;
   hateModePrompt?: string;
   finalPrompt: string;
+  chatActionsToolDescription?: string;
+  plainTextReactionOptionalStepPrompt?: string;
   dumbFinalPrompt?: string;
   notesPrompt: string;
   memoryPrompt: string;
@@ -284,6 +286,8 @@ export function defaultAiConfig(): AiPayload {
     commentsPromptAddition: "",
     hateModePrompt: "",
     finalPrompt: "",
+    chatActionsToolDescription: "",
+    plainTextReactionOptionalStepPrompt: "",
     dumbFinalPrompt: "",
     notesPrompt: "",
     memoryPrompt: "",

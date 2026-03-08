@@ -73,6 +73,8 @@
             'comment prompt addition',
             'hate mode prompt',
             'final prompt wrapper',
+            'chat actions tool description',
+            'plain-text reaction optional step',
             'low-context final wrapper',
             'notes extraction prompt',
             'memory prompt',
@@ -356,6 +358,24 @@
                         description="Last instruction template before model generation."
                         hidden={!matchesBlockItem('prompts', 'final prompt wrapper', 'final prompt')}
                         bind:value={config.ai.finalPrompt}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-tool-description"
+                        rows={4}
+                        containerClass="md:col-span-2"
+                        label="Chat actions tool description"
+                        description="Schema and guidance injected into send_chat_actions tool description."
+                        hidden={!matchesBlockItem('prompts', 'chat actions tool description', 'tool description', 'chatActionsToolDescription')}
+                        bind:value={config.ai.chatActionsToolDescription}
+                    />
+                    <SettingTextareaField
+                        id="g-ai-plain-reaction-optional-step"
+                        rows={3}
+                        containerClass="md:col-span-2"
+                        label="Plain-text reaction optional step"
+                        description="Follow-up instruction used to extract reactions after plain-text generation."
+                        hidden={!matchesBlockItem('prompts', 'plain-text reaction optional step', 'optional step', 'plainTextReactionOptionalStepPrompt')}
+                        bind:value={config.ai.plainTextReactionOptionalStepPrompt}
                     />
                     <SettingTextareaField
                         id="g-ai-dumb-final"

@@ -96,6 +96,14 @@ export const configSchema = z.object({
          */
         finalPrompt: z.string().max(20000),
         /**
+         * Optional override for send_chat_actions tool description.
+         */
+        chatActionsToolDescription: z.string().max(20000).optional(),
+        /**
+         * Optional prompt for plain-text reaction extraction pass.
+         */
+        plainTextReactionOptionalStepPrompt: z.string().max(20000).optional(),
+        /**
          * Optional alternative final prompt for dumb models (plain text)
          */
         dumbFinalPrompt: z.string().max(10000).optional(),
