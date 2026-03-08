@@ -183,18 +183,16 @@ async function loadMessageReactions(
     const keys = reactionRows.map((
         r: typeof messageReactions.$inferSelect,
     ) => r.reactionKey);
-    const usersRows = keys.length === 0
-        ? []
-        : await db
-            .select()
-            .from(messageReactionUsers)
-            .where(and(
-                eq(messageReactionUsers.chatId, chatId),
-                inArray(messageReactionUsers.reactionKey, keys),
-                messageIds
-                    ? inArray(messageReactionUsers.messageId, messageIds)
-                    : undefined,
-            ));
+    const usersRows = keys.length === 0 ? [] : await db
+        .select()
+        .from(messageReactionUsers)
+        .where(and(
+            eq(messageReactionUsers.chatId, chatId),
+            inArray(messageReactionUsers.reactionKey, keys),
+            messageIds
+                ? inArray(messageReactionUsers.messageId, messageIds)
+                : undefined,
+        ));
 
     const usersByReaction = new Map<string, ReactionBy[]>();
     for (const row of usersRows) {
@@ -215,7 +213,8 @@ async function loadMessageReactions(
             type: row.type,
             emoji: row.emoji ?? undefined,
             customEmojiId: row.customEmojiId ?? undefined,
-            by: usersByReaction.get(`${row.messageId}:${row.reactionKey}`) ?? [],
+            by: usersByReaction.get(`${row.messageId}:${row.reactionKey}`) ??
+                [],
             count: row.count,
         };
         reactionsByMessage.set(row.messageId, bucket);

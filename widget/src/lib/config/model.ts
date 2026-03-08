@@ -497,8 +497,14 @@ function normalizeRequestWindowConfig(value: unknown): RequestWindowConfig {
   const obj = value as Partial<RequestWindowConfig>;
   return {
     free: {
-      perUser: normalizeRequestWindowLimit(obj.free?.perUser, base.free.perUser),
-      perChat: normalizeRequestWindowLimit(obj.free?.perChat, base.free.perChat),
+      perUser: normalizeRequestWindowLimit(
+        obj.free?.perUser,
+        base.free.perUser,
+      ),
+      perChat: normalizeRequestWindowLimit(
+        obj.free?.perChat,
+        base.free.perChat,
+      ),
     },
     trusted: {
       perUser: normalizeRequestWindowLimit(

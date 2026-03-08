@@ -392,7 +392,10 @@ function getDateString(date: Date): string {
     const offsetMinutes = -date.getTimezoneOffset();
     const offsetSign = offsetMinutes >= 0 ? '+' : '-';
     const absOffsetMinutes = Math.abs(offsetMinutes);
-    const offsetHours = String(Math.floor(absOffsetMinutes / 60)).padStart(2, '0');
+    const offsetHours = String(Math.floor(absOffsetMinutes / 60)).padStart(
+        2,
+        '0',
+    );
     const offsetMins = String(absOffsetMinutes % 60).padStart(2, '0');
 
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${offsetSign}${offsetHours}:${offsetMins}`;

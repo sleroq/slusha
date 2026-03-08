@@ -2,7 +2,10 @@ import { assertEquals } from '@std/assert';
 import { Message } from 'grammy_types';
 import { ReplyMessage } from './telegram/helpers.ts';
 import { ChatMessage, ReplyTo } from './memory.ts';
-import { selectHistoryCandidates, selectHistoryCandidatesV3 } from './history.ts';
+import {
+    selectHistoryCandidates,
+    selectHistoryCandidatesV3,
+} from './history.ts';
 
 function createReplyTo(id: number): ReplyTo {
     return {
@@ -282,7 +285,14 @@ Deno.test(
             maxRootMessages: 6,
         });
 
-        assertEquals(selected.map((m) => m.msg.id), [208, 207, 205, 204, 206, 203]);
+        assertEquals(selected.map((m) => m.msg.id), [
+            208,
+            207,
+            205,
+            204,
+            206,
+            203,
+        ]);
     },
 );
 

@@ -482,7 +482,9 @@ export function mergeWithChatOverride(
         k !== 'ai' && k !== 'requestWindowPerChat'
     ) as Array<[
         keyof Omit<ChatConfigOverride, 'ai' | 'requestWindowPerChat'>,
-        ChatConfigOverride[keyof Omit<ChatConfigOverride, 'ai' | 'requestWindowPerChat'>],
+        ChatConfigOverride[
+            keyof Omit<ChatConfigOverride, 'ai' | 'requestWindowPerChat'>
+        ],
     ]>;
 
     for (const [key, value] of entries) {

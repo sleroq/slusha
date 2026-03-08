@@ -1,9 +1,6 @@
 import { Composer } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
-import {
-    getUsageSnapshot,
-    renderProgressBar,
-} from '../usage-window.ts';
+import { getUsageSnapshot, renderProgressBar } from '../usage-window.ts';
 
 function formatWindowLine(
     label: string,
