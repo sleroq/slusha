@@ -42,6 +42,22 @@ const generationTaskSchema = z.object({
     openrouterReasoning: openrouterReasoningSchema.optional(),
     maxOutputTokens: z.number().int().min(1).max(65536).optional(),
 });
+const requestWindowLimitSchema = z.object({
+    maxRequests: boundedPositiveInt(1, 100000),
+    windowMinutes: boundedPositiveInt(1, 7 * 24 * 60),
+});
+const requestWindowLimitOverrideSchema = z.object({
+    maxRequests: boundedPositiveInt(1, 100000).optional(),
+    windowMinutes: boundedPositiveInt(1, 7 * 24 * 60).optional(),
+});
+const requestWindowTierSchema = z.object({
+    perUser: requestWindowLimitSchema,
+    perChat: requestWindowLimitSchema,
+});
+const requestWindowPerChatOverrideSchema = z.object({
+    free: requestWindowLimitOverrideSchema.optional(),
+    trusted: requestWindowLimitOverrideSchema.optional(),
+});
 
 const defaultGoogleSafetySettings: Array<
     { category: string; threshold: string }
@@ -171,6 +187,18 @@ export const configSchema = z.object({
     chatLastUseNotes: boundedPositiveInt(1, 100).default(3),
     chatLastUseMemory: boundedPositiveInt(1, 100).default(2),
     responseDelay: z.number().min(0).max(120).default(1),
+    requestWindow: z.object({
+        free: requestWindowTierSchema,
+        trusted: requestWindowTierSchema,
+        downgradeModel: z.string().min(1).max(200),
+        disableLongContext: z.boolean().default(true),
+        downgradeMessagesToPass: boundedPositiveInt(1, 100).default(4),
+        downgradeBytesLimit: boundedPositiveInt(1024, 100 * 1024 * 1024)
+            .default(1024 * 1024),
+        disableNotes: z.boolean().default(true),
+        disableAttachments: z.boolean().default(true),
+        disableMemory: z.boolean().default(true),
+    }),
 });
 
 const chatOverrideAiSchema = z.object({
@@ -212,6 +240,7 @@ export const chatConfigOverrideSchema = z.object({
     responseDelay: configSchema.shape.responseDelay.optional(),
     disableRepliesDueToRights: z.boolean().optional(),
     disabledReplyRightsLastProbeAt: z.number().int().min(0).optional(),
+    requestWindowPerChat: requestWindowPerChatOverrideSchema.optional(),
 });
 
 export const safetySettings: Array<{ category: string; threshold: string }> = [
@@ -450,10 +479,10 @@ export function mergeWithChatOverride(
     };
 
     const entries = Object.entries(override).filter(([k]) =>
-        k !== 'ai'
+        k !== 'ai' && k !== 'requestWindowPerChat'
     ) as Array<[
-        keyof Omit<ChatConfigOverride, 'ai'>,
-        ChatConfigOverride[keyof Omit<ChatConfigOverride, 'ai'>],
+        keyof Omit<ChatConfigOverride, 'ai' | 'requestWindowPerChat'>,
+        ChatConfigOverride[keyof Omit<ChatConfigOverride, 'ai' | 'requestWindowPerChat'>],
     ]>;
 
     for (const [key, value] of entries) {

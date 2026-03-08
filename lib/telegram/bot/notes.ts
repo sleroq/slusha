@@ -11,6 +11,7 @@ import {
 } from '../../ai/chat-context.ts';
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
+import { getUsageSnapshot } from '../usage-window.ts';
 
 export default function notes(config: Config, botId: number) {
     const bot = new Composer<SlushaContext>();
@@ -19,6 +20,19 @@ export default function notes(config: Config, botId: number) {
     bot.on('message', (ctx, next) => {
         async function handleNotes() {
             const effectiveConfig = await ctx.m.getEffectiveConfig();
+            const chatOverride = await ctx.m.getChatConfigOverride();
+            const usageSnapshot = await getUsageSnapshot(ctx.memory.db, {
+                config: effectiveConfig,
+                chatId: ctx.chat.id,
+                userId: ctx.from?.id,
+                chatOverride,
+            });
+            if (
+                usageSnapshot.downgraded &&
+                effectiveConfig.requestWindow.disableNotes
+            ) {
+                return;
+            }
             const frequency = effectiveConfig.ai.notesFrequency;
             const chat = await ctx.m.getChat();
             const history = await ctx.m.getRecentHistory(frequency);
@@ -173,6 +187,19 @@ export default function notes(config: Config, botId: number) {
     bot.on('message', (ctx, next) => {
         async function handleMemory() {
             const effectiveConfig = await ctx.m.getEffectiveConfig();
+            const chatOverride = await ctx.m.getChatConfigOverride();
+            const usageSnapshot = await getUsageSnapshot(ctx.memory.db, {
+                config: effectiveConfig,
+                chatId: ctx.chat.id,
+                userId: ctx.from?.id,
+                chatOverride,
+            });
+            if (
+                usageSnapshot.downgraded &&
+                effectiveConfig.requestWindow.disableMemory
+            ) {
+                return;
+            }
             const frequency = effectiveConfig.ai.memoryFrequency;
             const chat = await ctx.m.getChat();
             const history = await ctx.m.getRecentHistory(frequency);

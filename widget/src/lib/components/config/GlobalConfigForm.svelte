@@ -105,6 +105,21 @@
             'memory update frequency',
             'max reply length',
             'attachment byte limit',
+            'free user per-user max requests',
+            'free user per-user window minutes',
+            'free user per-chat max requests',
+            'free user per-chat window minutes',
+            'trusted user per-user max requests',
+            'trusted user per-user window minutes',
+            'trusted user per-chat max requests',
+            'trusted user per-chat window minutes',
+            'downgrade model',
+            'downgraded messages to pass',
+            'downgraded bytes limit',
+            'disable long context',
+            'disable notes',
+            'disable attachments',
+            'disable memory',
             'include attachments in history',
         ),
     );
@@ -553,6 +568,121 @@
                         description="Adds attachment text to model context when possible."
                         hidden={!matchesBlockItem('advanced', 'include attachments in history')}
                         bind:checked={config.ai.includeAttachmentsInHistory}
+                    />
+                    <SettingInputField
+                        id="g-req-free-user-max"
+                        type="number"
+                        label="Free user per-user max requests"
+                        description="Switches to downgrade mode when this limit is reached."
+                        hidden={!matchesBlockItem('advanced', 'free user per-user max requests')}
+                        bind:value={config.requestWindow.free.perUser.maxRequests}
+                    />
+                    <SettingInputField
+                        id="g-req-free-user-window"
+                        type="number"
+                        label="Free user per-user window (minutes)"
+                        description="Rolling window for free user personal usage."
+                        hidden={!matchesBlockItem('advanced', 'free user per-user window minutes')}
+                        bind:value={config.requestWindow.free.perUser.windowMinutes}
+                    />
+                    <SettingInputField
+                        id="g-req-free-chat-max"
+                        type="number"
+                        label="Free user per-chat max requests"
+                        description="Chat-wide limit for free tier before downgrade mode."
+                        hidden={!matchesBlockItem('advanced', 'free user per-chat max requests')}
+                        bind:value={config.requestWindow.free.perChat.maxRequests}
+                    />
+                    <SettingInputField
+                        id="g-req-free-chat-window"
+                        type="number"
+                        label="Free user per-chat window (minutes)"
+                        description="Rolling window for free tier chat usage."
+                        hidden={!matchesBlockItem('advanced', 'free user per-chat window minutes')}
+                        bind:value={config.requestWindow.free.perChat.windowMinutes}
+                    />
+                    <SettingInputField
+                        id="g-req-trusted-user-max"
+                        type="number"
+                        label="Trusted user per-user max requests"
+                        description="Personal limit for trusted tier before downgrade mode."
+                        hidden={!matchesBlockItem('advanced', 'trusted user per-user max requests')}
+                        bind:value={config.requestWindow.trusted.perUser.maxRequests}
+                    />
+                    <SettingInputField
+                        id="g-req-trusted-user-window"
+                        type="number"
+                        label="Trusted user per-user window (minutes)"
+                        description="Rolling window for trusted user personal usage."
+                        hidden={!matchesBlockItem('advanced', 'trusted user per-user window minutes')}
+                        bind:value={config.requestWindow.trusted.perUser.windowMinutes}
+                    />
+                    <SettingInputField
+                        id="g-req-trusted-chat-max"
+                        type="number"
+                        label="Trusted user per-chat max requests"
+                        description="Chat-wide limit for trusted tier before downgrade mode."
+                        hidden={!matchesBlockItem('advanced', 'trusted user per-chat max requests')}
+                        bind:value={config.requestWindow.trusted.perChat.maxRequests}
+                    />
+                    <SettingInputField
+                        id="g-req-trusted-chat-window"
+                        type="number"
+                        label="Trusted user per-chat window (minutes)"
+                        description="Rolling window for trusted tier chat usage."
+                        hidden={!matchesBlockItem('advanced', 'trusted user per-chat window minutes')}
+                        bind:value={config.requestWindow.trusted.perChat.windowMinutes}
+                    />
+                    <SettingInputField
+                        id="g-req-downgrade-model"
+                        label="Downgrade model"
+                        description="Model used when either window limit is exhausted."
+                        hidden={!matchesBlockItem('advanced', 'downgrade model')}
+                        bind:value={config.requestWindow.downgradeModel}
+                    />
+                    <SettingInputField
+                        id="g-req-downgrade-messages"
+                        type="number"
+                        label="Downgraded messages to pass"
+                        description="Maximum messages included when long context is disabled."
+                        hidden={!matchesBlockItem('advanced', 'downgraded messages to pass')}
+                        bind:value={config.requestWindow.downgradeMessagesToPass}
+                    />
+                    <SettingInputField
+                        id="g-req-downgrade-bytes"
+                        type="number"
+                        label="Downgraded bytes limit"
+                        description="Max bytes included when long context is disabled."
+                        hidden={!matchesBlockItem('advanced', 'downgraded bytes limit')}
+                        bind:value={config.requestWindow.downgradeBytesLimit}
+                    />
+                    <SettingToggleField
+                        id="g-req-disable-long-context"
+                        label="Disable long context in cost mode"
+                        description="Reduces history size when windows are exhausted."
+                        hidden={!matchesBlockItem('advanced', 'disable long context')}
+                        bind:checked={config.requestWindow.disableLongContext}
+                    />
+                    <SettingToggleField
+                        id="g-req-disable-notes"
+                        label="Disable notes in cost mode"
+                        description="Skips notes generation and inclusion while downgraded."
+                        hidden={!matchesBlockItem('advanced', 'disable notes')}
+                        bind:checked={config.requestWindow.disableNotes}
+                    />
+                    <SettingToggleField
+                        id="g-req-disable-attachments"
+                        label="Disable attachments in cost mode"
+                        description="Excludes attachments from history while downgraded."
+                        hidden={!matchesBlockItem('advanced', 'disable attachments')}
+                        bind:checked={config.requestWindow.disableAttachments}
+                    />
+                    <SettingToggleField
+                        id="g-req-disable-memory"
+                        label="Disable memory in cost mode"
+                        description="Skips memory generation and inclusion while downgraded."
+                        hidden={!matchesBlockItem('advanced', 'disable memory')}
+                        bind:checked={config.requestWindow.disableMemory}
                     />
                 </div>
             </details>

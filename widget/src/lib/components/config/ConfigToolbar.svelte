@@ -7,6 +7,7 @@
         AvailableChat,
         ConfigRole,
         ConfigScope,
+        UsageWindowStatus,
     } from '$lib/config/model';
 
     interface Props {
@@ -16,6 +17,7 @@
         canViewGlobal: boolean;
         role: ConfigRole;
         availableChats: AvailableChat[];
+        usageWindowStatus?: UsageWindowStatus;
         onReload: () => void;
         isReloading: boolean;
         isLoading: boolean;
@@ -28,6 +30,7 @@
         canViewGlobal,
         role,
         availableChats,
+        usageWindowStatus,
         onReload,
         isReloading = false,
         isLoading = false,
@@ -84,6 +87,23 @@
     </div>
 
     <div class="space-y-4">
+        {#if usageWindowStatus}
+            <div class="space-y-1 rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="font-medium text-foreground">
+                        Usage ({usageWindowStatus.tier})
+                    </span>
+                    {#if usageWindowStatus.downgraded}
+                        <span class="rounded bg-amber-500/20 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                            cost mode
+                        </span>
+                    {/if}
+                </div>
+                <p>Per-user: <span class="font-mono">{usageWindowStatus.userBar}</span> {usageWindowStatus.userUsed}/{usageWindowStatus.userMax} ({usageWindowStatus.userWindowMinutes}m)</p>
+                <p>Per-chat: <span class="font-mono">{usageWindowStatus.chatBar}</span> {usageWindowStatus.chatUsed}/{usageWindowStatus.chatMax} ({usageWindowStatus.chatWindowMinutes}m)</p>
+            </div>
+        {/if}
+
         <div class="grid gap-3" class:md:grid-cols-3={canViewGlobal} class:md:grid-cols-2={!canViewGlobal}>
             {#if canViewGlobal}
                 <div class="space-y-2">
