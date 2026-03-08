@@ -1,14 +1,25 @@
 services:
-  slusha:
-    image: slusha:latest
-    container_name: slusha
+  slusha-prod:
+    profiles:
+      - production
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: slusha-bot:latest
+    container_name: slusha-bot
     environment:
-      - DENO_ENV=production
-      - BOT_TOKEN=${BOT_TOKEN}
-      - AI_TOKEN=${AI_TOKEN}
+      DENO_ENV: production
+      BOT_TOKEN: ${BOT_TOKEN}
+      AI_TOKEN: ${AI_TOKEN}
+      DATABASE_URL: ${DATABASE_URL:-file:./data/slusha.sqlite}
+      WEB_HOST: ${WEB_HOST:-0.0.0.0}
+      WEB_PORT: ${WEB_PORT:-8080}
+      WIDGET_BASE_URL: ${WIDGET_BASE_URL:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
     volumes:
-      - ./memory.json:/app/memory.json:Z
-      - ./slusha.config.js:/app/slusha.config.js:ro,Z
-      - ./tmp:/app/tmp:Z
-      - ./log:/app/log:Z
+      - ./data:/home/nonroot/app/data:Z
+      - ./tmp:/home/nonroot/app/tmp:Z
+      - ./log:/home/nonroot/app/log:Z
+    ports:
+      - ${WEB_PORT:-8080}:${WEB_PORT:-8080}
     restart: unless-stopped
