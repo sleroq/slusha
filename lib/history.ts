@@ -252,11 +252,21 @@ function getUnsupportedContentFields(msgInfo: Message): string[] {
     );
 }
 
-function getTimeString(date: Date): string {
+function getDateString(date: Date): string {
+    const year = String(date.getFullYear());
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
 
-    return `${hours}:${minutes}`;
+    const offsetMinutes = -date.getTimezoneOffset();
+    const offsetSign = offsetMinutes >= 0 ? '+' : '-';
+    const absOffsetMinutes = Math.abs(offsetMinutes);
+    const offsetHours = String(Math.floor(absOffsetMinutes / 60)).padStart(2, '0');
+    const offsetMins = String(absOffsetMinutes % 60).padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${offsetSign}${offsetHours}:${offsetMins}`;
 }
 
 async function constructMsg(
@@ -344,71 +354,43 @@ async function constructMsg(
         ? msg.info.from.id.toString()
         : 'unknown';
     const authorTag = user.username ?? firstName;
+    const messageDate = typeof msg.info.date === 'number'
+        ? getDateString(new Date(msg.info.date * 1000))
+        : undefined;
     const replyTargetId = msg.replyTo?.id;
     const messageMeta: Record<string, unknown> = {
-        kind: 'history_message_meta',
         message_id: msg.id,
-        author_id: authorId,
-        author_tag: authorTag,
+        author: {
+            id: authorId,
+            tag: authorTag,
+            name: firstName,
+        },
     };
+    if (messageDate) {
+        messageMeta.date = messageDate;
+    }
     if (typeof replyTargetId === 'number') {
         messageMeta.reply_to_message_id = replyTargetId;
     }
+    if (replyTo) {
+        messageMeta.reply_to_author_tag = replyTo;
+    }
+    if (msg.info.forward_origin) {
+        messageMeta.forward_origin = removeFieldsWithSuffixes(
+            msg.info.forward_origin,
+        );
+    }
+    if (msg.info.via_bot?.username) {
+        messageMeta.via_bot = `@${msg.info.via_bot.username}`;
+    }
+    if (msg.info.quote?.text) {
+        messageMeta.quote_text = msg.info.quote.text;
+    }
 
     let prettyInputMessage = '';
-
     if (characterName && msg.isMyself) {
-        prettyInputMessage += `${characterName}`;
-        if (user.username) {
-            prettyInputMessage += ` (${user.username})`;
-        }
-
-        prettyInputMessage += ` [${
-            getTimeString(new Date(msg.info.date * 1000))
-        }]`;
-
-        prettyInputMessage += `:\n`;
+        messageMeta.character = characterName;
     }
-
-    if (!msg.isMyself) {
-        prettyInputMessage += `${user.name}`;
-        if (user.username) {
-            prettyInputMessage += ` (${user.username})`;
-        }
-
-        if (replyTo) {
-            prettyInputMessage += ` <reply to ${replyTo}>`;
-        }
-
-        if (msg.info.forward_origin) {
-            const prettyJsonObject = JSON.stringify(removeFieldsWithSuffixes(
-                msg.info.forward_origin,
-            ));
-
-            if (user.name === 'Telegram') {
-                prettyInputMessage +=
-                    ` <new post in the channel ${prettyJsonObject}>`;
-            } else {
-                prettyInputMessage += ` <forward from "${prettyJsonObject}">`;
-            }
-        }
-
-        if (msg.info.via_bot) {
-            prettyInputMessage +=
-                ` <this message content generated via bot @${msg.info.via_bot.username}>`;
-        }
-
-        if (msg.info.quote?.text) {
-            prettyInputMessage += `\n <quoting "${msg.info.quote.text}">`;
-        }
-
-        prettyInputMessage += ` [${
-            getTimeString(new Date(msg.info.date * 1000))
-        }]`;
-
-        prettyInputMessage += `:\n`;
-    }
-
     prettyInputMessage += `${text.trim()}`;
 
     if (

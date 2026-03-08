@@ -109,16 +109,17 @@ export function annotateHistoryWithTargetRefs(
             return text;
         }
 
-        if (parsedMeta.kind !== 'history_message_meta') {
-            return text;
-        }
-
         const messageId = parsedMeta.message_id;
-        if (typeof messageId !== 'number') {
+        const resolvedMessageId = typeof messageId === 'number'
+            ? messageId
+            : typeof messageId === 'string' && /^\d+$/.test(messageId)
+            ? Number(messageId)
+            : undefined;
+        if (typeof resolvedMessageId !== 'number') {
             return text;
         }
 
-        const targetRef = refByMessageId.get(messageId);
+        const targetRef = refByMessageId.get(resolvedMessageId);
         if (!targetRef || parsedMeta.target_ref === targetRef) {
             return text;
         }

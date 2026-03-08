@@ -56,7 +56,7 @@ Deno.test('annotateHistoryWithTargetRefs annotates history meta block', () => {
         {
             role: 'user',
             content:
-                '<slusha_meta>\n{"kind":"history_message_meta","message_id":42,"author_id":"1","author_tag":"@alice"}\n</slusha_meta>\nAlice:\nhi',
+                '<slusha_meta>\n{"message_id":42,"author":{"id":"1","tag":"@alice","name":"Alice"},"date":"2026-03-08 05:58:00 +03:00"}\n</slusha_meta>\nhi',
         },
         {
             role: 'assistant',
@@ -81,7 +81,7 @@ Deno.test('annotateHistoryWithTargetRefs annotates history meta block', () => {
     assertEquals(annotated[0], {
         role: 'user',
         content:
-            '<slusha_meta>\n{"kind":"history_message_meta","message_id":42,"author_id":"1","author_tag":"@alice","target_ref":"t0"}\n</slusha_meta>\nAlice:\nhi',
+            '<slusha_meta>\n{"message_id":42,"author":{"id":"1","tag":"@alice","name":"Alice"},"date":"2026-03-08 05:58:00 +03:00","target_ref":"t0"}\n</slusha_meta>\nhi',
     });
     assertEquals(
         (annotated[1].content as Array<{ type: string; text: string }>)[0]

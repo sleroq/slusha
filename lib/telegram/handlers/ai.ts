@@ -401,10 +401,17 @@ async function sendGeneratedOutput(params: {
             replyText = '-' + replyText;
         }
 
+        const explicitTargetRef = typeof res.target_ref === 'string' &&
+                res.target_ref.trim().length > 0
+            ? res.target_ref.trim()
+            : undefined;
         let msgToReply: number | undefined;
-        msgToReply = resolveTargetMessageId(res.target_ref);
-        if (!msgToReply && lastMsgId) {
+        if (explicitTargetRef) {
+            msgToReply = resolveTargetMessageId(explicitTargetRef);
+        } else if (lastMsgId) {
             msgToReply = lastMsgId;
+        } else {
+            msgToReply = ctx.msg?.message_id;
         }
 
         let replyInfo;
