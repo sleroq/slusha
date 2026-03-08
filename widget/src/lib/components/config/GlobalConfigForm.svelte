@@ -140,6 +140,7 @@
             'allowed model names',
             'model selector',
             'blacklisted reactions',
+            'reserved message tokens',
         ),
     );
     let hasMatches = $derived(
@@ -718,6 +719,15 @@
                             reactions={availableReactions}
                             hidden={!matchesBlockItem('admin', 'blacklisted reactions', 'reactions')}
                             bind:value={text.blacklistedReactions}
+                        />
+                        <SettingStringListField
+                            id="g-reserved-message-tokens"
+                            label="Reserved message tokens"
+                            description="Any generated reply containing one of these tokens is rejected and retried silently."
+                            itemPlaceholder="token"
+                            addLabel="Add token"
+                            hidden={!matchesBlockItem('admin', 'reserved message tokens', 'reservedMessageTokens', 'slusha_meta', 'target_ref')}
+                            bind:value={text.reservedMessageTokens}
                         />
                     {/if}
                     <SettingStringListField

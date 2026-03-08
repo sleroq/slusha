@@ -68,7 +68,10 @@ const PLAIN_TEXT_META_CLOSE = '</slusha_meta>';
 const plainTextTargetRefLineRegex = /^@@target_ref=(t\d+)\s*\r?\n([\s\S]*)$/;
 const plainTextMetadataBlockRegex =
     /^<slusha_meta>\s*\r?\n([\s\S]*?)\r?\n<\/slusha_meta>\s*/;
-const reservedMessageTokenRegex = /slusha_meta|target_ref/i;
+const defaultReservedMessageTokens = [
+    'slusha_meta',
+    'target_ref',
+];
 const RESERVED_MESSAGE_TOKEN_ERROR =
     'Generated output contains reserved metadata token';
 
@@ -299,11 +302,29 @@ function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
     return entries;
 }
 
-function hasReservedMessageToken(entries: ChatEntry[]): boolean {
-    return entries.some((entry) =>
-        isTextEntry(entry) && typeof entry.text === 'string' &&
-            reservedMessageTokenRegex.test(entry.text)
+function normalizeReservedMessageTokens(rawTokens: string[]): string[] {
+    const normalized = Array.from(
+        new Set(
+            rawTokens
+                .map((token) => token.trim().toLowerCase())
+                .filter((token) => token.length > 0),
+        ),
     );
+    return normalized.length > 0 ? normalized : defaultReservedMessageTokens;
+}
+
+function hasReservedMessageToken(
+    entries: ChatEntry[],
+    reservedTokens: string[],
+): boolean {
+    return entries.some((entry) => {
+        if (!isTextEntry(entry) || typeof entry.text !== 'string') {
+            return false;
+        }
+
+        const text = entry.text.toLowerCase();
+        return reservedTokens.some((token) => text.includes(token));
+    });
 }
 
 function isReservedMessageTokenError(error: unknown): boolean {
@@ -641,6 +662,9 @@ export default function registerAI(bot: Bot<SlushaContext>) {
         );
         const enabledReactions = resolveEnabledReactions(
             effectiveConfig.blacklistedReactions,
+        );
+        const reservedMessageTokens = normalizeReservedMessageTokens(
+            effectiveConfig.ai.reservedMessageTokens,
         );
 
         const baseMessagesToPass = chatState.messagesToPass ??
@@ -1063,7 +1087,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     : await generatePlainTextAndReactionsOutput(
                         attemptMessages,
                     );
-                if (hasReservedMessageToken(generatedOutput)) {
+                if (hasReservedMessageToken(generatedOutput, reservedMessageTokens)) {
                     throw new Error(RESERVED_MESSAGE_TOKEN_ERROR);
                 }
                 output = generatedOutput;

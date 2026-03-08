@@ -94,6 +94,7 @@ export class ConfigController {
     tendToReply: "",
     tendToIgnore: "",
     blacklistedReactions: "",
+    reservedMessageTokens: "",
     nepons: "",
     adminIds: "",
     trustedIds: "",

@@ -115,6 +115,10 @@ const defaultConfig = {
         notesFrequency: 190,
         memoryFrequency: 150,
         messageMaxLength: 4096,
+        reservedMessageTokens: [
+            'slusha_meta',
+            'target_ref',
+        ],
         includeAttachmentsInHistory: true,
         bytesLimit: 20971520,
         google: {

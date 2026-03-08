@@ -29,6 +29,7 @@ const replyMethodSchema = z.enum([
     'plain_text_reactions',
 ]);
 const historyVersionSchema = z.enum(['v2', 'v3']);
+const reservedMessageTokenSchema = z.string().min(1).max(128);
 const googleThinkingConfigSchema = z.object({
     thinkingLevel: thinkingLevelSchema.optional(),
     thinkingBudget: z.number().int().min(0).max(65536).optional(),
@@ -127,6 +128,11 @@ export const configSchema = z.object({
         notesFrequency: boundedPositiveInt(1, 5000).default(150),
         memoryFrequency: boundedPositiveInt(1, 5000).default(50),
         messageMaxLength: boundedPositiveInt(200, 20000).default(4096),
+        reservedMessageTokens: z.array(reservedMessageTokenSchema).max(64)
+            .default([
+                'slusha_meta',
+                'target_ref',
+            ]),
         /**
          * Whether to include attachments (images, videos, voice, etc.)
          * from user messages when constructing model history

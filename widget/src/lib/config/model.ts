@@ -147,6 +147,7 @@ export interface AiPayload {
   notesFrequency: number;
   memoryFrequency: number;
   messageMaxLength: number;
+  reservedMessageTokens: string[];
   includeAttachmentsInHistory: boolean;
   bytesLimit: number;
   google: {
@@ -307,6 +308,7 @@ export interface GlobalFormText {
   tendToReply: string;
   tendToIgnore: string;
   blacklistedReactions: string;
+  reservedMessageTokens: string;
   nepons: string;
   adminIds: string;
   trustedIds: string;
@@ -350,6 +352,7 @@ export function defaultAiConfig(): AiPayload {
     notesFrequency: 150,
     memoryFrequency: 50,
     messageMaxLength: 4096,
+    reservedMessageTokens: ["slusha_meta", "target_ref"],
     includeAttachmentsInHistory: true,
     bytesLimit: 20 * 1024 * 1024,
     google: {
@@ -711,6 +714,11 @@ export function fromUnknownGlobal(payload: unknown): UserConfigPayload {
       ...base.ai,
       ...ai,
       generation,
+      reservedMessageTokens: Array.isArray(ai.reservedMessageTokens)
+        ? ai.reservedMessageTokens.filter((item): item is string =>
+          typeof item === "string"
+        )
+        : base.ai.reservedMessageTokens,
     },
     names: Array.isArray(obj.names) ? obj.names : [],
     tendToReply: Array.isArray(obj.tendToReply) ? obj.tendToReply : [],
@@ -878,6 +886,9 @@ export function globalTextFromConfig(
     blacklistedReactions: stringListToTextarea(
       config.blacklistedReactions ?? [],
     ),
+    reservedMessageTokens: stringListToTextarea(
+      config.ai.reservedMessageTokens ?? [],
+    ),
     nepons: stringListToTextarea(config.nepons),
     adminIds: stringListToTextarea((config.adminIds ?? []).map(String)),
     trustedIds: stringListToTextarea((config.trustedIds ?? []).map(String)),
@@ -909,6 +920,10 @@ export function buildGlobalPayload(
     tendToReply: matcherTextareaToList(text.tendToReply),
     tendToIgnore: matcherTextareaToList(text.tendToIgnore),
     blacklistedReactions: textareaToStringList(text.blacklistedReactions),
+    ai: {
+      ...config.ai,
+      reservedMessageTokens: textareaToStringList(text.reservedMessageTokens),
+    },
     nepons: textareaToStringList(text.nepons),
     adminIds: textareaToNumberList(text.adminIds),
     trustedIds: textareaToNumberList(text.trustedIds),
