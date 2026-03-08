@@ -1,5 +1,9 @@
 import en from "./locales/en";
+import hi from "./locales/hi";
+import id from "./locales/id";
+import pt from "./locales/pt";
 import ru from "./locales/ru";
+import uk from "./locales/uk";
 
 export const SUPPORTED_LOCALES = ["en", "ru", "uk", "pt", "hi", "id"] as const;
 export type WidgetLocale = (typeof SUPPORTED_LOCALES)[number];
@@ -12,10 +16,10 @@ type TranslationParams = Record<string, string | number>;
 const DICTIONARIES: Record<WidgetLocale, Record<TranslationKey, string>> = {
   en,
   ru,
-  uk: en,
-  pt: en,
-  hi: en,
-  id: en,
+  uk,
+  pt,
+  hi,
+  id,
 };
 
 function isSupportedLocale(value: string): value is WidgetLocale {
