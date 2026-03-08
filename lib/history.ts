@@ -20,6 +20,7 @@ interface HistoryOptions {
     resolveReplyThread?: boolean;
     includeReactions?: boolean;
     historyVersion?: 'v2' | 'v3';
+    activeMessageId?: number;
 }
 
 interface HistoryCandidate {
@@ -132,6 +133,7 @@ export function selectHistoryCandidatesV3(
     history: ChatMessage[],
     options: {
         maxRootMessages?: number;
+        activeMessageId?: number;
     },
 ): HistoryCandidate[] {
     if (!hasThreadMetadata(history)) {
@@ -144,13 +146,34 @@ export function selectHistoryCandidatesV3(
     const selected: HistoryCandidate[] = [];
     const seen = new Set<number>();
 
-    let activeThreadAnchor: ChatMessage | undefined;
-    for (let i = history.length - 1; i >= 0; i--) {
-        const candidate = history[i];
-        if (!candidate.isMyself) {
-            activeThreadAnchor = candidate;
-            break;
+    const activeThreadAnchor = typeof options.activeMessageId === 'number'
+        ? history.find((msg) => msg.id === options.activeMessageId)
+        : undefined;
+
+    let fallbackAnchor: ChatMessage | undefined;
+    if (!activeThreadAnchor) {
+        for (let i = history.length - 1; i >= 0; i--) {
+            const candidate = history[i];
+            if (!candidate.isMyself) {
+                fallbackAnchor = candidate;
+                break;
+            }
         }
+    }
+
+    const effectiveAnchor = activeThreadAnchor ?? fallbackAnchor;
+    const anchorTopicId = typeof effectiveAnchor?.info.message_thread_id ===
+            'number'
+        ? effectiveAnchor.info.message_thread_id
+        : undefined;
+    const scopedToTelegramTopic = typeof anchorTopicId === 'number';
+
+    function isInScopedTopic(msg: ChatMessage): boolean {
+        if (!scopedToTelegramTopic) {
+            return true;
+        }
+
+        return msg.info.message_thread_id === anchorTopicId;
     }
 
     const maxRootMessages = options.maxRootMessages;
@@ -159,13 +182,16 @@ export function selectHistoryCandidatesV3(
         : undefined;
 
     let activeThreadTaken = 0;
-    if (activeThreadAnchor) {
+    if (effectiveAnchor) {
         for (let i = history.length - 1; i >= 0; i--) {
             const msg = history[i];
             if (seen.has(msg.id)) {
                 continue;
             }
-            if (!sameThread(msg, activeThreadAnchor)) {
+            if (!isInScopedTopic(msg)) {
+                continue;
+            }
+            if (!scopedToTelegramTopic && !sameThread(msg, effectiveAnchor)) {
                 continue;
             }
             if (
@@ -186,6 +212,11 @@ export function selectHistoryCandidatesV3(
 
     let rootMessagesProcessed = 0;
     for (let i = history.length - 1; i >= 0; i--) {
+        const msg = history[i];
+        if (!isInScopedTopic(msg)) {
+            continue;
+        }
+
         if (
             typeof maxRootMessages === 'number' &&
             rootMessagesProcessed >= maxRootMessages
@@ -194,7 +225,6 @@ export function selectHistoryCandidatesV3(
         }
         rootMessagesProcessed += 1;
 
-        const msg = history[i];
         if (seen.has(msg.id)) {
             continue;
         }
@@ -588,6 +618,7 @@ interface BuildHistoryContextOptions {
     includeReactions?: boolean;
     characterName?: string;
     historyVersion?: 'v2' | 'v3';
+    activeMessageId?: number;
 }
 
 export async function buildHistoryContext(
@@ -610,6 +641,7 @@ export async function buildHistoryContext(
     const candidates = mode === 'chat' && options.historyVersion === 'v3'
         ? selectHistoryCandidatesV3(history, {
             maxRootMessages: undefined,
+            activeMessageId: options.activeMessageId,
         })
         : selectHistoryCandidates(history, {
             resolveReplyThread: resolveReplies,
@@ -737,6 +769,7 @@ export function makeHistoryV2(
             resolveReplyThread: options.resolveReplyThread,
             includeReactions: options.includeReactions,
             historyVersion: 'v2',
+            activeMessageId: options.activeMessageId,
         },
     );
 }
@@ -762,6 +795,7 @@ export function makeHistoryV3(
             resolveReplyThread: options.resolveReplyThread,
             includeReactions: options.includeReactions,
             historyVersion: 'v3',
+            activeMessageId: options.activeMessageId,
         },
     );
 }

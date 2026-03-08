@@ -326,6 +326,9 @@ async function sendGeneratedOutput(params: {
         effectiveConfig,
         historyById,
     } = params;
+    const chatTopicId = typeof ctx.msg?.message_thread_id === 'number'
+        ? ctx.msg.message_thread_id
+        : undefined;
 
     function resolveTargetMessageId(targetRef?: string): number | undefined {
         if (targetRef) {
@@ -416,6 +419,21 @@ async function sendGeneratedOutput(params: {
             msgToReply = ctx.msg?.message_id;
         }
 
+        if (typeof chatTopicId === 'number' && typeof msgToReply === 'number') {
+            const targetMsg = historyById.get(msgToReply);
+            const targetTopicId = targetMsg?.info.message_thread_id;
+            const targetInSameTopic = targetMsg
+                ? targetTopicId === chatTopicId
+                : msgToReply === ctx.msg?.message_id;
+            if (!targetInSameTopic) {
+                msgToReply = undefined;
+            }
+        }
+
+        const replyOther = typeof chatTopicId === 'number'
+            ? { message_thread_id: chatTopicId }
+            : undefined;
+
         let replyInfo;
         try {
             if (ctx.chat?.type === 'private') {
@@ -430,6 +448,7 @@ async function sendGeneratedOutput(params: {
                     ctx,
                     replyText,
                     msgToReply,
+                    replyOther,
                 );
             }
         } catch (error) {
@@ -668,6 +687,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     bytesLimit: effectiveConfig.ai.bytesLimit,
                     symbolLimit: effectiveConfig.ai.messageMaxLength,
                     includeReactions: true,
+                    activeMessageId: ctx.msg.message_id,
                     attachments:
                         effectiveConfig.ai.includeAttachmentsInHistory &&
                         parsedModel.provider === 'google',

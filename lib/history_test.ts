@@ -19,6 +19,7 @@ function createMessage(
     options?: {
         threadId?: string;
         threadRootMessageId?: number;
+        messageThreadId?: number;
         fromId?: number;
         date?: number;
     },
@@ -39,6 +40,7 @@ function createMessage(
                 first_name: 'User',
             },
             date: options?.date ?? id,
+            message_thread_id: options?.messageThreadId,
         } as unknown as Message,
     };
 }
@@ -281,5 +283,78 @@ Deno.test(
         });
 
         assertEquals(selected.map((m) => m.msg.id), [208, 207, 205, 204, 206, 203]);
+    },
+);
+
+Deno.test(
+    'selectHistoryCandidatesV3 scopes to active telegram topic when anchor provided',
+    () => {
+        const history: ChatMessage[] = [
+            createMessage(300, undefined, {
+                threadId: 'thread:300',
+                threadRootMessageId: 300,
+                messageThreadId: 77,
+                fromId: 10,
+            }),
+            createMessage(301, undefined, {
+                threadId: 'thread:301',
+                threadRootMessageId: 301,
+                messageThreadId: 88,
+                fromId: 20,
+            }),
+            createMessage(302, 300, {
+                threadId: 'thread:300',
+                threadRootMessageId: 300,
+                messageThreadId: 77,
+                fromId: 30,
+            }),
+            createMessage(303, undefined, {
+                threadId: 'thread:301',
+                threadRootMessageId: 301,
+                messageThreadId: 88,
+                fromId: 20,
+            }),
+            createMessage(304, undefined, {
+                threadId: 'thread:300',
+                threadRootMessageId: 300,
+                messageThreadId: 77,
+                fromId: 40,
+            }),
+        ];
+
+        const selected = selectHistoryCandidatesV3(history, {
+            activeMessageId: 304,
+        });
+
+        assertEquals(selected.map((m) => m.msg.id), [304, 302, 300]);
+    },
+);
+
+Deno.test(
+    'selectHistoryCandidatesV3 falls back to latest non-bot anchor when active message is missing',
+    () => {
+        const history: ChatMessage[] = [
+            createMessage(401, undefined, {
+                threadId: 'thread:401',
+                threadRootMessageId: 401,
+                fromId: 10,
+            }),
+            createMessage(402, undefined, {
+                threadId: 'thread:402',
+                threadRootMessageId: 402,
+                fromId: 20,
+            }),
+            createMessage(403, 401, {
+                threadId: 'thread:401',
+                threadRootMessageId: 401,
+                fromId: 30,
+            }),
+        ];
+
+        const selected = selectHistoryCandidatesV3(history, {
+            activeMessageId: 999999,
+        });
+
+        assertEquals(selected.map((m) => m.msg.id), [403, 401, 402]);
     },
 );

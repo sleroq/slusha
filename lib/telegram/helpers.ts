@@ -82,12 +82,11 @@ async function replyGenericId<Other>(
             try {
                 res = await ctx.reply(part, {
                     parse_mode,
-                    reply_to_message_id: ctx.msg?.message_id,
                     ...other,
                 });
             } catch (_) { // Retry without markdown
                 res = await ctx.reply(text, {
-                    reply_to_message_id: ctx.msg?.message_id,
+                    ...other,
                 });
             }
         }
