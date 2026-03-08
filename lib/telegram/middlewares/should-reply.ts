@@ -13,6 +13,10 @@ export function shouldReply() {
         const msg = await ctx.m.getLastMessage();
         const currentMessage = ctx.msg;
         const effectiveConfig = await ctx.m.getEffectiveConfig();
+        const isIgnoreCandidate =
+            Boolean(msg?.text) &&
+            msg.text.length < 20 &&
+            testMessage(effectiveConfig.tendToIgnore, msg.text);
 
         if (!msg || !currentMessage) return;
 
@@ -36,7 +40,22 @@ export function shouldReply() {
             return next();
         }
 
-        if (currentMessage.reply_to_message?.from?.id === ctx.me.id) {
+        const isDirectReplyToBot = currentMessage.reply_to_message?.from?.id ===
+            ctx.me.id;
+        const isGroupChat =
+            currentMessage.chat.type === 'group' ||
+            currentMessage.chat.type === 'supergroup';
+
+        if (
+            isGroupChat &&
+            isDirectReplyToBot &&
+            isIgnoreCandidate &&
+            probability(effectiveConfig.tendToIgnoreProbability)
+        ) {
+            return;
+        }
+
+        if (isDirectReplyToBot) {
             await ctx.m.setLastUse(Date.now());
             return next();
         }
@@ -59,11 +78,7 @@ export function shouldReply() {
             return next();
         }
 
-        if (
-            testMessage(effectiveConfig.tendToIgnore, msg.text) &&
-            msg.text.length < 20 &&
-            probability(effectiveConfig.tendToIgnoreProbability)
-        ) {
+        if (isIgnoreCandidate && probability(effectiveConfig.tendToIgnoreProbability)) {
             return;
         }
 
