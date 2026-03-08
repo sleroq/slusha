@@ -142,6 +142,41 @@ function parseSendChatActionsEntries(
     return undefined;
 }
 
+function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
+    const chunks = splitTextByTwoLines(rawText.trim());
+    const entries: ChatEntry[] = [];
+
+    for (const chunk of chunks) {
+        const trimmed = chunk.trim();
+        if (!trimmed) {
+            continue;
+        }
+
+        const targetMatch = trimmed.match(/^@@target_ref=(t\d+)\s*\r?\n([\s\S]*)$/);
+        if (targetMatch) {
+            const targetRef = targetMatch[1];
+            const text = targetMatch[2].trim();
+            if (!text) {
+                continue;
+            }
+
+            entries.push({
+                type: 'reply',
+                text,
+                target_ref: targetRef,
+            });
+            continue;
+        }
+
+        entries.push({
+            type: 'reply',
+            text: trimmed,
+        });
+    }
+
+    return entries;
+}
+
 function buildTelemetryMetadata(
     ctx: SlushaContext,
     chatName: string,
@@ -504,6 +539,10 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 finalPrompt +=
                     ` Ответь на сообщение от ${ctx.info.userToReply}.`;
             }
+            if (replyMethod !== 'json_actions') {
+                finalPrompt +=
+                    ' If you need to reply to a specific message from Reply Target Map, start that reply block with "@@target_ref=tN" on the first line, then put reply text on the next line.';
+            }
 
             messages.push({
                 role: 'user',
@@ -549,10 +588,9 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             });
 
             const plainTextResponse = response.text.trim();
-            const splitReplies = splitTextByTwoLines(plainTextResponse);
-            const replyEntries: ChatEntry[] = splitReplies.length > 0
-                ? splitReplies.map((text) => ({ type: 'reply', text }))
-                : [{ type: 'reply', text: plainTextResponse }];
+            const replyEntries = parsePlainTextRepliesWithTargets(
+                plainTextResponse,
+            );
 
             if (enabledReactions.length === 0) {
                 return replyEntries;
