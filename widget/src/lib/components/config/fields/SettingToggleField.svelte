@@ -13,7 +13,7 @@
         id: string;
         label: string;
         description: string;
-        checked: boolean;
+        checked: boolean | undefined;
         hidden?: boolean;
         sourceState?: SourceState;
     }
@@ -26,6 +26,12 @@
         hidden = false,
         sourceState,
     }: Props = $props();
+
+    let effectiveChecked = $derived(checked ?? false);
+
+    function handleChange(next: boolean) {
+        checked = next;
+    }
 </script>
 
 <div class="space-y-2 rounded-md border p-3" {hidden}>
@@ -42,7 +48,7 @@
                 {/if}
             </span>
         </Label>
-        <Switch {id} bind:checked />
+        <Switch {id} checked={effectiveChecked} onCheckedChange={handleChange} />
     </div>
     <p class="text-xs text-muted-foreground">{description}</p>
 </div>

@@ -157,32 +157,43 @@ export function sanitizeChatOverrideForRole(
     if (override.tendToReply !== undefined) {
         next.tendToReply = override.tendToReply;
     }
-    if (hasDefinedPrimitiveDelta(
-        override.tendToReplyProbability,
-        globalConfig.tendToReplyProbability,
-    )) {
+    if (
+        hasDefinedPrimitiveDelta(
+            override.tendToReplyProbability,
+            globalConfig.tendToReplyProbability,
+        )
+    ) {
         next.tendToReplyProbability = override.tendToReplyProbability;
     }
     if (override.tendToIgnore !== undefined) {
         next.tendToIgnore = override.tendToIgnore;
     }
-    if (hasDefinedPrimitiveDelta(
-        override.tendToIgnoreProbability,
-        globalConfig.tendToIgnoreProbability,
-    )) {
+    if (
+        hasDefinedPrimitiveDelta(
+            override.tendToIgnoreProbability,
+            globalConfig.tendToIgnoreProbability,
+        )
+    ) {
         next.tendToIgnoreProbability = override.tendToIgnoreProbability;
     }
-    if (hasDefinedPrimitiveDelta(
-        override.randomReplyProbability,
-        globalConfig.randomReplyProbability,
-    )) {
+    if (
+        hasDefinedPrimitiveDelta(
+            override.randomReplyProbability,
+            globalConfig.randomReplyProbability,
+        )
+    ) {
         next.randomReplyProbability = override.randomReplyProbability;
     }
     if (override.blacklistedReactions !== undefined) {
         next.blacklistedReactions = override.blacklistedReactions;
     }
     if (override.nepons !== undefined) next.nepons = override.nepons;
-    if (hasDefinedPrimitiveDelta(override.responseDelay, globalConfig.responseDelay)) {
+    if (
+        hasDefinedPrimitiveDelta(
+            override.responseDelay,
+            globalConfig.responseDelay,
+        )
+    ) {
         next.responseDelay = override.responseDelay;
     }
     if (role === 'admin' && override.requestWindowPerChat !== undefined) {
@@ -196,10 +207,12 @@ export function sanitizeChatOverrideForRole(
     }
 
     if (override.ai && role === 'regular') {
-        if (hasDefinedPrimitiveDelta(
-            override.ai.historyVersion,
-            globalConfig.ai.historyVersion,
-        )) {
+        if (
+            hasDefinedPrimitiveDelta(
+                override.ai.historyVersion,
+                globalConfig.ai.historyVersion,
+            )
+        ) {
             next.ai = {
                 historyVersion: override.ai.historyVersion,
             };
@@ -223,7 +236,10 @@ export function sanitizeChatOverrideForRole(
             aiDelta.model = ai.model;
         }
         if (
-            hasDefinedPrimitiveDelta(ai.temperature, globalConfig.ai.temperature)
+            hasDefinedPrimitiveDelta(
+                ai.temperature,
+                globalConfig.ai.temperature,
+            )
         ) {
             aiDelta.temperature = ai.temperature;
         }
@@ -244,7 +260,9 @@ export function sanitizeChatOverrideForRole(
         if (hasDefinedPrimitiveDelta(ai.prompt, globalConfig.ai.prompt)) {
             aiDelta.prompt = ai.prompt;
         }
-        if (hasDefinedPrimitiveDelta(ai.dumbPrompt, globalConfig.ai.dumbPrompt)) {
+        if (
+            hasDefinedPrimitiveDelta(ai.dumbPrompt, globalConfig.ai.dumbPrompt)
+        ) {
             aiDelta.dumbPrompt = ai.dumbPrompt;
         }
         if (
@@ -272,11 +290,19 @@ export function sanitizeChatOverrideForRole(
             aiDelta.commentsPromptAddition = ai.commentsPromptAddition;
         }
         if (
-            hasDefinedPrimitiveDelta(ai.hateModePrompt, globalConfig.ai.hateModePrompt)
+            hasDefinedPrimitiveDelta(
+                ai.hateModePrompt,
+                globalConfig.ai.hateModePrompt,
+            )
         ) {
             aiDelta.hateModePrompt = ai.hateModePrompt;
         }
-        if (hasDefinedPrimitiveDelta(ai.replyMethod, globalConfig.ai.replyMethod)) {
+        if (
+            hasDefinedPrimitiveDelta(
+                ai.replyMethod,
+                globalConfig.ai.replyMethod,
+            )
+        ) {
             aiDelta.replyMethod = ai.replyMethod;
         }
         if (
@@ -301,9 +327,12 @@ export function sanitizeChatOverrideForRole(
                 globalConfig.ai.includeAttachmentsInHistory,
             )
         ) {
-            aiDelta.includeAttachmentsInHistory = ai.includeAttachmentsInHistory;
+            aiDelta.includeAttachmentsInHistory =
+                ai.includeAttachmentsInHistory;
         }
-        if (hasDefinedPrimitiveDelta(ai.bytesLimit, globalConfig.ai.bytesLimit)) {
+        if (
+            hasDefinedPrimitiveDelta(ai.bytesLimit, globalConfig.ai.bytesLimit)
+        ) {
             aiDelta.bytesLimit = ai.bytesLimit;
         }
 

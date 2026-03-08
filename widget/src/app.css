@@ -8,7 +8,10 @@
   --radius: 0.625rem;
   --background: var(--tg-theme-bg-color, #ffffff);
   --foreground: var(--tg-theme-text-color, #1f2937);
-  --card: var(--tg-theme-section-bg-color, var(--tg-theme-secondary-bg-color, var(--background)));
+  --card: var(
+    --tg-theme-section-bg-color,
+    var(--tg-theme-secondary-bg-color, var(--background))
+  );
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
@@ -17,7 +20,10 @@
   --secondary: var(--tg-theme-secondary-bg-color, #f1f5f9);
   --secondary-foreground: var(--foreground);
   --muted: var(--tg-theme-secondary-bg-color, #f1f5f9);
-  --muted-foreground: var(--tg-theme-subtitle-text-color, var(--tg-theme-hint-color, #6b7280));
+  --muted-foreground: var(
+    --tg-theme-subtitle-text-color,
+    var(--tg-theme-hint-color, #6b7280)
+  );
   --accent: var(--tg-theme-secondary-bg-color, #f1f5f9);
   --accent-foreground: var(--tg-theme-accent-text-color, var(--foreground));
   --destructive: var(--tg-theme-destructive-text-color, #d34b53);

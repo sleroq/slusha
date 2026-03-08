@@ -9,7 +9,10 @@ import {
 import { type BotCharacter, ChatMemory } from '../../memory.ts';
 import { chatMembers, chats } from '../../db/schema.ts';
 import { ALLOWED_REACTIONS } from '../../telegram/reactions.ts';
-import { getUsageSnapshot, renderProgressBar } from '../../telegram/usage-window.ts';
+import {
+    getUsageSnapshot,
+    renderProgressBar,
+} from '../../telegram/usage-window.ts';
 import {
     buildBootstrapCapabilities,
     getModelOptionsForRole,
@@ -53,9 +56,10 @@ function readChatSummary(chatId: number, infoRaw: string): AvailableChat {
         const title = info.type === 'private'
             ? [info.first_name, info.last_name].filter(Boolean).join(' ').trim()
             : info.title;
-        const normalizedTitle = typeof title === 'string' && title.trim().length > 0
-            ? title.trim()
-            : String(chatId);
+        const normalizedTitle =
+            typeof title === 'string' && title.trim().length > 0
+                ? title.trim()
+                : String(chatId);
 
         return {
             id: chatId,
@@ -138,7 +142,8 @@ async function resolveAvailableChats(
 
         try {
             const member = await options.bot.api.getChatMember(chatId, userId);
-            const isAdmin = member.status === 'creator' || member.status === 'administrator';
+            const isAdmin = member.status === 'creator' ||
+                member.status === 'administrator';
             if (!isAdmin) {
                 return undefined;
             }
@@ -171,8 +176,13 @@ export async function handleBootstrapRequest(
     const availableChats = userId
         ? await resolveAvailableChats(options, userId, canEditGlobal)
         : [];
-    const serializedGlobalConfig = JSON.parse(serializeUserConfig(globalConfig)) as UserConfig;
-    const globalPayload = projectGlobalConfigForRole(serializedGlobalConfig, role);
+    const serializedGlobalConfig = JSON.parse(
+        serializeUserConfig(globalConfig),
+    ) as UserConfig;
+    const globalPayload = projectGlobalConfigForRole(
+        serializedGlobalConfig,
+        role,
+    );
     let chatBasePayload = projectEffectiveConfigForRole(
         serializedGlobalConfig,
         role,
@@ -225,7 +235,10 @@ export async function handleBootstrapRequest(
                 )
                 : {};
 
-            const effectiveConfig = mergeWithChatOverride(globalConfig, chatOverride);
+            const effectiveConfig = mergeWithChatOverride(
+                globalConfig,
+                chatOverride,
+            );
             const serializedEffectiveConfig = JSON.parse(
                 serializeUserConfig(effectiveConfig),
             ) as UserConfig;
@@ -235,12 +248,15 @@ export async function handleBootstrapRequest(
             );
 
             if (userId) {
-                const usageSnapshot = await getUsageSnapshot(options.memory.db, {
-                    config: globalConfig,
-                    chatId,
-                    userId,
-                    chatOverride,
-                });
+                const usageSnapshot = await getUsageSnapshot(
+                    options.memory.db,
+                    {
+                        config: globalConfig,
+                        chatId,
+                        userId,
+                        chatOverride,
+                    },
+                );
                 usageWindowStatus = {
                     tier: usageSnapshot.tier,
                     downgraded: usageSnapshot.downgraded,

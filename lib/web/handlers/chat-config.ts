@@ -28,7 +28,9 @@ export async function handlePutChatConfigRequest(
         return jsonResponse({ error: 'Missing payload' }, 400);
     }
 
-    const parsedOverride = parseChatOverridePayload(JSON.stringify(body.payload));
+    const parsedOverride = parseChatOverridePayload(
+        JSON.stringify(body.payload),
+    );
     const sanitizedOverride = sanitizeChatOverrideForRole(
         parsedOverride,
         role,

@@ -102,6 +102,12 @@
             'reply method',
             'max output tokens',
             'notes max output tokens',
+            'notes thinking budget',
+            'notes thinking level',
+            'memory max output tokens',
+            'memory thinking budget',
+            'memory thinking level',
+            'thinking level',
             'thinking budget',
             'reasoning max tokens',
             'notes update frequency',
@@ -504,12 +510,36 @@
                         bind:value={config.ai.generation.notes.maxOutputTokens}
                     />
                     <SettingInputField
+                        id="g-ai-notes-thinking-budget"
+                        type="number"
+                        label="Notes thinking budget"
+                        description="Google thinking token budget for notes generation (used by Gemini 2.5 models)."
+                        hidden={!matchesBlockItem('advanced', 'notes thinking budget', 'thinking budget')}
+                        bind:value={config.ai.generation.notes.thinking.thinkingBudget}
+                    />
+                    <SettingSelectField
+                        id="g-ai-notes-thinking-level"
+                        label="Notes thinking level"
+                        description="Google thinking level for notes generation (used by Gemini 3 models)."
+                        options={['minimal', 'low', 'medium', 'high']}
+                        hidden={!matchesBlockItem('advanced', 'notes thinking level', 'thinking level')}
+                        bind:value={config.ai.generation.notes.thinking.thinkingLevel}
+                    />
+                    <SettingInputField
                         id="g-ai-thinking-budget"
                         type="number"
                         label="Thinking budget"
-                        description="Google thinking token budget for chat generation."
+                        description="Google thinking token budget for chat generation (used by Gemini 2.5 models)."
                         hidden={!matchesBlockItem('advanced', 'thinking budget')}
                         bind:value={config.ai.generation.chat.thinking.thinkingBudget}
+                    />
+                    <SettingSelectField
+                        id="g-ai-thinking-level"
+                        label="Thinking level"
+                        description="Google thinking level for chat generation (used by Gemini 3 models)."
+                        options={['minimal', 'low', 'medium', 'high']}
+                        hidden={!matchesBlockItem('advanced', 'thinking level')}
+                        bind:value={config.ai.generation.chat.thinking.thinkingLevel}
                     />
                     <SettingInputField
                         id="g-ai-reasoning-max-tokens"
@@ -534,6 +564,30 @@
                         description="Message interval between memory updates."
                         hidden={!matchesBlockItem('advanced', 'memory update frequency')}
                         bind:value={config.ai.memoryFrequency}
+                    />
+                    <SettingInputField
+                        id="g-ai-memory-max-output-tokens"
+                        type="number"
+                        label="Memory max output tokens"
+                        description="Hard cap for generated tokens in memory updates."
+                        hidden={!matchesBlockItem('advanced', 'memory max output tokens')}
+                        bind:value={config.ai.generation.memory.maxOutputTokens}
+                    />
+                    <SettingInputField
+                        id="g-ai-memory-thinking-budget"
+                        type="number"
+                        label="Memory thinking budget"
+                        description="Google thinking token budget for memory generation (used by Gemini 2.5 models)."
+                        hidden={!matchesBlockItem('advanced', 'memory thinking budget', 'thinking budget')}
+                        bind:value={config.ai.generation.memory.thinking.thinkingBudget}
+                    />
+                    <SettingSelectField
+                        id="g-ai-memory-thinking-level"
+                        label="Memory thinking level"
+                        description="Google thinking level for memory generation (used by Gemini 3 models)."
+                        options={['minimal', 'low', 'medium', 'high']}
+                        hidden={!matchesBlockItem('advanced', 'memory thinking level', 'thinking level')}
+                        bind:value={config.ai.generation.memory.thinking.thinkingLevel}
                     />
                     <SettingInputField
                         id="g-ai-max-len"

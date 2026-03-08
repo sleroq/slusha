@@ -1087,7 +1087,12 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     : await generatePlainTextAndReactionsOutput(
                         attemptMessages,
                     );
-                if (hasReservedMessageToken(generatedOutput, reservedMessageTokens)) {
+                if (
+                    hasReservedMessageToken(
+                        generatedOutput,
+                        reservedMessageTokens,
+                    )
+                ) {
                     throw new Error(RESERVED_MESSAGE_TOKEN_ERROR);
                 }
                 output = generatedOutput;

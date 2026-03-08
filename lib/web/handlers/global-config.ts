@@ -1,7 +1,4 @@
-import {
-    parseUserConfigPayload,
-    setGlobalUserConfig,
-} from '../../config.ts';
+import { parseUserConfigPayload, setGlobalUserConfig } from '../../config.ts';
 import { jsonResponse } from '../http.ts';
 import { canEditGlobalConfig } from '../permissions.ts';
 import { RequestContext } from '../request-context.ts';

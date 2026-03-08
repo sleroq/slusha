@@ -443,8 +443,7 @@ export class ChatMemory {
     }
 
     private isOverrideEmpty(value: ChatConfigOverride) {
-        const noAi =
-            !value.ai ||
+        const noAi = !value.ai ||
             Object.values(value.ai).every((item) => item === undefined);
         const rest = Object.entries(value)
             .filter(([key]) => key !== 'ai')

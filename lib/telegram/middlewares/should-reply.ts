@@ -13,8 +13,7 @@ export function shouldReply() {
         const msg = await ctx.m.getLastMessage();
         const currentMessage = ctx.msg;
         const effectiveConfig = await ctx.m.getEffectiveConfig();
-        const isIgnoreCandidate =
-            Boolean(msg?.text) &&
+        const isIgnoreCandidate = Boolean(msg?.text) &&
             msg.text.length < 20 &&
             testMessage(effectiveConfig.tendToIgnore, msg.text);
 
@@ -42,8 +41,7 @@ export function shouldReply() {
 
         const isDirectReplyToBot = currentMessage.reply_to_message?.from?.id ===
             ctx.me.id;
-        const isGroupChat =
-            currentMessage.chat.type === 'group' ||
+        const isGroupChat = currentMessage.chat.type === 'group' ||
             currentMessage.chat.type === 'supergroup';
 
         if (
@@ -78,7 +76,10 @@ export function shouldReply() {
             return next();
         }
 
-        if (isIgnoreCandidate && probability(effectiveConfig.tendToIgnoreProbability)) {
+        if (
+            isIgnoreCandidate &&
+            probability(effectiveConfig.tendToIgnoreProbability)
+        ) {
             return;
         }
 
