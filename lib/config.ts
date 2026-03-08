@@ -208,42 +208,37 @@ export const configSchema = z.object({
 });
 
 const chatOverrideAiSchema = z.object({
-    model: configSchema.shape.ai.shape.model.optional(),
-    temperature: configSchema.shape.ai.shape.temperature.optional(),
-    topK: configSchema.shape.ai.shape.topK.optional(),
-    topP: configSchema.shape.ai.shape.topP.optional(),
-    prompt: configSchema.shape.ai.shape.prompt.optional(),
-    dumbPrompt: configSchema.shape.ai.shape.dumbPrompt.optional(),
-    privateChatPromptAddition: configSchema.shape.ai.shape
-        .privateChatPromptAddition.optional(),
-    groupChatPromptAddition: configSchema.shape.ai.shape.groupChatPromptAddition
-        .optional(),
-    commentsPromptAddition: configSchema.shape.ai.shape.commentsPromptAddition
-        .optional(),
-    hateModePrompt: configSchema.shape.ai.shape.hateModePrompt.optional(),
-    replyMethod: configSchema.shape.ai.shape.replyMethod.optional(),
-    historyVersion: configSchema.shape.ai.shape.historyVersion.optional(),
-    messagesToPass: configSchema.shape.ai.shape.messagesToPass.optional(),
-    messageMaxLength: configSchema.shape.ai.shape.messageMaxLength.optional(),
-    includeAttachmentsInHistory: configSchema.shape.ai.shape
-        .includeAttachmentsInHistory.optional(),
-    bytesLimit: configSchema.shape.ai.shape.bytesLimit.optional(),
+    model: z.string().min(1).max(200).optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    topK: z.number().min(1).max(200).optional(),
+    topP: z.number().min(0).max(1).optional(),
+    prompt: z.string().max(20000).optional(),
+    dumbPrompt: z.string().max(10000).optional(),
+    privateChatPromptAddition: z.string().max(10000).optional(),
+    groupChatPromptAddition: z.string().max(10000).optional(),
+    commentsPromptAddition: z.string().max(10000).optional(),
+    hateModePrompt: z.string().max(10000).optional(),
+    replyMethod: replyMethodSchema.optional(),
+    historyVersion: historyVersionSchema.optional(),
+    messagesToPass: boundedPositiveInt(1, 100).optional(),
+    messageMaxLength: boundedPositiveInt(200, 20000).optional(),
+    includeAttachmentsInHistory: z.boolean().optional(),
+    bytesLimit: boundedPositiveInt(1024, 100 * 1024 * 1024).optional(),
 });
 
 export const chatConfigOverrideSchema = z.object({
     ai: chatOverrideAiSchema.optional(),
-    names: configSchema.shape.names.optional(),
-    tendToReply: configSchema.shape.tendToReply.optional(),
-    tendToReplyProbability: configSchema.shape.tendToReplyProbability
-        .optional(),
-    tendToIgnore: configSchema.shape.tendToIgnore.optional(),
-    tendToIgnoreProbability: configSchema.shape.tendToIgnoreProbability
-        .optional(),
-    randomReplyProbability: configSchema.shape.randomReplyProbability
-        .optional(),
-    blacklistedReactions: configSchema.shape.blacklistedReactions.optional(),
-    nepons: configSchema.shape.nepons.optional(),
-    responseDelay: configSchema.shape.responseDelay.optional(),
+    names: z.array(matcherSchema).max(256).optional(),
+    tendToReply: z.array(matcherSchema).max(256).optional(),
+    tendToReplyProbability: boundedProbability.optional(),
+    tendToIgnore: z.array(matcherSchema).max(256).optional(),
+    tendToIgnoreProbability: boundedProbability.optional(),
+    randomReplyProbability: boundedProbability.optional(),
+    blacklistedReactions: z.array(allowedReactionSchema).max(
+        ALLOWED_REACTIONS.length,
+    ).optional(),
+    nepons: z.array(z.string().max(500)).max(256).optional(),
+    responseDelay: z.number().min(0).max(120).optional(),
     disableRepliesDueToRights: z.boolean().optional(),
     disabledReplyRightsLastProbeAt: z.number().int().min(0).optional(),
     requestWindowPerChat: requestWindowPerChatOverrideSchema.optional(),

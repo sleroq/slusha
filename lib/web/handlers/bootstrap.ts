@@ -173,10 +173,16 @@ export async function handleBootstrapRequest(
         : [];
     const serializedGlobalConfig = JSON.parse(serializeUserConfig(globalConfig)) as UserConfig;
     const globalPayload = projectGlobalConfigForRole(serializedGlobalConfig, role);
-    const chatBasePayload = projectEffectiveConfigForRole(
+    let chatBasePayload = projectEffectiveConfigForRole(
         serializedGlobalConfig,
         role,
     );
+    if (role === 'admin') {
+        chatBasePayload = {
+            ...chatBasePayload,
+            requestWindow: serializedGlobalConfig.requestWindow,
+        };
+    }
 
     let chatOverridePayload: unknown = undefined;
     let effectiveConfigPayload: unknown = undefined;

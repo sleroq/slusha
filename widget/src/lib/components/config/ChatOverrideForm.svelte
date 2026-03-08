@@ -165,11 +165,6 @@
 </script>
 
 <section class="config-form space-y-6">
-    <header class="space-y-1 pb-4">
-        <h2 class="text-lg font-semibold">{t('form.chat.title')}</h2>
-        <p class="text-sm text-muted-foreground">{t('form.chat.subtitle')}</p>
-    </header>
-
     <div class="space-y-5">
         {#if hasSearch && !hasMatches}
             <p class="text-sm text-muted-foreground">{t('form.chat.noMatches', { query: searchQuery.trim() })}</p>
@@ -177,7 +172,7 @@
 
         {#if showCurrentCharacter}
             <details class="quick-details border-t pt-4" open={hasSearch || Boolean(currentCharacter)}>
-                <summary class="cursor-pointer font-medium">Current Character</summary>
+                <summary class="cursor-pointer select-none font-medium">Current Character</summary>
                 <div class="mt-4 space-y-4">
                 {#if currentCharacter}
                     <p class="text-xs text-muted-foreground">Character prompts shown here are chat character prompts. Native Slusha prompts are intentionally excluded.</p>
@@ -250,7 +245,7 @@
 
         {#if showGeneral}
             <details open class="quick-details border-t pt-4">
-                <summary class="cursor-pointer font-medium">General</summary>
+                <summary class="cursor-pointer select-none font-medium">General</summary>
                 <div class="mt-4 space-y-6">
                     <div class="grid gap-3 md:grid-cols-2">
                         <SettingInputField
@@ -376,7 +371,7 @@
 
         {#if canEditChatInternals && showInternals}
             <details class="quick-details border-t pt-4" open={hasSearch}>
-                <summary class="cursor-pointer font-medium">Internal</summary>
+                <summary class="cursor-pointer select-none font-medium">Internal</summary>
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
                     <SettingTextareaField
                         id="c-internal-summary"
@@ -403,7 +398,7 @@
         {#if canConfigureTrustedSettings}
             {#if showModel}
                 <details class="quick-details border-t pt-4" open={hasSearch}>
-                    <summary class="cursor-pointer font-medium">Model</summary>
+                    <summary class="cursor-pointer select-none font-medium">Model</summary>
                     <div class="mt-4 grid gap-3 md:grid-cols-2">
                         <SettingSelectField
                             id="c-ai-model"
@@ -455,7 +450,7 @@
 
             {#if showPrompts}
                 <details class="quick-details border-t pt-4" open={hasSearch}>
-                    <summary class="cursor-pointer font-medium">Prompts</summary>
+                    <summary class="cursor-pointer select-none font-medium">Prompts</summary>
                     <div class="mt-4 grid gap-3 md:grid-cols-2">
                         <SettingTextareaField
                             id="c-ai-prompt"
@@ -535,7 +530,7 @@
 
             {#if showAdvanced}
                 <details class="quick-details border-t pt-4" open={hasSearch}>
-                    <summary class="cursor-pointer font-medium">Advanced</summary>
+                    <summary class="cursor-pointer select-none font-medium">Advanced</summary>
                     <div class="mt-4 grid gap-3 md:grid-cols-2">
                         <SettingInputField
                             id="c-ai-msgs"
@@ -597,7 +592,7 @@
 
             {#if showUsageLimits && canEditWindowOverrides}
                 <details class="quick-details border-t pt-4" open={hasSearch}>
-                    <summary class="cursor-pointer font-medium">Usage Limits</summary>
+                    <summary class="cursor-pointer select-none font-medium">Usage Limits</summary>
                     <div class="mt-4 grid gap-3 md:grid-cols-2">
                         <SettingInputField
                             id="c-req-free-chat-max"

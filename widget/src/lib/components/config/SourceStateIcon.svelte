@@ -16,7 +16,11 @@
         class="inline-flex h-4 w-4 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground"
         title={label}
         aria-label={label}
-        onclick={onUnset}
+        onclick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onUnset();
+        }}
     >
         <RotateCcwIcon class="h-3 w-3" />
     </button>

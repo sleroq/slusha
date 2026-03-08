@@ -443,9 +443,33 @@ export class ChatMemory {
     }
 
     private isOverrideEmpty(value: ChatConfigOverride) {
-        const noAi = !value.ai || Object.keys(value.ai).length === 0;
-        const rest = Object.entries(value).filter(([key]) => key !== 'ai');
-        return noAi && rest.length === 0;
+        const noAi =
+            !value.ai ||
+            Object.values(value.ai).every((item) => item === undefined);
+        const rest = Object.entries(value)
+            .filter(([key]) => key !== 'ai')
+            .map(([, item]) => item)
+            .every((item) => {
+                if (item === undefined) return true;
+                if (item && typeof item === 'object' && !Array.isArray(item)) {
+                    return Object.values(item as Record<string, unknown>).every(
+                        (nested) => {
+                            if (nested === undefined) return true;
+                            if (
+                                nested && typeof nested === 'object' &&
+                                !Array.isArray(nested)
+                            ) {
+                                return Object.values(
+                                    nested as Record<string, unknown>,
+                                ).every((deep) => deep === undefined);
+                            }
+                            return false;
+                        },
+                    );
+                }
+                return false;
+            });
+        return noAi && rest;
     }
 
     private async setChatConfigOverrideRaw(
