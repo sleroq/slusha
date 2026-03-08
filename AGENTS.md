@@ -48,3 +48,4 @@ We are building this together. When you learn something non-obvious but actually
 
 - Widget ESLint enables `svelte/prefer-svelte-reactivity`: avoid creating mutable `Set`/`Map` instances inside component scripts unless using Svelte reactive alternatives.
 - Widget uses Bits UI select wrappers in `widget/src/lib/components/ui/select`: prefer those over native `<select>` for mobile UX; use `onValueChange` for side effects like reload-on-select.
+- Backend exposes Prometheus metrics at `GET /metrics` from `lib/web/server.ts`; keep metric labels low-cardinality (use route templates, avoid user/chat IDs).

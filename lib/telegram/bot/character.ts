@@ -19,8 +19,48 @@ import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
+import {
+    aiFailuresTotal,
+    aiFinishReasonTotal,
+    aiRequestDurationSeconds,
+    aiRequestsTotal,
+    aiTokensTotal,
+    errorType,
+    rateLimitExceededTotal,
+} from '../../app/metrics.ts';
 
 const bot = new Composer<SlushaContext>();
+
+function tokenCountFromUsage(usage: unknown, key: string): number | undefined {
+    if (typeof usage !== 'object' || usage === null) {
+        return undefined;
+    }
+
+    const raw = Reflect.get(usage, key);
+    return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0
+        ? raw
+        : undefined;
+}
+
+function observeTokenUsage(labels: {
+    task: string;
+    provider: string;
+    model_ref: string;
+}, usage: unknown): void {
+    const inputTokens = tokenCountFromUsage(usage, 'inputTokens');
+    const outputTokens = tokenCountFromUsage(usage, 'outputTokens');
+    const totalTokens = tokenCountFromUsage(usage, 'totalTokens');
+
+    if (inputTokens !== undefined) {
+        aiTokensTotal.inc({ ...labels, token_type: 'input' }, inputTokens);
+    }
+    if (outputTokens !== undefined) {
+        aiTokensTotal.inc({ ...labels, token_type: 'output' }, outputTokens);
+    }
+    if (totalTokens !== undefined) {
+        aiTokensTotal.inc({ ...labels, token_type: 'total' }, totalTokens);
+    }
+}
 
 bot.command('character', async (ctx) => {
     const textParts = ctx.msg.text.split(' ').map((arg) => arg.trim());
@@ -286,6 +326,10 @@ bot.use(limit(
         limit: 1,
 
         onLimitExceeded: async (ctx) => {
+            rateLimitExceededTotal.inc({
+                limiter: 'character_callback',
+                scope: 'chat_or_user',
+            });
             await ctx.answerCallbackQuery(ctx.t('character-rate-limit'));
         },
 
@@ -422,35 +466,67 @@ bot.callbackQuery(/set.*/, async (ctx) => {
             task: 'character',
             expectsStructuredOutput: true,
         });
+        const labels = {
+            task: generationPolicy.telemetry.task,
+            provider: generationPolicy.telemetry.provider,
+            model_ref: generationPolicy.telemetry.modelRef,
+            reply_method: 'character',
+            downgraded: 'false',
+        };
         const providerOptions = generationPolicy
             .providerOptions as Parameters<
                 typeof generateObject
             >[0]['providerOptions'];
-        const result = await generateObject({
-            model: generationPolicy.model,
-            providerOptions,
-            schema: z.array(z.string()),
-            temperature: config.temperature,
-            topK: config.topK,
-            topP: config.topP,
-            maxOutputTokens: generationPolicy.maxOutputTokens,
-            prompt:
-                `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
-                'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.',
-            experimental_telemetry: {
-                isEnabled: true,
-                functionId: 'character-names',
-                metadata: buildGenerationTelemetryMetadata({
-                    sessionId: chatId.toString(),
-                    userId: '',
-                    tags: ['character'],
-                    temperature: config.temperature,
-                    topK: config.topK,
-                    topP: config.topP,
-                    policy: generationPolicy,
-                }),
-            },
+        aiRequestsTotal.inc(labels);
+        const startedAt = performance.now();
+        let result;
+        try {
+            result = await generateObject({
+                model: generationPolicy.model,
+                providerOptions,
+                schema: z.array(z.string()),
+                temperature: config.temperature,
+                topK: config.topK,
+                topP: config.topP,
+                maxOutputTokens: generationPolicy.maxOutputTokens,
+                prompt:
+                    `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
+                    'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.',
+                experimental_telemetry: {
+                    isEnabled: true,
+                    functionId: 'character-names',
+                    metadata: buildGenerationTelemetryMetadata({
+                        sessionId: chatId.toString(),
+                        userId: '',
+                        tags: ['character'],
+                        temperature: config.temperature,
+                        topK: config.topK,
+                        topP: config.topP,
+                        policy: generationPolicy,
+                    }),
+                },
+            });
+        } catch (error) {
+            aiFailuresTotal.inc({ ...labels, error_type: errorType(error) });
+            throw error;
+        } finally {
+            aiRequestDurationSeconds.observe(
+                labels,
+                (performance.now() - startedAt) / 1000,
+            );
+        }
+        const finishReasonRaw = Reflect.get(result, 'finishReason');
+        aiFinishReasonTotal.inc({
+            ...labels,
+            finish_reason: typeof finishReasonRaw === 'string'
+                ? finishReasonRaw
+                : 'unknown',
         });
+        observeTokenUsage({
+            task: generationPolicy.telemetry.task,
+            provider: generationPolicy.telemetry.provider,
+            model_ref: generationPolicy.telemetry.modelRef,
+        }, Reflect.get(result, 'usage'));
         names = result.object;
     } catch (error) {
         logger.error(error, 'Error getting names for character');

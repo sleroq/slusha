@@ -47,6 +47,14 @@ import {
     getUsageSnapshot,
     recordUsageEvent,
 } from '../usage-window.ts';
+import {
+    aiFailuresTotal,
+    aiFinishReasonTotal,
+    aiRequestDurationSeconds,
+    aiRequestsTotal,
+    aiTokensTotal,
+    errorType,
+} from '../../app/metrics.ts';
 
 const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
@@ -309,6 +317,37 @@ function buildTelemetryMetadata(
     });
 }
 
+function tokenCountFromUsage(usage: unknown, key: string): number | undefined {
+    if (typeof usage !== 'object' || usage === null) {
+        return undefined;
+    }
+
+    const raw = Reflect.get(usage, key);
+    return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0
+        ? raw
+        : undefined;
+}
+
+function observeTokenUsage(labels: {
+    task: string;
+    provider: string;
+    model_ref: string;
+}, usage: unknown): void {
+    const inputTokens = tokenCountFromUsage(usage, 'inputTokens');
+    const outputTokens = tokenCountFromUsage(usage, 'outputTokens');
+    const totalTokens = tokenCountFromUsage(usage, 'totalTokens');
+
+    if (inputTokens !== undefined) {
+        aiTokensTotal.inc({ ...labels, token_type: 'input' }, inputTokens);
+    }
+    if (outputTokens !== undefined) {
+        aiTokensTotal.inc({ ...labels, token_type: 'output' }, outputTokens);
+    }
+    if (totalTokens !== undefined) {
+        aiTokensTotal.inc({ ...labels, token_type: 'total' }, totalTokens);
+    }
+}
+
 type EffectiveConfig = Awaited<
     ReturnType<SlushaContext['m']['getEffectiveConfig']>
 >;
@@ -320,7 +359,10 @@ async function sendGeneratedOutput(params: {
     targetRefMap: Map<string, number>;
     enabledReactions: string[];
     effectiveConfig: EffectiveConfig;
-    historyById: Map<number, Awaited<ReturnType<SlushaContext['m']['getHistory']>>[number]>;
+    historyById: Map<
+        number,
+        Awaited<ReturnType<SlushaContext['m']['getHistory']>>[number]
+    >;
 }): Promise<boolean> {
     const {
         bot,
@@ -592,7 +634,10 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             ? Math.min(baseMessagesToPass, usageConfig.downgradeMessagesToPass)
             : baseMessagesToPass;
         const bytesLimit = isDowngraded && usageConfig.disableLongContext
-            ? Math.min(effectiveConfig.ai.bytesLimit, usageConfig.downgradeBytesLimit)
+            ? Math.min(
+                effectiveConfig.ai.bytesLimit,
+                usageConfig.downgradeBytesLimit,
+            )
             : effectiveConfig.ai.bytesLimit;
         const maxTargetCount = Math.min(
             Math.max(messagesToPass * 2, 12),
@@ -794,32 +839,67 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 .providerOptions as Parameters<
                     typeof generateText
                 >[0]['providerOptions'];
-            const response = await generateText({
-                model: generationPolicy.model,
-                providerOptions,
-                maxRetries: maxGenerationRetries,
-                tools: enabledReactions.length > 0
-                    ? {
-                        send_chat_reactions: sendChatReactionsTool,
-                    }
-                    : undefined,
-                messages,
-                temperature: effectiveConfig.ai.temperature,
-                topK: effectiveConfig.ai.topK,
-                topP: effectiveConfig.ai.topP,
-                maxOutputTokens: generationPolicy.maxOutputTokens,
-                experimental_telemetry: {
-                    isEnabled: true,
-                    functionId: 'user-message-dumb',
-                    metadata: buildTelemetryMetadata(
-                        ctx,
-                        chatName,
-                        tags,
-                        effectiveConfig,
-                        generationPolicy,
-                    ),
-                },
+            const labels = {
+                task: generationPolicy.telemetry.task,
+                provider: generationPolicy.telemetry.provider,
+                model_ref: generationPolicy.telemetry.modelRef,
+                reply_method: replyMethod,
+                downgraded: isDowngraded ? 'true' : 'false',
+            };
+            const tokenLabels = {
+                task: generationPolicy.telemetry.task,
+                provider: generationPolicy.telemetry.provider,
+                model_ref: generationPolicy.telemetry.modelRef,
+            };
+            aiRequestsTotal.inc(labels);
+            const startedAt = performance.now();
+
+            let response;
+            try {
+                response = await generateText({
+                    model: generationPolicy.model,
+                    providerOptions,
+                    maxRetries: maxGenerationRetries,
+                    tools: enabledReactions.length > 0
+                        ? {
+                            send_chat_reactions: sendChatReactionsTool,
+                        }
+                        : undefined,
+                    messages,
+                    temperature: effectiveConfig.ai.temperature,
+                    topK: effectiveConfig.ai.topK,
+                    topP: effectiveConfig.ai.topP,
+                    maxOutputTokens: generationPolicy.maxOutputTokens,
+                    experimental_telemetry: {
+                        isEnabled: true,
+                        functionId: 'user-message-dumb',
+                        metadata: buildTelemetryMetadata(
+                            ctx,
+                            chatName,
+                            tags,
+                            effectiveConfig,
+                            generationPolicy,
+                        ),
+                    },
+                });
+            } catch (error) {
+                aiFailuresTotal.inc({
+                    ...labels,
+                    error_type: errorType(error),
+                });
+                throw error;
+            } finally {
+                aiRequestDurationSeconds.observe(
+                    labels,
+                    (performance.now() - startedAt) / 1000,
+                );
+            }
+
+            aiFinishReasonTotal.inc({
+                ...labels,
+                finish_reason: response.finishReason,
             });
+            observeTokenUsage(tokenLabels, response.totalUsage);
 
             const plainTextResponse = response.text.trim();
             const replyEntries = parsePlainTextRepliesWithTargets(
@@ -857,35 +937,70 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 .providerOptions as Parameters<
                     typeof generateText
                 >[0]['providerOptions'];
-            const result = await generateText({
-                model: generationPolicy.model,
-                providerOptions,
-                maxRetries: maxGenerationRetries,
-                tools: {
-                    send_chat_actions: sendChatActionsTool,
-                },
-                toolChoice: {
-                    type: 'tool',
-                    toolName: 'send_chat_actions',
-                },
-                stopWhen: hasToolCall('send_chat_actions'),
-                temperature: effectiveConfig.ai.temperature,
-                topK: effectiveConfig.ai.topK,
-                topP: effectiveConfig.ai.topP,
-                maxOutputTokens: generationPolicy.maxOutputTokens,
-                messages,
-                experimental_telemetry: {
-                    isEnabled: true,
-                    functionId: 'user-message',
-                    metadata: buildTelemetryMetadata(
-                        ctx,
-                        chatName,
-                        tags,
-                        effectiveConfig,
-                        generationPolicy,
-                    ),
-                },
+            const labels = {
+                task: generationPolicy.telemetry.task,
+                provider: generationPolicy.telemetry.provider,
+                model_ref: generationPolicy.telemetry.modelRef,
+                reply_method: replyMethod,
+                downgraded: isDowngraded ? 'true' : 'false',
+            };
+            const tokenLabels = {
+                task: generationPolicy.telemetry.task,
+                provider: generationPolicy.telemetry.provider,
+                model_ref: generationPolicy.telemetry.modelRef,
+            };
+            aiRequestsTotal.inc(labels);
+            const startedAt = performance.now();
+
+            let result;
+            try {
+                result = await generateText({
+                    model: generationPolicy.model,
+                    providerOptions,
+                    maxRetries: maxGenerationRetries,
+                    tools: {
+                        send_chat_actions: sendChatActionsTool,
+                    },
+                    toolChoice: {
+                        type: 'tool',
+                        toolName: 'send_chat_actions',
+                    },
+                    stopWhen: hasToolCall('send_chat_actions'),
+                    temperature: effectiveConfig.ai.temperature,
+                    topK: effectiveConfig.ai.topK,
+                    topP: effectiveConfig.ai.topP,
+                    maxOutputTokens: generationPolicy.maxOutputTokens,
+                    messages,
+                    experimental_telemetry: {
+                        isEnabled: true,
+                        functionId: 'user-message',
+                        metadata: buildTelemetryMetadata(
+                            ctx,
+                            chatName,
+                            tags,
+                            effectiveConfig,
+                            generationPolicy,
+                        ),
+                    },
+                });
+            } catch (error) {
+                aiFailuresTotal.inc({
+                    ...labels,
+                    error_type: errorType(error),
+                });
+                throw error;
+            } finally {
+                aiRequestDurationSeconds.observe(
+                    labels,
+                    (performance.now() - startedAt) / 1000,
+                );
+            }
+
+            aiFinishReasonTotal.inc({
+                ...labels,
+                finish_reason: result.finishReason,
             });
+            observeTokenUsage(tokenLabels, result.totalUsage);
 
             const entries = parseSendChatActionsEntries(result.toolCalls);
             if (entries) {
