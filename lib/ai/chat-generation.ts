@@ -26,21 +26,10 @@ export function resolveReplyMethod(
 }
 
 export function splitTextByTwoLines(text: string): string[] {
-    const lines = text
-        .split('\n')
-        .map((line) => line.trimEnd());
-    const chunks: string[] = [];
-
-    for (let i = 0; i < lines.length; i += 2) {
-        const chunk = lines.slice(i, i + 2)
-            .join('\n')
-            .trim();
-        if (chunk.length > 0) {
-            chunks.push(chunk);
-        }
-    }
-
-    return chunks;
+    return text
+        .split(/\r?\n\s*\r?\n+/)
+        .map((chunk) => chunk.trim())
+        .filter((chunk) => chunk.length > 0);
 }
 
 export function getGenerationFallbackPlans(

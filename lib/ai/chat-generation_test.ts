@@ -11,8 +11,17 @@ Deno.test('resolveReplyMethod falls back to useJsonResponses', () => {
     assertEquals(resolveReplyMethod(undefined, false), 'plain_text_reactions');
 });
 
-Deno.test('splitTextByTwoLines chunks into two-line messages', () => {
-    assertEquals(splitTextByTwoLines('a\nb\nc\n\n'), ['a\nb', 'c']);
+Deno.test('splitTextByTwoLines splits by blank lines', () => {
+    assertEquals(splitTextByTwoLines('a\nb\n\n c\n\n'), ['a\nb', 'c']);
+});
+
+Deno.test('splitTextByTwoLines keeps metadata block with text', () => {
+    assertEquals(
+        splitTextByTwoLines(
+            '<slusha_meta>\n{"target_ref":"t0"}\n</slusha_meta>\nreply',
+        ),
+        ['<slusha_meta>\n{"target_ref":"t0"}\n</slusha_meta>\nreply'],
+    );
 });
 
 Deno.test('getGenerationFallbackPlans uses short history second stage', () => {

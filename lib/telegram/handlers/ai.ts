@@ -208,6 +208,7 @@ function parseSendChatReactionsEntries(
 function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
     const chunks = splitTextByTwoLines(rawText.trim());
     const entries: ChatEntry[] = [];
+    let pendingTargetRef: string | undefined;
 
     for (const chunk of chunks) {
         const trimmed = chunk.trim();
@@ -242,7 +243,8 @@ function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
 
         const targetMatch = candidateText.match(plainTextTargetRefLineRegex);
         if (targetMatch) {
-            targetRef = targetMatch[1];
+            targetRef = targetMatch[1] ?? targetRef ?? pendingTargetRef;
+            pendingTargetRef = undefined;
             const text = targetMatch[2].trim();
             if (!text) {
                 continue;
@@ -260,13 +262,19 @@ function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
             .replace(/<slusha_meta>[\s\S]*?<\/slusha_meta>/g, '')
             .trim();
         if (!visibleText) {
+            if (targetRef) {
+                pendingTargetRef = targetRef;
+            }
             continue;
         }
+
+        const resolvedTargetRef = targetRef ?? pendingTargetRef;
+        pendingTargetRef = undefined;
 
         entries.push({
             type: 'reply',
             text: visibleText,
-            target_ref: targetRef,
+            target_ref: resolvedTargetRef,
         });
     }
 
