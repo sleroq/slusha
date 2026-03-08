@@ -9,6 +9,10 @@
     import SettingToggleField from '$lib/components/config/fields/SettingToggleField.svelte';
     import { createSectionMatcher } from '$lib/components/config/search';
     import { useI18n } from '$lib/i18n/context.svelte';
+    import {
+        matcherListToTextarea,
+        stringListToTextarea,
+    } from '$lib/config/model';
     import type {
         ChatInternalsPayload,
         ChatFormText,
@@ -19,6 +23,7 @@
     interface Props {
         config: ResolvedChatOverridePayload;
         text: ChatFormText;
+        baseConfig: ResolvedChatOverridePayload;
         availableModels: string[];
         availableReactions: string[];
         chatInternals: ChatInternalsPayload;
@@ -33,6 +38,7 @@
     let {
         config = $bindable(),
         text = $bindable(),
+        baseConfig,
         availableModels = [],
         availableReactions = [],
         chatInternals = $bindable(),
@@ -142,8 +148,19 @@
 
     const isOverridden = (path: string): boolean => overriddenPathSet.has(path);
 
-    const sourceStateText = (path: string): string =>
-        isOverridden(path) ? 'Chat override' : 'Inherited from global';
+    const unsetIfOverridden = (path: string, onUnset: () => void): void => {
+        if (!isOverridden(path)) {
+            return;
+        }
+
+        onUnset();
+    };
+
+    const sourceStateFor = (path: string, onUnset: () => void) => ({
+        overridden: isOverridden(path),
+        label: 'Unset chat override (inherit global value)',
+        onUnset: () => unsetIfOverridden(path, onUnset),
+    });
 
 </script>
 
@@ -241,10 +258,9 @@
                             type="number"
                             label="Reply tendency (%)"
                             description="Chance to answer when tend-to-reply patterns match."
-                            sourceState={{
-                                overridden: isOverridden('tendToReplyProbability'),
-                                label: sourceStateText('tendToReplyProbability'),
-                            }}
+                            sourceState={sourceStateFor('tendToReplyProbability', () => {
+                                config.tendToReplyProbability = baseConfig.tendToReplyProbability;
+                            })}
                             hidden={!matchesBlockItem('general', 'reply tendency', 'tend to reply probability')}
                             bind:value={config.tendToReplyProbability}
                         />
@@ -253,10 +269,9 @@
                             type="number"
                             label="Ignore tendency (%)"
                             description="Chance to ignore when tend-to-ignore patterns match."
-                            sourceState={{
-                                overridden: isOverridden('tendToIgnoreProbability'),
-                                label: sourceStateText('tendToIgnoreProbability'),
-                            }}
+                            sourceState={sourceStateFor('tendToIgnoreProbability', () => {
+                                config.tendToIgnoreProbability = baseConfig.tendToIgnoreProbability;
+                            })}
                             hidden={!matchesBlockItem('general', 'ignore tendency', 'tend to ignore probability')}
                             bind:value={config.tendToIgnoreProbability}
                         />
@@ -265,10 +280,9 @@
                             type="number"
                             label="Random reply chance (%)"
                             description="Fallback probability to respond without a match."
-                            sourceState={{
-                                overridden: isOverridden('randomReplyProbability'),
-                                label: sourceStateText('randomReplyProbability'),
-                            }}
+                            sourceState={sourceStateFor('randomReplyProbability', () => {
+                                config.randomReplyProbability = baseConfig.randomReplyProbability;
+                            })}
                             hidden={!matchesBlockItem('general', 'random reply chance', 'random reply probability')}
                             bind:value={config.randomReplyProbability}
                         />
@@ -277,10 +291,9 @@
                             type="number"
                             label="Response delay (seconds)"
                             description="Wait time before sending the reply."
-                            sourceState={{
-                                overridden: isOverridden('responseDelay'),
-                                label: sourceStateText('responseDelay'),
-                            }}
+                            sourceState={sourceStateFor('responseDelay', () => {
+                                config.responseDelay = baseConfig.responseDelay;
+                            })}
                             hidden={!matchesBlockItem('general', 'response delay')}
                             bind:value={config.responseDelay}
                         />
@@ -289,10 +302,9 @@
                             label="History version"
                             description="Selects conversation history builder for this chat."
                             options={['v2', 'v3']}
-                            sourceState={{
-                                overridden: isOverridden('ai.historyVersion'),
-                                label: sourceStateText('ai.historyVersion'),
-                            }}
+                            sourceState={sourceStateFor('ai.historyVersion', () => {
+                                config.ai.historyVersion = baseConfig.ai.historyVersion;
+                            })}
                             hidden={!matchesBlockItem('general', 'history version', 'ai.historyVersion')}
                             bind:value={config.ai.historyVersion}
                         />
@@ -303,10 +315,10 @@
                             id="c-names"
                             label="Bot names"
                             description="One name or regex per line; used for mentions."
-                            sourceState={{
-                                overridden: isOverridden('names'),
-                                label: sourceStateText('names'),
-                            }}
+                            sourceState={sourceStateFor('names', () => {
+                                config.names = [...baseConfig.names];
+                                text.names = matcherListToTextarea(baseConfig.names);
+                            })}
                             hidden={!matchesBlockItem('general', 'bot names', 'names')}
                             bind:value={text.names}
                         />
@@ -314,10 +326,10 @@
                             id="c-tend-reply"
                             label="Reply trigger patterns"
                             description="One pattern per line; supports /regex/flags."
-                            sourceState={{
-                                overridden: isOverridden('tendToReply'),
-                                label: sourceStateText('tendToReply'),
-                            }}
+                            sourceState={sourceStateFor('tendToReply', () => {
+                                config.tendToReply = [...baseConfig.tendToReply];
+                                text.tendToReply = matcherListToTextarea(baseConfig.tendToReply);
+                            })}
                             hidden={!matchesBlockItem('general', 'reply trigger patterns', 'tend to reply')}
                             bind:value={text.tendToReply}
                         />
@@ -325,10 +337,10 @@
                             id="c-tend-ignore"
                             label="Ignore trigger patterns"
                             description="One pattern per line; supports /regex/flags."
-                            sourceState={{
-                                overridden: isOverridden('tendToIgnore'),
-                                label: sourceStateText('tendToIgnore'),
-                            }}
+                            sourceState={sourceStateFor('tendToIgnore', () => {
+                                config.tendToIgnore = [...baseConfig.tendToIgnore];
+                                text.tendToIgnore = matcherListToTextarea(baseConfig.tendToIgnore);
+                            })}
                             hidden={!matchesBlockItem('general', 'ignore trigger patterns', 'tend to ignore')}
                             bind:value={text.tendToIgnore}
                         />
@@ -337,10 +349,10 @@
                             label="Blacklisted reactions"
                             description="Select reactions to block in this chat. Unselected reactions stay allowed."
                             reactions={availableReactions}
-                            sourceState={{
-                                overridden: isOverridden('blacklistedReactions'),
-                                label: sourceStateText('blacklistedReactions'),
-                            }}
+                            sourceState={sourceStateFor('blacklistedReactions', () => {
+                                config.blacklistedReactions = [...baseConfig.blacklistedReactions];
+                                text.blacklistedReactions = stringListToTextarea(baseConfig.blacklistedReactions);
+                            })}
                             hidden={!matchesBlockItem('general', 'blacklisted reactions', 'reactions')}
                             bind:value={text.blacklistedReactions}
                         />
@@ -350,10 +362,10 @@
                             description="Add, reorder, and remove canned fallback replies."
                             itemPlaceholder="Fallback reply"
                             addLabel="Add reply"
-                            sourceState={{
-                                overridden: isOverridden('nepons'),
-                                label: sourceStateText('nepons'),
-                            }}
+                            sourceState={sourceStateFor('nepons', () => {
+                                config.nepons = [...baseConfig.nepons];
+                                text.nepons = stringListToTextarea(baseConfig.nepons);
+                            })}
                             hidden={!matchesBlockItem('general', 'nepon replies', 'nepons')}
                             bind:value={text.nepons}
                         />
@@ -398,10 +410,9 @@
                             label="Model"
                             description="Model used for this chat override."
                             options={availableModels}
-                            sourceState={{
-                                overridden: isOverridden('ai.model'),
-                                label: sourceStateText('ai.model'),
-                            }}
+                            sourceState={sourceStateFor('ai.model', () => {
+                                config.ai.model = baseConfig.ai.model;
+                            })}
                             hidden={!matchesBlockItem('model', 'model', 'ai model')}
                             bind:value={config.ai.model}
                         />
@@ -410,10 +421,9 @@
                             type="number"
                             label="Temperature"
                             description="Higher values increase randomness."
-                            sourceState={{
-                                overridden: isOverridden('ai.temperature'),
-                                label: sourceStateText('ai.temperature'),
-                            }}
+                            sourceState={sourceStateFor('ai.temperature', () => {
+                                config.ai.temperature = baseConfig.ai.temperature;
+                            })}
                             hidden={!matchesBlockItem('model', 'temperature')}
                             bind:value={config.ai.temperature}
                         />
@@ -422,10 +432,9 @@
                             type="number"
                             label="Top-K"
                             description="Limits token choices to the top K candidates."
-                            sourceState={{
-                                overridden: isOverridden('ai.topK'),
-                                label: sourceStateText('ai.topK'),
-                            }}
+                            sourceState={sourceStateFor('ai.topK', () => {
+                                config.ai.topK = baseConfig.ai.topK;
+                            })}
                             hidden={!matchesBlockItem('model', 'top-k', 'topk')}
                             bind:value={config.ai.topK}
                         />
@@ -434,10 +443,9 @@
                             type="number"
                             label="Top-P"
                             description="Uses nucleus sampling with cumulative probability P."
-                            sourceState={{
-                                overridden: isOverridden('ai.topP'),
-                                label: sourceStateText('ai.topP'),
-                            }}
+                            sourceState={sourceStateFor('ai.topP', () => {
+                                config.ai.topP = baseConfig.ai.topP;
+                            })}
                             hidden={!matchesBlockItem('model', 'top-p', 'topp')}
                             bind:value={config.ai.topP}
                         />
@@ -455,10 +463,9 @@
                             containerClass="md:col-span-2"
                             label="JSON-actions chat prompt"
                             description="Core behavior/persona prompt used only when reply method is json_actions."
-                            sourceState={{
-                                overridden: isOverridden('ai.prompt'),
-                                label: sourceStateText('ai.prompt'),
-                            }}
+                            sourceState={sourceStateFor('ai.prompt', () => {
+                                config.ai.prompt = baseConfig.ai.prompt;
+                            })}
                             hidden={!matchesBlockItem('prompts', 'json-actions chat prompt', 'primary chat prompt')}
                             bind:value={config.ai.prompt}
                         />
@@ -468,10 +475,9 @@
                             containerClass="md:col-span-2"
                             label="Plain-text chat prompt"
                             description="Core behavior/persona prompt used only when reply method is plain_text_reactions."
-                            sourceState={{
-                                overridden: isOverridden('ai.dumbPrompt'),
-                                label: sourceStateText('ai.dumbPrompt'),
-                            }}
+                            sourceState={sourceStateFor('ai.dumbPrompt', () => {
+                                config.ai.dumbPrompt = baseConfig.ai.dumbPrompt;
+                            })}
                             hidden={!matchesBlockItem('prompts', 'plain-text chat prompt', 'low-context chat prompt', 'dumb prompt')}
                             bind:value={config.ai.dumbPrompt}
                         />
@@ -481,10 +487,9 @@
                             containerClass="md:col-span-2"
                             label="Private chat prompt addition"
                             description="Extra instructions for private chats in this chat."
-                            sourceState={{
-                                overridden: isOverridden('ai.privateChatPromptAddition'),
-                                label: sourceStateText('ai.privateChatPromptAddition'),
-                            }}
+                            sourceState={sourceStateFor('ai.privateChatPromptAddition', () => {
+                                config.ai.privateChatPromptAddition = baseConfig.ai.privateChatPromptAddition;
+                            })}
                             hidden={!matchesBlockItem('prompts', 'private chat prompt addition')}
                             bind:value={config.ai.privateChatPromptAddition}
                         />
@@ -494,10 +499,9 @@
                             containerClass="md:col-span-2"
                             label="Group chat prompt addition"
                             description="Extra instructions for group chats in this chat."
-                            sourceState={{
-                                overridden: isOverridden('ai.groupChatPromptAddition'),
-                                label: sourceStateText('ai.groupChatPromptAddition'),
-                            }}
+                            sourceState={sourceStateFor('ai.groupChatPromptAddition', () => {
+                                config.ai.groupChatPromptAddition = baseConfig.ai.groupChatPromptAddition;
+                            })}
                             hidden={!matchesBlockItem('prompts', 'group chat prompt addition')}
                             bind:value={config.ai.groupChatPromptAddition}
                         />
@@ -507,10 +511,9 @@
                             containerClass="md:col-span-2"
                             label="Comment prompt addition"
                             description="Extra guidance for comment-style messages."
-                            sourceState={{
-                                overridden: isOverridden('ai.commentsPromptAddition'),
-                                label: sourceStateText('ai.commentsPromptAddition'),
-                            }}
+                            sourceState={sourceStateFor('ai.commentsPromptAddition', () => {
+                                config.ai.commentsPromptAddition = baseConfig.ai.commentsPromptAddition;
+                            })}
                             hidden={!matchesBlockItem('prompts', 'comment prompt addition', 'comments prompt addition')}
                             bind:value={config.ai.commentsPromptAddition}
                         />
@@ -520,10 +523,9 @@
                             containerClass="md:col-span-2"
                             label="Hate mode prompt"
                             description="Special prompt used when hate mode is enabled."
-                            sourceState={{
-                                overridden: isOverridden('ai.hateModePrompt'),
-                                label: sourceStateText('ai.hateModePrompt'),
-                            }}
+                            sourceState={sourceStateFor('ai.hateModePrompt', () => {
+                                config.ai.hateModePrompt = baseConfig.ai.hateModePrompt;
+                            })}
                             hidden={!matchesBlockItem('prompts', 'hate mode prompt')}
                             bind:value={config.ai.hateModePrompt}
                         />
@@ -540,10 +542,9 @@
                             type="number"
                             label="Messages passed to AI"
                             description="Number of recent messages sent to the model."
-                            sourceState={{
-                                overridden: isOverridden('ai.messagesToPass'),
-                                label: sourceStateText('ai.messagesToPass'),
-                            }}
+                            sourceState={sourceStateFor('ai.messagesToPass', () => {
+                                config.ai.messagesToPass = baseConfig.ai.messagesToPass;
+                            })}
                             hidden={!matchesBlockItem('advanced', 'messages passed to ai')}
                             bind:value={config.ai.messagesToPass}
                         />
@@ -552,10 +553,9 @@
                             type="number"
                             label="Max reply length (chars)"
                             description="Soft limit for generated response length."
-                            sourceState={{
-                                overridden: isOverridden('ai.messageMaxLength'),
-                                label: sourceStateText('ai.messageMaxLength'),
-                            }}
+                            sourceState={sourceStateFor('ai.messageMaxLength', () => {
+                                config.ai.messageMaxLength = baseConfig.ai.messageMaxLength;
+                            })}
                             hidden={!matchesBlockItem('advanced', 'max reply length', 'message max length')}
                             bind:value={config.ai.messageMaxLength}
                         />
@@ -564,10 +564,9 @@
                             type="number"
                             label="Attachment byte limit"
                             description="Maximum attachment size included in processing."
-                            sourceState={{
-                                overridden: isOverridden('ai.bytesLimit'),
-                                label: sourceStateText('ai.bytesLimit'),
-                            }}
+                            sourceState={sourceStateFor('ai.bytesLimit', () => {
+                                config.ai.bytesLimit = baseConfig.ai.bytesLimit;
+                            })}
                             hidden={!matchesBlockItem('advanced', 'attachment byte limit', 'bytes limit')}
                             bind:value={config.ai.bytesLimit}
                         />
@@ -576,10 +575,9 @@
                             label="Reply method"
                             description="Chooses how replies and reactions are generated in this chat."
                             options={['json_actions', 'plain_text_reactions']}
-                            sourceState={{
-                                overridden: isOverridden('ai.replyMethod'),
-                                label: sourceStateText('ai.replyMethod'),
-                            }}
+                            sourceState={sourceStateFor('ai.replyMethod', () => {
+                                config.ai.replyMethod = baseConfig.ai.replyMethod;
+                            })}
                             hidden={!matchesBlockItem('advanced', 'reply method', 'ai.replyMethod')}
                             bind:value={config.ai.replyMethod}
                         />
@@ -587,10 +585,9 @@
                             id="c-ai-attachments"
                             label="Include attachments in history"
                             description="Adds attachment text to model context when possible."
-                            sourceState={{
-                                overridden: isOverridden('ai.includeAttachmentsInHistory'),
-                                label: sourceStateText('ai.includeAttachmentsInHistory'),
-                            }}
+                            sourceState={sourceStateFor('ai.includeAttachmentsInHistory', () => {
+                                config.ai.includeAttachmentsInHistory = baseConfig.ai.includeAttachmentsInHistory;
+                            })}
                             hidden={!matchesBlockItem('advanced', 'include attachments in history')}
                             bind:checked={config.ai.includeAttachmentsInHistory}
                         />
@@ -607,10 +604,10 @@
                             type="number"
                             label="Free tier per-chat max requests"
                             description="Chat-wide free-tier limit before cost mode."
-                            sourceState={{
-                                overridden: isOverridden('requestWindowPerChat.free.maxRequests'),
-                                label: sourceStateText('requestWindowPerChat.free.maxRequests'),
-                            }}
+                            sourceState={sourceStateFor('requestWindowPerChat.free.maxRequests', () => {
+                                config.requestWindowPerChat.free.maxRequests =
+                                    baseConfig.requestWindowPerChat.free.maxRequests;
+                            })}
                             hidden={!matchesBlockItem('usage limits', 'free tier per-chat max requests')}
                             bind:value={config.requestWindowPerChat.free.maxRequests}
                         />
@@ -619,10 +616,10 @@
                             type="number"
                             label="Free tier per-chat window (minutes)"
                             description="Rolling window for free-tier chat usage."
-                            sourceState={{
-                                overridden: isOverridden('requestWindowPerChat.free.windowMinutes'),
-                                label: sourceStateText('requestWindowPerChat.free.windowMinutes'),
-                            }}
+                            sourceState={sourceStateFor('requestWindowPerChat.free.windowMinutes', () => {
+                                config.requestWindowPerChat.free.windowMinutes =
+                                    baseConfig.requestWindowPerChat.free.windowMinutes;
+                            })}
                             hidden={!matchesBlockItem('usage limits', 'free tier per-chat window minutes')}
                             bind:value={config.requestWindowPerChat.free.windowMinutes}
                         />
@@ -631,10 +628,10 @@
                             type="number"
                             label="Trusted tier per-chat max requests"
                             description="Chat-wide trusted-tier limit before cost mode."
-                            sourceState={{
-                                overridden: isOverridden('requestWindowPerChat.trusted.maxRequests'),
-                                label: sourceStateText('requestWindowPerChat.trusted.maxRequests'),
-                            }}
+                            sourceState={sourceStateFor('requestWindowPerChat.trusted.maxRequests', () => {
+                                config.requestWindowPerChat.trusted.maxRequests =
+                                    baseConfig.requestWindowPerChat.trusted.maxRequests;
+                            })}
                             hidden={!matchesBlockItem('usage limits', 'trusted tier per-chat max requests')}
                             bind:value={config.requestWindowPerChat.trusted.maxRequests}
                         />
@@ -643,10 +640,10 @@
                             type="number"
                             label="Trusted tier per-chat window (minutes)"
                             description="Rolling window for trusted-tier chat usage."
-                            sourceState={{
-                                overridden: isOverridden('requestWindowPerChat.trusted.windowMinutes'),
-                                label: sourceStateText('requestWindowPerChat.trusted.windowMinutes'),
-                            }}
+                            sourceState={sourceStateFor('requestWindowPerChat.trusted.windowMinutes', () => {
+                                config.requestWindowPerChat.trusted.windowMinutes =
+                                    baseConfig.requestWindowPerChat.trusted.windowMinutes;
+                            })}
                             hidden={!matchesBlockItem('usage limits', 'trusted tier per-chat window minutes')}
                             bind:value={config.requestWindowPerChat.trusted.windowMinutes}
                         />

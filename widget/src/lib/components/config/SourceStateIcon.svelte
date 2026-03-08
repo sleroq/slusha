@@ -1,19 +1,23 @@
 <script lang="ts">
-    import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
-    import CircleIcon from '@lucide/svelte/icons/circle';
+    import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 
     interface Props {
         overridden: boolean;
         label: string;
+        onUnset?: () => void;
     }
 
-    let { overridden, label }: Props = $props();
+    let { overridden, label, onUnset }: Props = $props();
 </script>
 
-<span class="inline-flex" title={label} aria-label={label}>
-    {#if overridden}
-        <CircleCheckIcon class="h-3.5 w-3.5 text-emerald-700" />
-    {:else}
-        <CircleIcon class="h-3.5 w-3.5 text-slate-500" />
-    {/if}
-</span>
+{#if overridden && onUnset}
+    <button
+        type="button"
+        class="inline-flex h-4 w-4 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground"
+        title={label}
+        aria-label={label}
+        onclick={onUnset}
+    >
+        <RotateCcwIcon class="h-3 w-3" />
+    </button>
+{/if}

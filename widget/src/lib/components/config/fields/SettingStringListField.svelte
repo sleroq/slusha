@@ -10,6 +10,7 @@
     interface SourceState {
         overridden: boolean;
         label: string;
+        onUnset?: () => void;
     }
 
     interface Props {
@@ -132,7 +133,11 @@
         <span class="inline-flex items-center gap-1.5">
             {label}
             {#if sourceState}
-                <SourceStateIcon overridden={sourceState.overridden} label={sourceState.label} />
+                <SourceStateIcon
+                    overridden={sourceState.overridden}
+                    label={sourceState.label}
+                    onUnset={sourceState.onUnset}
+                />
             {/if}
         </span>
     </Label>

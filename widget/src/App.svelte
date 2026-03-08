@@ -346,6 +346,7 @@
                             <ChatOverrideForm
                                 bind:config={controller.chatOverrideConfig}
                                 bind:text={controller.chatText}
+                                baseConfig={controller.chatBaseConfig}
                                 availableModels={controller.availableModels}
                                 availableReactions={controller.availableReactions}
                                 chatInternals={controller.chatInternals}

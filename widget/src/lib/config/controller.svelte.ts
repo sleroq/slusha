@@ -190,10 +190,9 @@ export class ConfigController {
     this.globalConfig = fromUnknownGlobal(data.globalPayload);
     this.globalText = globalTextFromConfig(this.globalConfig);
 
-    const effectiveConfig = fromUnknownGlobal(data.effectiveConfigPayload);
-    const baseConfig = data.globalPayload === undefined
-      ? effectiveConfig
-      : this.globalConfig;
+    const baseConfig = fromUnknownGlobal(
+      data.chatBasePayload ?? data.globalPayload ?? data.effectiveConfigPayload,
+    );
     this.chatBaseConfig = fromUnknownChatOverride({}, baseConfig);
     this.chatOverrideConfig = fromUnknownChatOverride(
       data.chatOverridePayload,

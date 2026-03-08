@@ -64,6 +64,7 @@ export interface BootstrapResponse {
   canEditChat: boolean;
   canEditChatInternals?: boolean;
   globalPayload?: unknown;
+  chatBasePayload?: unknown;
   chatOverridePayload?: unknown;
   effectiveConfigPayload?: unknown;
   currentCharacter?: unknown;
