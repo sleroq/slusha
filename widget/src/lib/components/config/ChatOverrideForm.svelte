@@ -68,6 +68,7 @@
             'ignore tendency',
             'random reply chance',
             'response delay',
+            'history version',
             'bot names',
             'reply trigger patterns',
             'ignore trigger patterns',
@@ -267,6 +268,18 @@
                             }}
                             hidden={!matchesBlockItem('general', 'response delay')}
                             bind:value={config.responseDelay}
+                        />
+                        <SettingSelectField
+                            id="c-ai-history-version"
+                            label="History version"
+                            description="Selects conversation history builder for this chat."
+                            options={['v2', 'v3']}
+                            sourceState={{
+                                overridden: isOverridden('ai.historyVersion'),
+                                label: sourceStateText('ai.historyVersion'),
+                            }}
+                            hidden={!matchesBlockItem('general', 'history version', 'ai.historyVersion')}
+                            bind:value={config.ai.historyVersion}
                         />
                     </div>
 

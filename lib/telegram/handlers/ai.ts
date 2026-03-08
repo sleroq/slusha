@@ -8,7 +8,7 @@ import {
     ModelMessage,
     tool,
 } from 'ai';
-import { makeHistoryV2 } from '../../history.ts';
+import { makeHistoryV2, makeHistoryV3 } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
 import { ReplyTo } from '../../memory.ts';
@@ -315,6 +315,7 @@ async function sendGeneratedOutput(params: {
     targetRefMap: Map<string, number>;
     enabledReactions: string[];
     effectiveConfig: EffectiveConfig;
+    historyById: Map<number, Awaited<ReturnType<SlushaContext['m']['getHistory']>>[number]>;
 }): Promise<boolean> {
     const {
         bot,
@@ -323,6 +324,7 @@ async function sendGeneratedOutput(params: {
         targetRefMap,
         enabledReactions,
         effectiveConfig,
+        historyById,
     } = params;
 
     function resolveTargetMessageId(targetRef?: string): number | undefined {
@@ -453,23 +455,51 @@ async function sendGeneratedOutput(params: {
         lastMsgId = replyInfo.message_id;
 
         let replyTo: ReplyTo | undefined;
+        let threadId: string | undefined;
+        let threadRootMessageId: number | undefined;
+        let threadParentMessageId: number | undefined;
+        let threadSource = 'bot_new';
         if (replyInfo.reply_to_message) {
+            threadParentMessageId = replyInfo.reply_to_message.message_id;
+            const parent = historyById.get(threadParentMessageId);
+            if (parent) {
+                threadId = parent.threadId ??
+                    (typeof parent.threadRootMessageId === 'number'
+                        ? `thread:${parent.threadRootMessageId}`
+                        : `thread:${threadParentMessageId}`);
+                threadRootMessageId = parent.threadRootMessageId ?? parent.id;
+                threadSource = 'bot_parent';
+            } else {
+                threadId = `thread:${threadParentMessageId}`;
+                threadRootMessageId = threadParentMessageId;
+                threadSource = 'bot_parent_external';
+            }
+
             replyTo = {
-                id: replyInfo.reply_to_message.message_id,
+                id: threadParentMessageId,
                 text: replyInfo.reply_to_message.text ??
                     replyInfo.reply_to_message.caption ?? '',
                 isMyself: false,
                 info: replyInfo.reply_to_message,
             };
+        } else {
+            threadId = `thread:${replyInfo.message_id}`;
+            threadRootMessageId = replyInfo.message_id;
         }
 
-        await ctx.m.addMessage({
+        const messageRecord = {
             id: replyInfo.message_id,
             text: replyText,
             isMyself: true,
             info: replyInfo,
             replyTo,
-        });
+            threadId,
+            threadRootMessageId,
+            threadParentMessageId,
+            threadSource,
+        };
+        await ctx.m.addMessage(messageRecord);
+        historyById.set(messageRecord.id, messageRecord);
 
         if (i === output.length - 1) {
             break;
@@ -624,7 +654,11 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 content: prompt,
             });
 
-            const history = await makeHistoryV2(
+            const historyBuilder = effectiveConfig.ai.historyVersion === 'v3'
+                ? makeHistoryV3
+                : makeHistoryV2;
+
+            const history = await historyBuilder(
                 { token: bot.token, id: bot.botInfo.id },
                 bot.api,
                 logger,
@@ -900,6 +934,8 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             `for "${name}" ${username}. `,
         );
 
+        const historyById = new Map(savedHistory.map((msg) => [msg.id, msg]));
+
         await sendGeneratedOutput({
             bot,
             ctx,
@@ -907,6 +943,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             targetRefMap,
             enabledReactions,
             effectiveConfig,
+            historyById,
         });
     });
 }

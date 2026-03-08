@@ -11,11 +11,19 @@ import {
 } from '../memory.ts';
 import { sequentialize } from '@grammyjs/runner';
 import { canMemberSendTextMessages } from './reply-rights.ts';
+import { Message } from 'grammy_types';
 
 interface RequestInfo {
     isRandom: boolean;
     userToReply?: string;
     config: Config['ai'];
+}
+
+interface ThreadResolution {
+    threadId: string;
+    threadRootMessageId: number;
+    threadParentMessageId?: number;
+    threadSource: string;
 }
 
 export type SlushaContext = Context & I18nFlavor & {
@@ -115,6 +123,84 @@ function parseReactionCounts(
 
         return undefined;
     }).filter((entry): entry is ReactionCountEntry => entry !== undefined);
+}
+
+function isSameTopic(left: Message, right: Message): boolean {
+    const leftTopic = left.message_thread_id;
+    const rightTopic = right.message_thread_id;
+    return leftTopic === rightTopic;
+}
+
+function resolveThreadForIncomingMessage(
+    history: Array<{
+        id: number;
+        isMyself: boolean;
+        info: Message;
+        threadId?: string;
+        threadRootMessageId?: number;
+    }>,
+    incoming: Message,
+    replyToId?: number,
+): ThreadResolution {
+    if (typeof replyToId === 'number') {
+        const parent = history.find((msg) => msg.id === replyToId);
+        const inheritedRoot = parent?.threadRootMessageId ?? replyToId;
+        const inheritedThread = parent?.threadId ?? `thread:${inheritedRoot}`;
+
+        return {
+            threadId: inheritedThread,
+            threadRootMessageId: inheritedRoot,
+            threadParentMessageId: replyToId,
+            threadSource: parent ? 'explicit_reply' : 'explicit_reply_external',
+        };
+    }
+
+    const incomingAuthorId = incoming.from?.id;
+    const incomingDate = incoming.date;
+    const maxGapSeconds = 180;
+    const maxInterveningMessages = 6;
+
+    if (typeof incomingAuthorId === 'number') {
+        let interleaving = 0;
+        for (let i = history.length - 1; i >= 0; i--) {
+            const candidate = history[i];
+            if (!isSameTopic(candidate.info, incoming)) {
+                continue;
+            }
+
+            if (candidate.info.from?.id === incomingAuthorId) {
+                const candidateDate = candidate.info.date;
+                const secondsSince = incomingDate - candidateDate;
+                if (
+                    secondsSince <= maxGapSeconds &&
+                    interleaving <= maxInterveningMessages
+                ) {
+                    const inheritedRoot = candidate.threadRootMessageId ??
+                        candidate.id;
+                    const inheritedThread = candidate.threadId ??
+                        `thread:${inheritedRoot}`;
+                    return {
+                        threadId: inheritedThread,
+                        threadRootMessageId: inheritedRoot,
+                        threadParentMessageId: candidate.id,
+                        threadSource: 'implicit_same_author',
+                    };
+                }
+                break;
+            }
+
+            interleaving += 1;
+            if (interleaving > maxInterveningMessages) {
+                break;
+            }
+        }
+    }
+
+    return {
+        threadId: `thread:${incoming.message_id}`,
+        threadRootMessageId: incoming.message_id,
+        threadSource: 'new_thread',
+    };
 }
 
 // TODO: Maybe derive from bot info somehow?
@@ -236,11 +322,15 @@ export default async function setupBot(config: Config, memory: Memory) {
             return next();
         }
 
+        const history = await ctx.m.getHistory();
+
         // Save all messages to memory
         let replyTo: ReplyTo | undefined;
+        let replyToId: number | undefined;
         if (ctx.msg.reply_to_message) {
+            replyToId = ctx.msg.reply_to_message.message_id;
             replyTo = {
-                id: ctx.msg.reply_to_message.message_id,
+                id: replyToId,
                 text: ctx.msg.reply_to_message.text ??
                     ctx.msg.reply_to_message.caption ?? '',
                 isMyself: false,
@@ -248,11 +338,21 @@ export default async function setupBot(config: Config, memory: Memory) {
             };
         }
 
+        const threadResolution = resolveThreadForIncomingMessage(
+            history,
+            ctx.msg,
+            replyToId,
+        );
+
         // Save every message to memory
         await ctx.m.addMessage({
             id: ctx.msg.message_id,
             text: ctx.msg.text ?? ctx.msg.caption ?? '',
             replyTo,
+            threadId: threadResolution.threadId,
+            threadRootMessageId: threadResolution.threadRootMessageId,
+            threadParentMessageId: threadResolution.threadParentMessageId,
+            threadSource: threadResolution.threadSource,
             isMyself: false,
             info: ctx.message,
         });

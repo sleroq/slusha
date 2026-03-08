@@ -28,6 +28,7 @@ const replyMethodSchema = z.enum([
     'json_actions',
     'plain_text_reactions',
 ]);
+const historyVersionSchema = z.enum(['v2', 'v3']);
 const googleThinkingConfigSchema = z.object({
     thinkingLevel: thinkingLevelSchema.optional(),
     thinkingBudget: z.number().int().min(0).max(65536).optional(),
@@ -78,6 +79,7 @@ export const configSchema = z.object({
          * Selects chat reply strategy for message generation and tool usage.
          */
         replyMethod: replyMethodSchema.optional(),
+        historyVersion: historyVersionSchema.default('v2'),
         /**
          * Optional alternative pre-prompt for dumb models that don't output JSON
          */
@@ -186,6 +188,7 @@ const chatOverrideAiSchema = z.object({
         .optional(),
     hateModePrompt: configSchema.shape.ai.shape.hateModePrompt.optional(),
     replyMethod: configSchema.shape.ai.shape.replyMethod.optional(),
+    historyVersion: configSchema.shape.ai.shape.historyVersion.optional(),
     messagesToPass: configSchema.shape.ai.shape.messagesToPass.optional(),
     messageMaxLength: configSchema.shape.ai.shape.messageMaxLength.optional(),
     includeAttachmentsInHistory: configSchema.shape.ai.shape

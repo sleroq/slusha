@@ -19,6 +19,7 @@ interface HistoryOptions {
     attachments?: boolean;
     resolveReplyThread?: boolean;
     includeReactions?: boolean;
+    historyVersion?: 'v2' | 'v3';
 }
 
 interface HistoryCandidate {
@@ -104,6 +105,104 @@ export function selectHistoryCandidates(
             });
             seen.add(threadMsg.id);
         }
+    }
+
+    return selected;
+}
+
+function sameThread(left: ChatMessage, right: ChatMessage): boolean {
+    if (left.threadId && right.threadId) {
+        return left.threadId === right.threadId;
+    }
+
+    if (left.threadRootMessageId && right.threadRootMessageId) {
+        return left.threadRootMessageId === right.threadRootMessageId;
+    }
+
+    return false;
+}
+
+function hasThreadMetadata(history: ChatMessage[]): boolean {
+    return history.some((msg) =>
+        Boolean(msg.threadId) || typeof msg.threadRootMessageId === 'number'
+    );
+}
+
+export function selectHistoryCandidatesV3(
+    history: ChatMessage[],
+    options: {
+        maxRootMessages?: number;
+    },
+): HistoryCandidate[] {
+    if (!hasThreadMetadata(history)) {
+        return selectHistoryCandidates(history, {
+            resolveReplyThread: true,
+            maxRootMessages: options.maxRootMessages,
+        });
+    }
+
+    const selected: HistoryCandidate[] = [];
+    const seen = new Set<number>();
+
+    let activeThreadAnchor: ChatMessage | undefined;
+    for (let i = history.length - 1; i >= 0; i--) {
+        const candidate = history[i];
+        if (!candidate.isMyself) {
+            activeThreadAnchor = candidate;
+            break;
+        }
+    }
+
+    const maxRootMessages = options.maxRootMessages;
+    const activeThreadBudget = typeof maxRootMessages === 'number'
+        ? Math.max(1, Math.floor(maxRootMessages * 0.7))
+        : undefined;
+
+    let activeThreadTaken = 0;
+    if (activeThreadAnchor) {
+        for (let i = history.length - 1; i >= 0; i--) {
+            const msg = history[i];
+            if (seen.has(msg.id)) {
+                continue;
+            }
+            if (!sameThread(msg, activeThreadAnchor)) {
+                continue;
+            }
+            if (
+                typeof activeThreadBudget === 'number' &&
+                activeThreadTaken >= activeThreadBudget
+            ) {
+                break;
+            }
+
+            selected.push({
+                msg,
+                rootIndex: i,
+            });
+            seen.add(msg.id);
+            activeThreadTaken += 1;
+        }
+    }
+
+    let rootMessagesProcessed = 0;
+    for (let i = history.length - 1; i >= 0; i--) {
+        if (
+            typeof maxRootMessages === 'number' &&
+            rootMessagesProcessed >= maxRootMessages
+        ) {
+            break;
+        }
+        rootMessagesProcessed += 1;
+
+        const msg = history[i];
+        if (seen.has(msg.id)) {
+            continue;
+        }
+        selected.push({
+            msg,
+            rootIndex: i,
+        });
+        seen.add(msg.id);
     }
 
     return selected;
@@ -372,6 +471,18 @@ async function constructMsg(
     if (typeof replyTargetId === 'number') {
         messageMeta.reply_to_message_id = replyTargetId;
     }
+    if (msg.threadId) {
+        messageMeta.thread_id = msg.threadId;
+    }
+    if (typeof msg.threadRootMessageId === 'number') {
+        messageMeta.thread_root_message_id = msg.threadRootMessageId;
+    }
+    if (typeof msg.threadParentMessageId === 'number') {
+        messageMeta.thread_parent_message_id = msg.threadParentMessageId;
+    }
+    if (msg.threadSource) {
+        messageMeta.thread_source = msg.threadSource;
+    }
     if (replyTo) {
         messageMeta.reply_to_author_tag = replyTo;
     }
@@ -476,6 +587,7 @@ interface BuildHistoryContextOptions {
     resolveReplyThread?: boolean;
     includeReactions?: boolean;
     characterName?: string;
+    historyVersion?: 'v2' | 'v3';
 }
 
 export async function buildHistoryContext(
@@ -495,10 +607,14 @@ export async function buildHistoryContext(
     const prompt: ModelMessage[] = [];
     let textPart = '';
 
-    const candidates = selectHistoryCandidates(history, {
-        resolveReplyThread: resolveReplies,
-        maxRootMessages: mode === 'notes' ? messagesLimit : undefined,
-    });
+    const candidates = mode === 'chat' && options.historyVersion === 'v3'
+        ? selectHistoryCandidatesV3(history, {
+            maxRootMessages: undefined,
+        })
+        : selectHistoryCandidates(history, {
+            resolveReplyThread: resolveReplies,
+            maxRootMessages: mode === 'notes' ? messagesLimit : undefined,
+        });
 
     for (const candidate of candidates) {
         const msg = candidate.msg;
@@ -620,6 +736,32 @@ export function makeHistoryV2(
             attachments: options.attachments,
             resolveReplyThread: options.resolveReplyThread,
             includeReactions: options.includeReactions,
+            historyVersion: 'v2',
+        },
+    );
+}
+
+export function makeHistoryV3(
+    botInfo: { token: string; id: number },
+    api: Api<RawApi>,
+    logger: Logger,
+    history: ChatMessage[],
+    options: HistoryOptions,
+): Promise<ModelMessage[]> {
+    return buildHistoryContext(
+        botInfo,
+        api,
+        logger,
+        history,
+        {
+            mode: 'chat',
+            symbolLimit: options.symbolLimit,
+            messagesLimit: options.messagesLimit,
+            bytesLimit: options.bytesLimit,
+            attachments: options.attachments,
+            resolveReplyThread: options.resolveReplyThread,
+            includeReactions: options.includeReactions,
+            historyVersion: 'v3',
         },
     );
 }

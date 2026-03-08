@@ -86,6 +86,12 @@ export const chatMessages = sqliteTable('chat_messages', {
     replyToText: text('reply_to_text'),
     replyToIsMyself: integer('reply_to_is_myself', { mode: 'boolean' }),
     replyToInfo: text('reply_to_info'),
+    threadId: text('thread_id'),
+    threadRootMessageId: integer('thread_root_message_id', { mode: 'number' }),
+    threadParentMessageId: integer('thread_parent_message_id', {
+        mode: 'number',
+    }),
+    threadSource: text('thread_source'),
     info: text('info').notNull(),
 }, (table) => ({
     pk: primaryKey({ columns: [table.chatId, table.messageId] }),

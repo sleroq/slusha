@@ -26,6 +26,7 @@ function pickTrustedAi(config: UserConfig['ai']): ChatEditableAi {
         temperature: config.temperature,
         topK: config.topK,
         topP: config.topP,
+        historyVersion: config.historyVersion,
         prompt: config.prompt,
         dumbPrompt: config.dumbPrompt,
         privateChatPromptAddition: config.privateChatPromptAddition,
@@ -46,6 +47,7 @@ function pickTrustedAiOverride(config: ChatEditableAi): ChatEditableAi {
         temperature: config.temperature,
         topK: config.topK,
         topP: config.topP,
+        historyVersion: config.historyVersion,
         prompt: config.prompt,
         dumbPrompt: config.dumbPrompt,
         privateChatPromptAddition: config.privateChatPromptAddition,
@@ -120,6 +122,9 @@ export function projectEffectiveConfigForRole(
         blacklistedReactions: config.blacklistedReactions,
         nepons: config.nepons,
         responseDelay: config.responseDelay,
+        ai: {
+            historyVersion: config.ai.historyVersion,
+        },
     };
 
     if (role === 'trusted' || role === 'admin') {
@@ -155,6 +160,14 @@ export function sanitizeChatOverrideForRole(
         next.blacklistedReactions = normalizeReactionBlacklist(
             next.blacklistedReactions,
         );
+    }
+
+    if (override.ai && role === 'regular') {
+        if (override.ai.historyVersion !== undefined) {
+            next.ai = {
+                historyVersion: override.ai.historyVersion,
+            };
+        }
     }
 
     if ((role === 'trusted' || role === 'admin') && override.ai) {

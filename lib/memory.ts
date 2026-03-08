@@ -78,6 +78,10 @@ export interface ChatMessage {
     id: number;
     text: string;
     replyTo?: ReplyTo;
+    threadId?: string;
+    threadRootMessageId?: number;
+    threadParentMessageId?: number;
+    threadSource?: string;
     isMyself: boolean;
     info: Message;
     reactions?: MessageReactions;
@@ -147,6 +151,10 @@ function buildMessageFromRow(
                     : ({} as ReplyMessage),
             }
             : undefined,
+        threadId: row.threadId ?? undefined,
+        threadRootMessageId: row.threadRootMessageId ?? undefined,
+        threadParentMessageId: row.threadParentMessageId ?? undefined,
+        threadSource: row.threadSource ?? undefined,
         reactions,
     };
 }
@@ -527,6 +535,10 @@ export class ChatMemory {
                 replyToInfo: message.replyTo?.info
                     ? JSON.stringify(message.replyTo.info)
                     : null,
+                threadId: message.threadId,
+                threadRootMessageId: message.threadRootMessageId,
+                threadParentMessageId: message.threadParentMessageId,
+                threadSource: message.threadSource,
                 info: JSON.stringify(message.info),
             })
             .onConflictDoUpdate({
@@ -540,6 +552,10 @@ export class ChatMemory {
                     replyToInfo: message.replyTo?.info
                         ? JSON.stringify(message.replyTo.info)
                         : null,
+                    threadId: message.threadId,
+                    threadRootMessageId: message.threadRootMessageId,
+                    threadParentMessageId: message.threadParentMessageId,
+                    threadSource: message.threadSource,
                     info: JSON.stringify(message.info),
                 },
             });

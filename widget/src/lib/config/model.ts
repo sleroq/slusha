@@ -70,6 +70,7 @@ export interface GenerationTaskConfig {
 }
 
 export type ReplyMethod = "json_actions" | "plain_text_reactions";
+export type HistoryVersion = "v2" | "v3";
 
 export interface AiPayload {
   model: string;
@@ -82,6 +83,7 @@ export interface AiPayload {
   prompt: string;
   dumbPrompt?: string;
   replyMethod?: ReplyMethod;
+  historyVersion: HistoryVersion;
   dumbPrePrompt?: string;
   privateChatPromptAddition?: string;
   groupChatPromptAddition?: string;
@@ -120,6 +122,7 @@ export interface ChatEditableAiPayload {
   temperature: number;
   topK: number;
   topP: number;
+  historyVersion: HistoryVersion;
   prompt?: string;
   dumbPrompt?: string;
   privateChatPromptAddition?: string;
@@ -277,6 +280,7 @@ export function defaultAiConfig(): AiPayload {
     prompt: "",
     dumbPrompt: "",
     replyMethod: "json_actions",
+    historyVersion: "v2",
     dumbPrePrompt: "",
     privateChatPromptAddition: "",
     groupChatPromptAddition: "",
@@ -350,6 +354,7 @@ export function defaultChatEditableAiConfig(
     temperature: typeof base.temperature === "number" ? base.temperature : 0.8,
     topK: typeof base.topK === "number" ? base.topK : 40,
     topP: typeof base.topP === "number" ? base.topP : 0.95,
+    historyVersion: base.historyVersion === "v3" ? "v3" : "v2",
     prompt: typeof base.prompt === "string" ? base.prompt : "",
     dumbPrompt: typeof base.dumbPrompt === "string" ? base.dumbPrompt : "",
     privateChatPromptAddition:
@@ -749,6 +754,9 @@ export function buildChatPayload(
   if ((config.ai.replyMethod ?? "") !== (base.ai.replyMethod ?? "")) {
     aiPayload.replyMethod = config.ai.replyMethod;
   }
+  if ((config.ai.historyVersion ?? "v2") !== (base.ai.historyVersion ?? "v2")) {
+    aiPayload.historyVersion = config.ai.historyVersion;
+  }
   if (config.ai.messagesToPass !== base.ai.messagesToPass) {
     aiPayload.messagesToPass = config.ai.messagesToPass;
   }
@@ -817,6 +825,7 @@ export function collectChatOverridePaths(
     paths.push("ai.hateModePrompt");
   }
   if (payload.ai.replyMethod !== undefined) paths.push("ai.replyMethod");
+  if (payload.ai.historyVersion !== undefined) paths.push("ai.historyVersion");
   if (payload.ai.messagesToPass !== undefined) {
     paths.push("ai.messagesToPass");
   }
