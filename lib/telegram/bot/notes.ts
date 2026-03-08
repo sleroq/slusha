@@ -4,6 +4,11 @@ import { Config } from '../../config.ts';
 import logger from '../../logger.ts';
 import { SlushaContext } from '../setup-bot.ts';
 import { makeNotesHistory } from '../../history.ts';
+import {
+    buildChatInfoBlock,
+    buildChatPromptAddition,
+    isTelegramCommentsHistory,
+} from '../../ai/chat-context.ts';
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
 
@@ -16,7 +21,7 @@ export default function notes(config: Config, botId: number) {
             const effectiveConfig = await ctx.m.getEffectiveConfig();
             const frequency = effectiveConfig.ai.notesFrequency;
             const chat = await ctx.m.getChat();
-            const history = await ctx.m.getHistory();
+            const history = await ctx.m.getRecentHistory(frequency);
 
             if (
                 chat.lastUse <
@@ -170,7 +175,7 @@ export default function notes(config: Config, botId: number) {
             const effectiveConfig = await ctx.m.getEffectiveConfig();
             const frequency = effectiveConfig.ai.memoryFrequency;
             const chat = await ctx.m.getChat();
-            const history = await ctx.m.getHistory();
+            const history = await ctx.m.getRecentHistory(frequency);
 
             if (
                 chat.lastUse <
@@ -218,68 +223,47 @@ export default function notes(config: Config, botId: number) {
 
             let prompt = ''; // Intentionaly no pre-prompt here
 
-            // TODO: Improve this check
-            const isComments = savedHistory.some(
-                (m) =>
-                    m.info.forward_origin?.type === 'channel' &&
-                    m.info.from?.first_name === 'Telegram',
-            );
-
-            if (ctx.chat.type === 'private') {
-                if (effectiveConfig.ai.privateChatPromptAddition) {
-                    prompt += effectiveConfig.ai.privateChatPromptAddition;
-                }
-            } else if (
-                isComments && effectiveConfig.ai.commentsPromptAddition
-            ) {
-                prompt += effectiveConfig.ai.commentsPromptAddition;
-            } else if (effectiveConfig.ai.groupChatPromptAddition) {
-                prompt += effectiveConfig.ai.groupChatPromptAddition;
-            }
+            const isComments = isTelegramCommentsHistory(savedHistory);
+            prompt += buildChatPromptAddition({
+                chatType: ctx.chat.type,
+                isComments,
+                privateChatPromptAddition:
+                    effectiveConfig.ai.privateChatPromptAddition,
+                commentsPromptAddition:
+                    effectiveConfig.ai.commentsPromptAddition,
+                groupChatPromptAddition:
+                    effectiveConfig.ai.groupChatPromptAddition,
+            });
 
             prompt += '\n\n';
 
-            const currentChat = await ctx.m.getChat();
-            const character = currentChat.character;
+            const character = chat.character;
             if (character) {
                 prompt += '### Character ###\n' + character.description;
             } else {
                 prompt += effectiveConfig.ai.prompt;
             }
 
-            let chatInfoMsg = `Date and time right now: ${
-                new Date().toLocaleString()
-            }`;
-
-            if (ctx.chat.type === 'private') {
-                chatInfoMsg +=
-                    `\nЛичный чат с ${ctx.from.first_name} (@${ctx.from.username})`;
-            } else {
-                const activeMembers = await ctx.m.getActiveMembers();
-                if (activeMembers.length > 0) {
-                    const prettyMembersList = activeMembers
-                        .map((m) => {
-                            let text = `- ${m.first_name}`;
-                            if (m.username) {
-                                text += ` (@${m.username})`;
-                            }
-                            return text;
-                        })
-                        .join('\n');
-
-                    chatInfoMsg +=
-                        `\nChat: ${ctx.chat.title}, Active members:\n${prettyMembersList}`;
-                }
-            }
+            const activeMembers = ctx.chat.type === 'private'
+                ? []
+                : await ctx.m.getActiveMembers();
+            const chatInfoMsg = buildChatInfoBlock({
+                nowText: new Date().toLocaleString(),
+                chatType: ctx.chat.type,
+                chatTitle: ctx.chat.title,
+                userFirstName: ctx.from.first_name,
+                userUsername: ctx.from.username,
+                activeMembers,
+            });
 
             prompt += '\n\n' + chatInfoMsg;
 
             let memPrompt = effectiveConfig.ai.memoryPrompt;
-            if (currentChat.memory) {
+            if (chat.memory) {
                 memPrompt += '\n\n' +
                     effectiveConfig.ai.memoryPromptRepeat +
                     '\n' +
-                    currentChat.memory;
+                    chat.memory;
             }
 
             prompt += '\n\n' + effectiveConfig.ai.memoryPrompt;

@@ -1,10 +1,12 @@
 # AGENTS.md
 
 Deno-first monorepo with:
+
 - root app (`main.ts`, `lib/`, `scripts/`)
 - widget app (`widget/`, Svelte 5 + Vite)
 
 ## Root Commands (run from repo root)
+
 - Typecheck: `deno check --allow-import main.ts`
 - Lint: `deno lint`
 - Format check: `deno fmt --check`
@@ -17,6 +19,7 @@ Deno-first monorepo with:
 - Build widget assets: `scripts/build-widget.bash`
 
 ## Widget Commands (run from `widget/`)
+
 - Dev server: `deno task dev` (long-running)
 - Typecheck: `deno task check`
 - Lint: `deno task lint`
@@ -26,12 +29,14 @@ Deno-first monorepo with:
 - Preview: `deno task preview` (long-running)
 
 ## Verification Order
+
 1. Typecheck
 2. Lint
 3. Tests
 4. Build (if relevant)
 
 Minimum gates:
+
 - Root-only: `deno check --allow-import main.ts` + `deno lint` + `AI_TOKEN="test" deno test -A`
 - Widget-only: `deno task check` + `deno task lint` + `deno task build`
 

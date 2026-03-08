@@ -67,10 +67,13 @@ export async function fetchBootstrap(
     query.set("chatId", chatId.trim());
   }
 
-  const request = await safeFetch(`/api/config/bootstrap?${query.toString()}`, {
-    headers: buildHeaders(initDataRaw),
-    signal,
-  });
+  const request = await safeFetch(
+    `/api/config/bootstrap?${query.toString()}`,
+    {
+      headers: buildHeaders(initDataRaw),
+      signal,
+    },
+  );
   if (!request.ok || !request.response) {
     return {
       ok: false,

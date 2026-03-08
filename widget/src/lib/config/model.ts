@@ -69,6 +69,9 @@ export interface GenerationTaskConfig {
   maxOutputTokens?: number;
 }
 
+export type ReplyMethod = "json_actions" | "plain_text_reactions";
+export type HistoryVersion = "v2" | "v3";
+
 export interface AiPayload {
   model: string;
   notesModel?: string;
@@ -79,13 +82,16 @@ export interface AiPayload {
   prePrompt: string;
   prompt: string;
   dumbPrompt?: string;
-  useJsonResponses: boolean;
+  replyMethod?: ReplyMethod;
+  historyVersion: HistoryVersion;
   dumbPrePrompt?: string;
   privateChatPromptAddition?: string;
   groupChatPromptAddition?: string;
   commentsPromptAddition?: string;
   hateModePrompt?: string;
   finalPrompt: string;
+  chatActionsToolDescription?: string;
+  chatReactionsToolDescription?: string;
   dumbFinalPrompt?: string;
   notesPrompt: string;
   memoryPrompt: string;
@@ -116,13 +122,14 @@ export interface ChatEditableAiPayload {
   temperature: number;
   topK: number;
   topP: number;
+  historyVersion: HistoryVersion;
   prompt?: string;
   dumbPrompt?: string;
   privateChatPromptAddition?: string;
   groupChatPromptAddition?: string;
   commentsPromptAddition?: string;
   hateModePrompt?: string;
-  useJsonResponses: boolean;
+  replyMethod?: ReplyMethod;
   messagesToPass: number;
   messageMaxLength: number;
   includeAttachmentsInHistory: boolean;
@@ -246,6 +253,7 @@ export interface GlobalFormText {
   names: string;
   tendToReply: string;
   tendToIgnore: string;
+  blacklistedReactions: string;
   nepons: string;
   adminIds: string;
   trustedIds: string;
@@ -271,13 +279,16 @@ export function defaultAiConfig(): AiPayload {
     prePrompt: "",
     prompt: "",
     dumbPrompt: "",
-    useJsonResponses: true,
+    replyMethod: "json_actions",
+    historyVersion: "v2",
     dumbPrePrompt: "",
     privateChatPromptAddition: "",
     groupChatPromptAddition: "",
     commentsPromptAddition: "",
     hateModePrompt: "",
     finalPrompt: "",
+    chatActionsToolDescription: "",
+    chatReactionsToolDescription: "",
     dumbFinalPrompt: "",
     notesPrompt: "",
     memoryPrompt: "",
@@ -290,8 +301,14 @@ export function defaultAiConfig(): AiPayload {
     bytesLimit: 20 * 1024 * 1024,
     google: {
       safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        {
+          category: "HARM_CATEGORY_HARASSMENT",
+          threshold: "BLOCK_NONE",
+        },
+        {
+          category: "HARM_CATEGORY_HATE_SPEECH",
+          threshold: "BLOCK_NONE",
+        },
         {
           category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
           threshold: "BLOCK_NONE",
@@ -337,6 +354,7 @@ export function defaultChatEditableAiConfig(
     temperature: typeof base.temperature === "number" ? base.temperature : 0.8,
     topK: typeof base.topK === "number" ? base.topK : 40,
     topP: typeof base.topP === "number" ? base.topP : 0.95,
+    historyVersion: base.historyVersion === "v3" ? "v3" : "v2",
     prompt: typeof base.prompt === "string" ? base.prompt : "",
     dumbPrompt: typeof base.dumbPrompt === "string" ? base.dumbPrompt : "",
     privateChatPromptAddition:
@@ -352,9 +370,10 @@ export function defaultChatEditableAiConfig(
     hateModePrompt: typeof base.hateModePrompt === "string"
       ? base.hateModePrompt
       : "",
-    useJsonResponses: typeof base.useJsonResponses === "boolean"
-      ? base.useJsonResponses
-      : true,
+    replyMethod: base.replyMethod === "plain_text_reactions" ||
+        base.replyMethod === "json_actions"
+      ? base.replyMethod
+      : "json_actions",
     messagesToPass: typeof base.messagesToPass === "number"
       ? base.messagesToPass
       : 5,
@@ -607,6 +626,9 @@ export function globalTextFromConfig(
     names: matcherListToTextarea(config.names),
     tendToReply: matcherListToTextarea(config.tendToReply),
     tendToIgnore: matcherListToTextarea(config.tendToIgnore),
+    blacklistedReactions: stringListToTextarea(
+      config.blacklistedReactions ?? [],
+    ),
     nepons: stringListToTextarea(config.nepons),
     adminIds: stringListToTextarea((config.adminIds ?? []).map(String)),
     trustedIds: stringListToTextarea((config.trustedIds ?? []).map(String)),
@@ -637,6 +659,7 @@ export function buildGlobalPayload(
     names: matcherTextareaToList(text.names),
     tendToReply: matcherTextareaToList(text.tendToReply),
     tendToIgnore: matcherTextareaToList(text.tendToIgnore),
+    blacklistedReactions: textareaToStringList(text.blacklistedReactions),
     nepons: textareaToStringList(text.nepons),
     adminIds: textareaToNumberList(text.adminIds),
     trustedIds: textareaToNumberList(text.trustedIds),
@@ -664,7 +687,9 @@ export function buildChatPayload(
   const names = matcherTextareaToList(text.names);
   const tendToReply = matcherTextareaToList(text.tendToReply);
   const tendToIgnore = matcherTextareaToList(text.tendToIgnore);
-  const blacklistedReactions = textareaToStringList(text.blacklistedReactions);
+  const blacklistedReactions = textareaToStringList(
+    text.blacklistedReactions,
+  );
   const nepons = textareaToStringList(text.nepons);
 
   const payload: ChatOverridePayload = {};
@@ -726,8 +751,11 @@ export function buildChatPayload(
   if ((config.ai.hateModePrompt ?? "") !== (base.ai.hateModePrompt ?? "")) {
     aiPayload.hateModePrompt = config.ai.hateModePrompt;
   }
-  if (config.ai.useJsonResponses !== base.ai.useJsonResponses) {
-    aiPayload.useJsonResponses = config.ai.useJsonResponses;
+  if ((config.ai.replyMethod ?? "") !== (base.ai.replyMethod ?? "")) {
+    aiPayload.replyMethod = config.ai.replyMethod;
+  }
+  if ((config.ai.historyVersion ?? "v2") !== (base.ai.historyVersion ?? "v2")) {
+    aiPayload.historyVersion = config.ai.historyVersion;
   }
   if (config.ai.messagesToPass !== base.ai.messagesToPass) {
     aiPayload.messagesToPass = config.ai.messagesToPass;
@@ -796,9 +824,8 @@ export function collectChatOverridePaths(
   if (payload.ai.hateModePrompt !== undefined) {
     paths.push("ai.hateModePrompt");
   }
-  if (payload.ai.useJsonResponses !== undefined) {
-    paths.push("ai.useJsonResponses");
-  }
+  if (payload.ai.replyMethod !== undefined) paths.push("ai.replyMethod");
+  if (payload.ai.historyVersion !== undefined) paths.push("ai.historyVersion");
   if (payload.ai.messagesToPass !== undefined) {
     paths.push("ai.messagesToPass");
   }

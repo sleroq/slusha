@@ -24,6 +24,11 @@ const matcherSchema = z.union([
 ]);
 
 const thinkingLevelSchema = z.enum(['minimal', 'low', 'medium', 'high']);
+const replyMethodSchema = z.enum([
+    'json_actions',
+    'plain_text_reactions',
+]);
+const historyVersionSchema = z.enum(['v2', 'v3']);
 const googleThinkingConfigSchema = z.object({
     thinkingLevel: thinkingLevelSchema.optional(),
     thinkingBudget: z.number().int().min(0).max(65536).optional(),
@@ -71,10 +76,10 @@ export const configSchema = z.object({
         prompt: z.string().max(20000),
         dumbPrompt: z.string().max(10000).optional(),
         /**
-         * When false, bot will not expect JSON array output and will
-         * generate a single plain text message instead. Reactions are disabled.
+         * Selects chat reply strategy for message generation and tool usage.
          */
-        useJsonResponses: z.boolean().default(true),
+        replyMethod: replyMethodSchema.optional(),
+        historyVersion: historyVersionSchema.default('v2'),
         /**
          * Optional alternative pre-prompt for dumb models that don't output JSON
          */
@@ -87,6 +92,14 @@ export const configSchema = z.object({
          * Smart-mode final prompt (expects JSON array response)
          */
         finalPrompt: z.string().max(20000),
+        /**
+         * Optional override for send_chat_actions tool description.
+         */
+        chatActionsToolDescription: z.string().max(20000).optional(),
+        /**
+         * Optional override for send_chat_reactions tool description in plain_text_reactions mode.
+         */
+        chatReactionsToolDescription: z.string().max(20000).optional(),
         /**
          * Optional alternative final prompt for dumb models (plain text)
          */
@@ -154,7 +167,7 @@ export const configSchema = z.object({
             'gemini-3.1-flash-lite-preview',
         ]),
     maxNotesToStore: boundedPositiveInt(1, 200).default(5),
-    maxMessagesToStore: boundedPositiveInt(1, 2000).default(100),
+    maxMessagesToStore: boundedPositiveInt(1, 10000).default(100),
     chatLastUseNotes: boundedPositiveInt(1, 100).default(3),
     chatLastUseMemory: boundedPositiveInt(1, 100).default(2),
     responseDelay: z.number().min(0).max(120).default(1),
@@ -174,7 +187,8 @@ const chatOverrideAiSchema = z.object({
     commentsPromptAddition: configSchema.shape.ai.shape.commentsPromptAddition
         .optional(),
     hateModePrompt: configSchema.shape.ai.shape.hateModePrompt.optional(),
-    useJsonResponses: configSchema.shape.ai.shape.useJsonResponses.optional(),
+    replyMethod: configSchema.shape.ai.shape.replyMethod.optional(),
+    historyVersion: configSchema.shape.ai.shape.historyVersion.optional(),
     messagesToPass: configSchema.shape.ai.shape.messagesToPass.optional(),
     messageMaxLength: configSchema.shape.ai.shape.messageMaxLength.optional(),
     includeAttachmentsInHistory: configSchema.shape.ai.shape

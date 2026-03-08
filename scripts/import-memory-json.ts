@@ -23,7 +23,6 @@ function toBoolInt(value: boolean | undefined): boolean | null {
 }
 
 async function upsertChat(db: DbClient, chatId: number, chat: Chat) {
-
     await db.insert(chats).values({
         id: chatId,
         info: JSON.stringify(chat.info),
@@ -76,16 +75,22 @@ async function upsertChat(db: DbClient, chatId: number, chat: Chat) {
 
     await db.delete(chatOptOutUsers).where(eq(chatOptOutUsers.chatId, chatId));
     if (chat.optOutUsers.length > 0) {
-        await db.insert(chatOptOutUsers).values(chat.optOutUsers.map((user) => ({
-            chatId,
-            userId: user.id,
-            username: user.username ?? null,
-            firstName: user.first_name,
-        })));
+        await db.insert(chatOptOutUsers).values(
+            chat.optOutUsers.map((user) => ({
+                chatId,
+                userId: user.id,
+                username: user.username ?? null,
+                firstName: user.first_name,
+            })),
+        );
     }
 
-    await db.delete(messageReactionUsers).where(eq(messageReactionUsers.chatId, chatId));
-    await db.delete(messageReactions).where(eq(messageReactions.chatId, chatId));
+    await db.delete(messageReactionUsers).where(
+        eq(messageReactionUsers.chatId, chatId),
+    );
+    await db.delete(messageReactions).where(
+        eq(messageReactions.chatId, chatId),
+    );
     await db.delete(chatMessages).where(eq(chatMessages.chatId, chatId));
 
     if (chat.history.length > 0) {
@@ -190,7 +195,9 @@ async function main() {
     const [stats] = await db.select({ total: count() }).from(chats);
 
     console.log(
-        `Imported ${entries.length} chats from memory.json to sqlite. Total chats in DB: ${stats?.total ?? 0}`,
+        `Imported ${entries.length} chats from memory.json to sqlite. Total chats in DB: ${
+            stats?.total ?? 0
+        }`,
     );
 }
 

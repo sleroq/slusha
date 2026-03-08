@@ -68,6 +68,7 @@
             'ignore tendency',
             'random reply chance',
             'response delay',
+            'history version',
             'bot names',
             'reply trigger patterns',
             'ignore trigger patterns',
@@ -86,6 +87,8 @@
     let showPrompts = $derived(
         matchesSection(
             'prompts',
+            'json-actions chat prompt',
+            'plain-text chat prompt',
             'primary chat prompt',
             'low-context chat prompt',
             'private chat prompt addition',
@@ -98,9 +101,9 @@
         matchesSection(
             'advanced',
             'messages passed to ai',
+            'reply method',
             'max reply length',
             'attachment byte limit',
-            'use json responses',
             'include attachments in history',
         ),
     );
@@ -266,6 +269,18 @@
                             hidden={!matchesBlockItem('general', 'response delay')}
                             bind:value={config.responseDelay}
                         />
+                        <SettingSelectField
+                            id="c-ai-history-version"
+                            label="History version"
+                            description="Selects conversation history builder for this chat."
+                            options={['v2', 'v3']}
+                            sourceState={{
+                                overridden: isOverridden('ai.historyVersion'),
+                                label: sourceStateText('ai.historyVersion'),
+                            }}
+                            hidden={!matchesBlockItem('general', 'history version', 'ai.historyVersion')}
+                            bind:value={config.ai.historyVersion}
+                        />
                     </div>
 
                     <div class="grid gap-3 md:grid-cols-2">
@@ -423,26 +438,26 @@
                             id="c-ai-prompt"
                             rows={4}
                             containerClass="md:col-span-2"
-                            label="Primary chat prompt"
-                            description="Core behavior and persona instructions for this chat."
+                            label="JSON-actions chat prompt"
+                            description="Core behavior/persona prompt used only when reply method is json_actions."
                             sourceState={{
                                 overridden: isOverridden('ai.prompt'),
                                 label: sourceStateText('ai.prompt'),
                             }}
-                            hidden={!matchesBlockItem('prompts', 'primary chat prompt')}
+                            hidden={!matchesBlockItem('prompts', 'json-actions chat prompt', 'primary chat prompt')}
                             bind:value={config.ai.prompt}
                         />
                         <SettingTextareaField
                             id="c-ai-dumb-prompt"
                             rows={3}
                             containerClass="md:col-span-2"
-                            label="Low-context chat prompt"
-                            description="Prompt used in simplified response mode."
+                            label="Plain-text chat prompt"
+                            description="Core behavior/persona prompt used only when reply method is plain_text_reactions."
                             sourceState={{
                                 overridden: isOverridden('ai.dumbPrompt'),
                                 label: sourceStateText('ai.dumbPrompt'),
                             }}
-                            hidden={!matchesBlockItem('prompts', 'low-context chat prompt', 'dumb prompt')}
+                            hidden={!matchesBlockItem('prompts', 'plain-text chat prompt', 'low-context chat prompt', 'dumb prompt')}
                             bind:value={config.ai.dumbPrompt}
                         />
                         <SettingTextareaField
@@ -541,16 +556,17 @@
                             hidden={!matchesBlockItem('advanced', 'attachment byte limit', 'bytes limit')}
                             bind:value={config.ai.bytesLimit}
                         />
-                        <SettingToggleField
-                            id="c-ai-json"
-                            label="Use JSON responses"
-                            description="Request structured JSON output from the model."
+                        <SettingSelectField
+                            id="c-ai-reply-method"
+                            label="Reply method"
+                            description="Chooses how replies and reactions are generated in this chat."
+                            options={['json_actions', 'plain_text_reactions']}
                             sourceState={{
-                                overridden: isOverridden('ai.useJsonResponses'),
-                                label: sourceStateText('ai.useJsonResponses'),
+                                overridden: isOverridden('ai.replyMethod'),
+                                label: sourceStateText('ai.replyMethod'),
                             }}
-                            hidden={!matchesBlockItem('advanced', 'use json responses')}
-                            bind:checked={config.ai.useJsonResponses}
+                            hidden={!matchesBlockItem('advanced', 'reply method', 'ai.replyMethod')}
+                            bind:value={config.ai.replyMethod}
                         />
                         <SettingToggleField
                             id="c-ai-attachments"

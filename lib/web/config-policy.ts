@@ -26,13 +26,14 @@ function pickTrustedAi(config: UserConfig['ai']): ChatEditableAi {
         temperature: config.temperature,
         topK: config.topK,
         topP: config.topP,
+        historyVersion: config.historyVersion,
         prompt: config.prompt,
         dumbPrompt: config.dumbPrompt,
         privateChatPromptAddition: config.privateChatPromptAddition,
         groupChatPromptAddition: config.groupChatPromptAddition,
         commentsPromptAddition: config.commentsPromptAddition,
         hateModePrompt: config.hateModePrompt,
-        useJsonResponses: config.useJsonResponses,
+        replyMethod: config.replyMethod,
         messagesToPass: config.messagesToPass,
         messageMaxLength: config.messageMaxLength,
         includeAttachmentsInHistory: config.includeAttachmentsInHistory,
@@ -46,13 +47,14 @@ function pickTrustedAiOverride(config: ChatEditableAi): ChatEditableAi {
         temperature: config.temperature,
         topK: config.topK,
         topP: config.topP,
+        historyVersion: config.historyVersion,
         prompt: config.prompt,
         dumbPrompt: config.dumbPrompt,
         privateChatPromptAddition: config.privateChatPromptAddition,
         groupChatPromptAddition: config.groupChatPromptAddition,
         commentsPromptAddition: config.commentsPromptAddition,
         hateModePrompt: config.hateModePrompt,
-        useJsonResponses: config.useJsonResponses,
+        replyMethod: config.replyMethod,
         messagesToPass: config.messagesToPass,
         messageMaxLength: config.messageMaxLength,
         includeAttachmentsInHistory: config.includeAttachmentsInHistory,
@@ -120,6 +122,9 @@ export function projectEffectiveConfigForRole(
         blacklistedReactions: config.blacklistedReactions,
         nepons: config.nepons,
         responseDelay: config.responseDelay,
+        ai: {
+            historyVersion: config.ai.historyVersion,
+        },
     };
 
     if (role === 'trusted' || role === 'admin') {
@@ -155,6 +160,14 @@ export function sanitizeChatOverrideForRole(
         next.blacklistedReactions = normalizeReactionBlacklist(
             next.blacklistedReactions,
         );
+    }
+
+    if (override.ai && role === 'regular') {
+        if (override.ai.historyVersion !== undefined) {
+            next.ai = {
+                historyVersion: override.ai.historyVersion,
+            };
+        }
     }
 
     if ((role === 'trusted' || role === 'admin') && override.ai) {

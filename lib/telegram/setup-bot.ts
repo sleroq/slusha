@@ -11,11 +11,19 @@ import {
 } from '../memory.ts';
 import { sequentialize } from '@grammyjs/runner';
 import { canMemberSendTextMessages } from './reply-rights.ts';
+import { Message } from 'grammy_types';
 
 interface RequestInfo {
     isRandom: boolean;
     userToReply?: string;
     config: Config['ai'];
+}
+
+interface ThreadResolution {
+    threadId: string;
+    threadRootMessageId: number;
+    threadParentMessageId?: number;
+    threadSource: string;
 }
 
 export type SlushaContext = Context & I18nFlavor & {
@@ -115,6 +123,67 @@ function parseReactionCounts(
 
         return undefined;
     }).filter((entry): entry is ReactionCountEntry => entry !== undefined);
+}
+
+function isSameTopic(left: Message, right: Message): boolean {
+    const leftTopic = left.message_thread_id;
+    const rightTopic = right.message_thread_id;
+    return leftTopic === rightTopic;
+}
+
+async function resolveThreadForIncomingMessage(
+    memory: ChatMemory,
+    incoming: Message,
+    replyToId?: number,
+): Promise<ThreadResolution> {
+    if (typeof replyToId === 'number') {
+        const parent = await memory.getMessageById(replyToId);
+        const inheritedRoot = parent?.threadRootMessageId ?? replyToId;
+        const inheritedThread = parent?.threadId ?? `thread:${inheritedRoot}`;
+
+        return {
+            threadId: inheritedThread,
+            threadRootMessageId: inheritedRoot,
+            threadParentMessageId: replyToId,
+            threadSource: parent ? 'explicit_reply' : 'explicit_reply_external',
+        };
+    }
+
+    const incomingAuthorId = incoming.from?.id;
+    const incomingDate = incoming.date;
+    const maxGapSeconds = 180;
+    const maxInterveningMessages = 6;
+
+    if (typeof incomingAuthorId === 'number') {
+        const candidate = await memory.getLastMessageByAuthorInTopic(
+            incomingAuthorId,
+            incoming.message_thread_id,
+            maxInterveningMessages + 1,
+        );
+
+        if (candidate && isSameTopic(candidate.info, incoming)) {
+            const candidateDate = candidate.info.date;
+            const secondsSince = incomingDate - candidateDate;
+            if (secondsSince <= maxGapSeconds) {
+                const inheritedRoot = candidate.threadRootMessageId ??
+                    candidate.id;
+                const inheritedThread = candidate.threadId ??
+                    `thread:${inheritedRoot}`;
+                return {
+                    threadId: inheritedThread,
+                    threadRootMessageId: inheritedRoot,
+                    threadParentMessageId: candidate.id,
+                    threadSource: 'implicit_same_author',
+                };
+            }
+        }
+    }
+
+    return {
+        threadId: `thread:${incoming.message_id}`,
+        threadRootMessageId: incoming.message_id,
+        threadSource: 'new_thread',
+    };
 }
 
 // TODO: Maybe derive from bot info somehow?
@@ -238,9 +307,11 @@ export default async function setupBot(config: Config, memory: Memory) {
 
         // Save all messages to memory
         let replyTo: ReplyTo | undefined;
+        let replyToId: number | undefined;
         if (ctx.msg.reply_to_message) {
+            replyToId = ctx.msg.reply_to_message.message_id;
             replyTo = {
-                id: ctx.msg.reply_to_message.message_id,
+                id: replyToId,
                 text: ctx.msg.reply_to_message.text ??
                     ctx.msg.reply_to_message.caption ?? '',
                 isMyself: false,
@@ -248,11 +319,21 @@ export default async function setupBot(config: Config, memory: Memory) {
             };
         }
 
+        const threadResolution = await resolveThreadForIncomingMessage(
+            ctx.m,
+            ctx.msg,
+            replyToId,
+        );
+
         // Save every message to memory
         await ctx.m.addMessage({
             id: ctx.msg.message_id,
             text: ctx.msg.text ?? ctx.msg.caption ?? '',
             replyTo,
+            threadId: threadResolution.threadId,
+            threadRootMessageId: threadResolution.threadRootMessageId,
+            threadParentMessageId: threadResolution.threadParentMessageId,
+            threadSource: threadResolution.threadSource,
             isMyself: false,
             info: ctx.message,
         });

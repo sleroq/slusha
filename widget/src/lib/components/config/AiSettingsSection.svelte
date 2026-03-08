@@ -29,15 +29,14 @@
         <div class="space-y-2"><Label for={`${prefix}-ai-memory-freq`}>ai.memoryFrequency</Label><Input id={`${prefix}-ai-memory-freq`} type="number" bind:value={ai.memoryFrequency} /></div>
         <div class="space-y-2"><Label for={`${prefix}-ai-max-len`}>ai.messageMaxLength</Label><Input id={`${prefix}-ai-max-len`} type="number" bind:value={ai.messageMaxLength} /></div>
         <div class="space-y-2"><Label for={`${prefix}-ai-bytes`}>ai.bytesLimit</Label><Input id={`${prefix}-ai-bytes`} type="number" bind:value={ai.bytesLimit} /></div>
-        <div class="flex items-center justify-between rounded-md border p-3"><Label for={`${prefix}-ai-json`}>ai.useJsonResponses</Label><Switch id={`${prefix}-ai-json`} bind:checked={ai.useJsonResponses} /></div>
         <div class="flex items-center justify-between rounded-md border p-3"><Label for={`${prefix}-ai-attachments`}>ai.includeAttachmentsInHistory</Label><Switch id={`${prefix}-ai-attachments`} bind:checked={ai.includeAttachmentsInHistory} /></div>
     </div>
 
     <div class="grid gap-3 md:grid-cols-2">
         <div class="space-y-2 md:col-span-2"><Label for={`${prefix}-ai-preprompt`}>ai.prePrompt</Label><Textarea id={`${prefix}-ai-preprompt`} rows={4} bind:value={ai.prePrompt} /></div>
+        <div class="space-y-2 md:col-span-2"><Label for={`${prefix}-ai-dumb-preprompt`}>ai.dumbPrePrompt</Label><Textarea id={`${prefix}-ai-dumb-preprompt`} rows={3} bind:value={ai.dumbPrePrompt} /></div>
         <div class="space-y-2 md:col-span-2"><Label for={`${prefix}-ai-prompt`}>ai.prompt</Label><Textarea id={`${prefix}-ai-prompt`} rows={4} bind:value={ai.prompt} /></div>
         <div class="space-y-2 md:col-span-2"><Label for={`${prefix}-ai-dumb-prompt`}>ai.dumbPrompt</Label><Textarea id={`${prefix}-ai-dumb-prompt`} rows={3} bind:value={ai.dumbPrompt} /></div>
-        <div class="space-y-2 md:col-span-2"><Label for={`${prefix}-ai-dumb-preprompt`}>ai.dumbPrePrompt</Label><Textarea id={`${prefix}-ai-dumb-preprompt`} rows={3} bind:value={ai.dumbPrePrompt} /></div>
         <div class="space-y-2 md:col-span-2"><Label for={`${prefix}-ai-private-addition`}>ai.privateChatPromptAddition</Label><Textarea id={`${prefix}-ai-private-addition`} rows={3} bind:value={ai.privateChatPromptAddition} /></div>
         <div class="space-y-2 md:col-span-2"><Label for={`${prefix}-ai-group-addition`}>ai.groupChatPromptAddition</Label><Textarea id={`${prefix}-ai-group-addition`} rows={3} bind:value={ai.groupChatPromptAddition} /></div>
         <div class="space-y-2 md:col-span-2"><Label for={`${prefix}-ai-comments-addition`}>ai.commentsPromptAddition</Label><Textarea id={`${prefix}-ai-comments-addition`} rows={3} bind:value={ai.commentsPromptAddition} /></div>

@@ -19,11 +19,22 @@ interface HistoryOptions {
     attachments?: boolean;
     resolveReplyThread?: boolean;
     includeReactions?: boolean;
+    historyVersion?: 'v2' | 'v3';
+    activeMessageId?: number;
 }
 
 interface HistoryCandidate {
     msg: ChatMessage;
     rootIndex: number;
+}
+
+const HISTORY_META_OPEN = '<slusha_meta>';
+const HISTORY_META_CLOSE = '</slusha_meta>';
+
+function buildHistoryMetadataBlock(metadata: Record<string, unknown>): string {
+    return `${HISTORY_META_OPEN}\n${
+        JSON.stringify(metadata)
+    }\n${HISTORY_META_CLOSE}`;
 }
 
 function collectReplyThread(
@@ -95,6 +106,133 @@ export function selectHistoryCandidates(
             });
             seen.add(threadMsg.id);
         }
+    }
+
+    return selected;
+}
+
+function sameThread(left: ChatMessage, right: ChatMessage): boolean {
+    if (left.threadId && right.threadId) {
+        return left.threadId === right.threadId;
+    }
+
+    if (left.threadRootMessageId && right.threadRootMessageId) {
+        return left.threadRootMessageId === right.threadRootMessageId;
+    }
+
+    return false;
+}
+
+function hasThreadMetadata(history: ChatMessage[]): boolean {
+    return history.some((msg) =>
+        Boolean(msg.threadId) || typeof msg.threadRootMessageId === 'number'
+    );
+}
+
+export function selectHistoryCandidatesV3(
+    history: ChatMessage[],
+    options: {
+        maxRootMessages?: number;
+        activeMessageId?: number;
+    },
+): HistoryCandidate[] {
+    if (!hasThreadMetadata(history)) {
+        return selectHistoryCandidates(history, {
+            resolveReplyThread: true,
+            maxRootMessages: options.maxRootMessages,
+        });
+    }
+
+    const selected: HistoryCandidate[] = [];
+    const seen = new Set<number>();
+
+    const activeThreadAnchor = typeof options.activeMessageId === 'number'
+        ? history.find((msg) => msg.id === options.activeMessageId)
+        : undefined;
+
+    let fallbackAnchor: ChatMessage | undefined;
+    if (!activeThreadAnchor) {
+        for (let i = history.length - 1; i >= 0; i--) {
+            const candidate = history[i];
+            if (!candidate.isMyself) {
+                fallbackAnchor = candidate;
+                break;
+            }
+        }
+    }
+
+    const effectiveAnchor = activeThreadAnchor ?? fallbackAnchor;
+    const anchorTopicId = typeof effectiveAnchor?.info.message_thread_id ===
+            'number'
+        ? effectiveAnchor.info.message_thread_id
+        : undefined;
+    const scopedToTelegramTopic = typeof anchorTopicId === 'number';
+
+    function isInScopedTopic(msg: ChatMessage): boolean {
+        if (!scopedToTelegramTopic) {
+            return true;
+        }
+
+        return msg.info.message_thread_id === anchorTopicId;
+    }
+
+    const maxRootMessages = options.maxRootMessages;
+    const activeThreadBudget = typeof maxRootMessages === 'number'
+        ? Math.max(1, Math.floor(maxRootMessages * 0.7))
+        : undefined;
+
+    let activeThreadTaken = 0;
+    if (effectiveAnchor) {
+        for (let i = history.length - 1; i >= 0; i--) {
+            const msg = history[i];
+            if (seen.has(msg.id)) {
+                continue;
+            }
+            if (!isInScopedTopic(msg)) {
+                continue;
+            }
+            if (!scopedToTelegramTopic && !sameThread(msg, effectiveAnchor)) {
+                continue;
+            }
+            if (
+                typeof activeThreadBudget === 'number' &&
+                activeThreadTaken >= activeThreadBudget
+            ) {
+                break;
+            }
+
+            selected.push({
+                msg,
+                rootIndex: i,
+            });
+            seen.add(msg.id);
+            activeThreadTaken += 1;
+        }
+    }
+
+    let rootMessagesProcessed = 0;
+    for (let i = history.length - 1; i >= 0; i--) {
+        const msg = history[i];
+        if (!isInScopedTopic(msg)) {
+            continue;
+        }
+
+        if (
+            typeof maxRootMessages === 'number' &&
+            rootMessagesProcessed >= maxRootMessages
+        ) {
+            break;
+        }
+        rootMessagesProcessed += 1;
+
+        if (seen.has(msg.id)) {
+            continue;
+        }
+        selected.push({
+            msg,
+            rootIndex: i,
+        });
+        seen.add(msg.id);
     }
 
     return selected;
@@ -243,11 +381,21 @@ function getUnsupportedContentFields(msgInfo: Message): string[] {
     );
 }
 
-function getTimeString(date: Date): string {
+function getDateString(date: Date): string {
+    const year = String(date.getFullYear());
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
 
-    return `${hours}:${minutes}`;
+    const offsetMinutes = -date.getTimezoneOffset();
+    const offsetSign = offsetMinutes >= 0 ? '+' : '-';
+    const absOffsetMinutes = Math.abs(offsetMinutes);
+    const offsetHours = String(Math.floor(absOffsetMinutes / 60)).padStart(2, '0');
+    const offsetMins = String(absOffsetMinutes % 60).padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${offsetSign}${offsetHours}:${offsetMins}`;
 }
 
 async function constructMsg(
@@ -331,98 +479,100 @@ async function constructMsg(
     // const prettyInputMessage = JSON.stringify(inputMessage, null, 2);
     // const prettyInputMessage = JSON.stringify(inputMessage);
 
-    let prettyInputMessage = '';
-
     const authorId = typeof msg.info.from?.id === 'number'
         ? msg.info.from.id.toString()
         : 'unknown';
     const authorTag = user.username ?? firstName;
+    const messageDate = typeof msg.info.date === 'number'
+        ? getDateString(new Date(msg.info.date * 1000))
+        : undefined;
     const replyTargetId = msg.replyTo?.id;
-
-    prettyInputMessage += `[m${msg.id}][u${authorId}:${authorTag}]`;
+    const messageMeta: Record<string, unknown> = {
+        message_id: msg.id,
+        author: {
+            id: authorId,
+            tag: authorTag,
+            name: firstName,
+        },
+    };
+    if (messageDate) {
+        messageMeta.date = messageDate;
+    }
     if (typeof replyTargetId === 'number') {
-        prettyInputMessage += `[reply_to:m${replyTargetId}]`;
+        messageMeta.reply_to_message_id = replyTargetId;
     }
-    prettyInputMessage += ' ';
+    if (msg.threadId) {
+        messageMeta.thread_id = msg.threadId;
+    }
+    if (typeof msg.threadRootMessageId === 'number') {
+        messageMeta.thread_root_message_id = msg.threadRootMessageId;
+    }
+    if (typeof msg.threadParentMessageId === 'number') {
+        messageMeta.thread_parent_message_id = msg.threadParentMessageId;
+    }
+    if (msg.threadSource) {
+        messageMeta.thread_source = msg.threadSource;
+    }
+    if (replyTo) {
+        messageMeta.reply_to_author_tag = replyTo;
+    }
+    if (msg.info.forward_origin) {
+        messageMeta.forward_origin = removeFieldsWithSuffixes(
+            msg.info.forward_origin,
+        );
+    }
+    if (msg.info.via_bot?.username) {
+        messageMeta.via_bot = `@${msg.info.via_bot.username}`;
+    }
+    if (msg.info.quote?.text) {
+        messageMeta.quote_text = msg.info.quote.text;
+    }
 
+    let prettyInputMessage = '';
     if (characterName && msg.isMyself) {
-        prettyInputMessage += `${characterName}`;
-        if (user.username) {
-            prettyInputMessage += ` (${user.username})`;
-        }
-
-        prettyInputMessage += ` [${
-            getTimeString(new Date(msg.info.date * 1000))
-        }]`;
-
-        prettyInputMessage += `:\n`;
+        messageMeta.character = characterName;
     }
-
-    if (!msg.isMyself) {
-        prettyInputMessage += `${user.name}`;
-        if (user.username) {
-            prettyInputMessage += ` (${user.username})`;
-        }
-
-        if (replyTo) {
-            prettyInputMessage += ` <reply to ${replyTo}>`;
-        }
-
-        if (msg.info.forward_origin) {
-            const prettyJsonObject = JSON.stringify(removeFieldsWithSuffixes(
-                msg.info.forward_origin,
-            ));
-
-            if (user.name === 'Telegram') {
-                prettyInputMessage +=
-                    ` <new post in the channel ${prettyJsonObject}>`;
-            } else {
-                prettyInputMessage += ` <forward from "${prettyJsonObject}">`;
-            }
-        }
-
-        if (msg.info.via_bot) {
-            prettyInputMessage +=
-                ` <this message content generated via bot @${msg.info.via_bot.username}>`;
-        }
-
-        if (msg.info.quote?.text) {
-            prettyInputMessage += `\n <quoting "${msg.info.quote.text}">`;
-        }
-
-        prettyInputMessage += ` [${
-            getTimeString(new Date(msg.info.date * 1000))
-        }]`;
-
-        prettyInputMessage += `:\n`;
-    }
-
     prettyInputMessage += `${text.trim()}`;
 
     if (
         includeReactions && msg.reactions &&
         Object.keys(msg.reactions).length > 0
     ) {
-        const parts: string[] = [];
+        const reactions: Array<Record<string, unknown>> = [];
         for (const rec of Object.values(msg.reactions)) {
-            let label = '';
-            if (rec.type === 'emoji' && rec.emoji) label = rec.emoji;
-            else if (rec.type === 'custom' && rec.customEmojiId) {
-                label = `custom:${rec.customEmojiId}`;
-            } else continue;
+            if (rec.type === 'emoji' && rec.emoji) {
+                reactions.push({
+                    type: 'emoji',
+                    emoji: rec.emoji,
+                    count: rec.count,
+                    by: rec.by.map((user) =>
+                        user.username ? `@${user.username}` : user.name
+                    ),
+                });
+                continue;
+            }
 
-            if (rec.by && rec.by.length > 0) {
-                const users = rec.by.map((u) =>
-                    u.username ? `@${u.username}` : u.name
-                ).join(', ');
-                parts.push(`${label} by ${users}`);
-            } else if (rec.count && rec.count > 0) {
-                parts.push(`${label} x${rec.count}`);
+            if (rec.type === 'custom' && rec.customEmojiId) {
+                reactions.push({
+                    type: 'custom',
+                    custom_emoji_id: rec.customEmojiId,
+                    count: rec.count,
+                    by: rec.by.map((user) =>
+                        user.username ? `@${user.username}` : user.name
+                    ),
+                });
             }
         }
-        if (parts.length > 0) {
-            prettyInputMessage += ` <reactions: ${parts.join(', ')}>`;
+
+        if (reactions.length > 0) {
+            messageMeta.reactions = reactions;
         }
+    }
+
+    const messageBody = prettyInputMessage.trim();
+    prettyInputMessage = buildHistoryMetadataBlock(messageMeta);
+    if (messageBody.length > 0) {
+        prettyInputMessage += `\n${messageBody}`;
     }
 
     parts.push({
@@ -458,35 +608,61 @@ async function constructMsg(
     } as ModelMessage;
 }
 
-export async function makeHistoryV2(
+interface BuildHistoryContextOptions {
+    mode: 'chat' | 'notes';
+    symbolLimit: number;
+    messagesLimit: number;
+    bytesLimit: number;
+    attachments?: boolean;
+    resolveReplyThread?: boolean;
+    includeReactions?: boolean;
+    characterName?: string;
+    historyVersion?: 'v2' | 'v3';
+    activeMessageId?: number;
+}
+
+export async function buildHistoryContext(
     botInfo: { token: string; id: number },
     api: Api<RawApi>,
     logger: Logger,
     history: ChatMessage[],
-    options: HistoryOptions,
+    options: BuildHistoryContextOptions,
 ): Promise<ModelMessage[]> {
-    const { messagesLimit, bytesLimit, symbolLimit } = options;
-    const resolveReplies = options.resolveReplyThread ?? true;
+    const { mode, messagesLimit, bytesLimit, symbolLimit } = options;
+    const resolveReplies = mode === 'chat'
+        ? (options.resolveReplyThread ?? true)
+        : false;
 
     let totalBytes = 0;
     let totalAttachments = 0;
     const prompt: ModelMessage[] = [];
+    let textPart = '';
 
-    const candidates = selectHistoryCandidates(history, {
-        resolveReplyThread: resolveReplies,
-    });
+    const candidates = mode === 'chat' && options.historyVersion === 'v3'
+        ? selectHistoryCandidatesV3(history, {
+            maxRootMessages: undefined,
+            activeMessageId: options.activeMessageId,
+        })
+        : selectHistoryCandidates(history, {
+            resolveReplyThread: resolveReplies,
+            maxRootMessages: mode === 'notes' ? messagesLimit : undefined,
+        });
 
     for (const candidate of candidates) {
         const msg = candidate.msg;
-        let attachAttachments = options.attachments ?? true;
 
-        // If message is too old, don't attach attachments
-        if (candidate.rootIndex < history.length - 10 || totalAttachments > 2) {
-            attachAttachments = false;
+        let attachAttachments = false;
+        if (mode === 'chat') {
+            attachAttachments = options.attachments ?? true;
+            if (
+                candidate.rootIndex < history.length - 10 ||
+                totalAttachments > 2
+            ) {
+                attachAttachments = false;
+            }
         }
 
         let msgRes;
-
         try {
             msgRes = await constructMsg(
                 api,
@@ -496,11 +672,14 @@ export async function makeHistoryV2(
                     symbolLimit,
                     attachments: attachAttachments,
                     includeReactions: options.includeReactions,
+                    characterName: options.characterName,
                 },
             );
         } catch (error) {
             logger.error(
-                'Could not construct replied message',
+                mode === 'chat'
+                    ? 'Could not construct replied message'
+                    : 'Could not construct message',
                 {
                     error,
                     messageId: msg.id,
@@ -508,95 +687,27 @@ export async function makeHistoryV2(
                     hasText: Boolean(msg.text),
                     textLength: msg.text?.length ?? 0,
                     supportedFields: getSupportedContentFields(msg.info),
-                    unsupportedFields: getUnsupportedContentFields(
-                        msg.info,
-                    ),
+                    unsupportedFields: getUnsupportedContentFields(msg.info),
                 },
             );
             continue;
         }
 
-        if (Array.isArray(msgRes.content)) {
-            const attachmentsPart = msgRes.content.find((m) =>
-                m.type === 'file' || m.type === 'image'
-            );
+        if (mode === 'chat') {
+            if (Array.isArray(msgRes.content)) {
+                const attachmentsPart = msgRes.content.find((m) =>
+                    m.type === 'file' || m.type === 'image'
+                );
+                totalAttachments += attachmentsPart ? 1 : 0;
+            }
 
-            totalAttachments += attachmentsPart ? 1 : 0;
-        }
+            const size = JSON.stringify(msgRes).length;
+            if (totalBytes + size >= bytesLimit) {
+                break;
+            }
 
-        const size = JSON.stringify(msgRes).length;
-
-        if (totalBytes + size >= bytesLimit) {
-            // logger.info(
-            //     `Skipping old messages because prompt is too big ${size} (${
-            //         totalBytes + size
-            //     } > ${bytesLimit})`,
-            // );
-            break;
-        }
-
-        prompt.push(msgRes);
-        totalBytes += size;
-    }
-
-    // Reverse messages to make them in chronological order
-    prompt.reverse();
-
-    // Remove old messages to fit the limit
-    prompt.splice(0, prompt.length - messagesLimit);
-
-    return prompt;
-}
-
-interface NotesHistoryOptions {
-    symbolLimit: number;
-    messagesLimit: number;
-    bytesLimit: number;
-    characterName?: string;
-}
-
-export async function makeNotesHistory(
-    botInfo: { token: string; id: number },
-    api: Api<RawApi>,
-    logger: Logger,
-    history: ChatMessage[],
-    options: NotesHistoryOptions,
-): Promise<ModelMessage[]> {
-    const { messagesLimit, bytesLimit, symbolLimit, characterName } = options;
-
-    let totalBytes = 0;
-    let textPart = '';
-
-    const candidates = selectHistoryCandidates(history, {
-        resolveReplyThread: false,
-        maxRootMessages: messagesLimit,
-    });
-
-    for (const candidate of candidates) {
-        const msg = candidate.msg;
-
-        let msgRes;
-        try {
-            msgRes = await constructMsg(
-                api,
-                botInfo,
-                msg,
-                {
-                    symbolLimit,
-                    attachments: false,
-                    characterName,
-                },
-            );
-        } catch (error) {
-            logger.error('Could not construct message', {
-                error,
-                messageId: msg.id,
-                isMyself: msg.isMyself,
-                hasText: Boolean(msg.text),
-                textLength: msg.text?.length ?? 0,
-                supportedFields: getSupportedContentFields(msg.info),
-                unsupportedFields: getUnsupportedContentFields(msg.info),
-            });
+            prompt.push(msgRes);
+            totalBytes += size;
             continue;
         }
 
@@ -611,28 +722,111 @@ export async function makeNotesHistory(
         }
 
         const size = JSON.stringify(content).length;
-
         if (totalBytes + size >= bytesLimit) {
             logger.info(
                 `Skipping old messages because prompt is too big ${size} (${
                     totalBytes + size
                 } > ${bytesLimit})`,
             );
-
             break;
         }
 
         textPart += content;
-
         textPart += '\n--- ---\n';
-
         totalBytes += size;
     }
 
-    return [{
-        role: 'user',
-        content: textPart,
-    }];
+    if (mode === 'notes') {
+        return [{
+            role: 'user',
+            content: textPart,
+        }];
+    }
+
+    prompt.reverse();
+    prompt.splice(0, prompt.length - messagesLimit);
+    return prompt;
+}
+
+export function makeHistoryV2(
+    botInfo: { token: string; id: number },
+    api: Api<RawApi>,
+    logger: Logger,
+    history: ChatMessage[],
+    options: HistoryOptions,
+): Promise<ModelMessage[]> {
+    return buildHistoryContext(
+        botInfo,
+        api,
+        logger,
+        history,
+        {
+            mode: 'chat',
+            symbolLimit: options.symbolLimit,
+            messagesLimit: options.messagesLimit,
+            bytesLimit: options.bytesLimit,
+            attachments: options.attachments,
+            resolveReplyThread: options.resolveReplyThread,
+            includeReactions: options.includeReactions,
+            historyVersion: 'v2',
+            activeMessageId: options.activeMessageId,
+        },
+    );
+}
+
+export function makeHistoryV3(
+    botInfo: { token: string; id: number },
+    api: Api<RawApi>,
+    logger: Logger,
+    history: ChatMessage[],
+    options: HistoryOptions,
+): Promise<ModelMessage[]> {
+    return buildHistoryContext(
+        botInfo,
+        api,
+        logger,
+        history,
+        {
+            mode: 'chat',
+            symbolLimit: options.symbolLimit,
+            messagesLimit: options.messagesLimit,
+            bytesLimit: options.bytesLimit,
+            attachments: options.attachments,
+            resolveReplyThread: options.resolveReplyThread,
+            includeReactions: options.includeReactions,
+            historyVersion: 'v3',
+            activeMessageId: options.activeMessageId,
+        },
+    );
+}
+
+interface NotesHistoryOptions {
+    symbolLimit: number;
+    messagesLimit: number;
+    bytesLimit: number;
+    characterName?: string;
+}
+
+export function makeNotesHistory(
+    botInfo: { token: string; id: number },
+    api: Api<RawApi>,
+    logger: Logger,
+    history: ChatMessage[],
+    options: NotesHistoryOptions,
+): Promise<ModelMessage[]> {
+    return buildHistoryContext(
+        botInfo,
+        api,
+        logger,
+        history,
+        {
+            mode: 'notes',
+            symbolLimit: options.symbolLimit,
+            messagesLimit: options.messagesLimit,
+            bytesLimit: options.bytesLimit,
+            characterName: options.characterName,
+        },
+    );
 }
 
 async function getAttachments(
