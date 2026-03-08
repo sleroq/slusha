@@ -14,6 +14,7 @@ import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
 import { ReplyTo } from '../../memory.ts';
 import {
     chatActionsToolInputSchema,
+    chatReactionsToolInputSchema,
     ChatEntry,
     isReactEntry,
     isTextEntry,
@@ -45,8 +46,8 @@ import { buildLanguageProtocol } from '../../ai/language-protocol.ts';
 const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
 
-const DEFAULT_PLAIN_TEXT_OPTIONAL_REACTION_STEP =
-    'Optional step: return only react actions (no reply actions) using target_ref from Reply Target Map. If no reaction is needed, return empty actions list.';
+const DEFAULT_CHAT_REACTIONS_TOOL_DESCRIPTION =
+    'Submit Telegram reactions once per turn. Return entries containing only {"type":"react","react":"❤","target_ref":"tN"}. Do not include reply text.';
 
 const PLAIN_TEXT_META_OPEN = '<slusha_meta>';
 const PLAIN_TEXT_META_CLOSE = '</slusha_meta>';
@@ -141,6 +142,31 @@ function createSendChatActionsTool(description: string) {
     });
 }
 
+function createSendChatReactionsTool(description: string) {
+    return tool({
+        description,
+        inputSchema: chatReactionsToolInputSchema,
+        inputExamples: [
+            {
+                input: {
+                    entries: [
+                        {
+                            type: 'react',
+                            react: '❤',
+                            target_ref: 't1',
+                        },
+                    ],
+                },
+            },
+            {
+                input: {
+                    entries: [],
+                },
+            },
+        ],
+    });
+}
+
 function parseSendChatActionsEntries(
     toolCalls: Array<{ toolName: string; input: unknown }>,
 ): ChatEntry[] | undefined {
@@ -150,6 +176,25 @@ function parseSendChatActionsEntries(
     const parsedToolCallInput = chatActionsToolCall
         ? chatActionsToolInputSchema.safeParse(
             chatActionsToolCall.input,
+        )
+        : undefined;
+
+    if (parsedToolCallInput?.success) {
+        return parsedToolCallInput.data.entries;
+    }
+
+    return undefined;
+}
+
+function parseSendChatReactionsEntries(
+    toolCalls: Array<{ toolName: string; input: unknown }>,
+): ChatEntry[] | undefined {
+    const chatReactionsToolCall = toolCalls.find((call) =>
+        call.toolName === 'send_chat_reactions'
+    );
+    const parsedToolCallInput = chatReactionsToolCall
+        ? chatReactionsToolInputSchema.safeParse(
+            chatReactionsToolCall.input,
         )
         : undefined;
 
@@ -434,11 +479,12 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION,
             ),
         );
-        const plainTextReactionOptionalStepPrompt = resolveCustomPrompt(
-            effectiveConfig.ai.plainTextReactionOptionalStepPrompt,
-            DEFAULT_PLAIN_TEXT_OPTIONAL_REACTION_STEP,
+        const sendChatReactionsTool = createSendChatReactionsTool(
+            resolveCustomPrompt(
+                effectiveConfig.ai.plainTextReactionOptionalStepPrompt,
+                DEFAULT_CHAT_REACTIONS_TOOL_DESCRIPTION,
+            ),
         );
-
         const useJsonResponses = effectiveConfig.ai.useJsonResponses;
         const replyMethod = resolveReplyMethod(
             effectiveConfig.ai.replyMethod,
@@ -595,6 +641,10 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     ` If you need to reply to a specific message from Reply Target Map, start that reply block with ${PLAIN_TEXT_META_OPEN} on a separate line, then a one-line JSON object like {"target_ref":"tN"}, then ${PLAIN_TEXT_META_CLOSE}, then put reply text on the next line.`;
                 finalPrompt +=
                     ` Never include ${PLAIN_TEXT_META_OPEN}...${PLAIN_TEXT_META_CLOSE} in user-facing text body. It is machine-only metadata.`;
+                if (enabledReactions.length > 0) {
+                    finalPrompt +=
+                        ' Reply as plain text in assistant content. Optionally call send_chat_reactions only for react entries. Do not put reply text inside tool calls.';
+                }
             }
 
             messages.push({
@@ -622,6 +672,11 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 model: generationPolicy.model,
                 providerOptions,
                 maxRetries: maxGenerationRetries,
+                tools: enabledReactions.length > 0
+                    ? {
+                        send_chat_reactions: sendChatReactionsTool,
+                    }
+                    : undefined,
                 messages,
                 temperature: effectiveConfig.ai.temperature,
                 topK: effectiveConfig.ai.topK,
@@ -649,75 +704,18 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                 return replyEntries;
             }
 
-            const structuredPolicy = resolveGenerationPolicy({
-                modelRef,
-                config: effectiveConfig.ai,
-                task: 'chat',
-                expectsStructuredOutput: true,
-            });
-            const structuredProviderOptions = structuredPolicy
-                .providerOptions as Parameters<
-                    typeof generateText
-                >[0]['providerOptions'];
-            try {
-                const reactionResult = await generateText({
-                    model: structuredPolicy.model,
-                    providerOptions: structuredProviderOptions,
-                    maxRetries: maxGenerationRetries,
-                    tools: {
-                        send_chat_actions: sendChatActionsTool,
-                    },
-                    toolChoice: {
-                        type: 'tool',
-                        toolName: 'send_chat_actions',
-                    },
-                    stopWhen: hasToolCall('send_chat_actions'),
-                    temperature: effectiveConfig.ai.temperature,
-                    topK: effectiveConfig.ai.topK,
-                    topP: effectiveConfig.ai.topP,
-                    maxOutputTokens: structuredPolicy.maxOutputTokens,
-                    messages: [
-                        ...messages,
-                        {
-                            role: 'assistant',
-                            content: plainTextResponse,
-                        },
-                        {
-                            role: 'user',
-                            content: plainTextReactionOptionalStepPrompt,
-                        },
-                    ],
-                    experimental_telemetry: {
-                        isEnabled: true,
-                        functionId: 'user-message-plain-reactions',
-                        metadata: buildTelemetryMetadata(
-                            ctx,
-                            chatName,
-                            tags,
-                            effectiveConfig,
-                            structuredPolicy,
-                        ),
-                    },
-                });
-
-                const reactionEntries = parseSendChatActionsEntries(
-                    reactionResult.toolCalls,
-                );
-                if (!reactionEntries) {
-                    return replyEntries;
-                }
-
-                const filteredReactionEntries = reactionEntries
-                    .filter((entry) => isReactEntry(entry));
-
-                return [...replyEntries, ...filteredReactionEntries];
-            } catch (error) {
-                logger.warn(
-                    'Could not generate reactions for plain-text method, keeping text reply only',
-                    error,
-                );
+            const reactionEntries = parseSendChatReactionsEntries(
+                response.toolCalls,
+            );
+            if (!reactionEntries) {
                 return replyEntries;
             }
+
+            const filteredReactionEntries = reactionEntries.filter((entry) =>
+                isReactEntry(entry)
+            );
+
+            return [...replyEntries, ...filteredReactionEntries];
         };
 
         const generateStructuredActionsOutput = async (

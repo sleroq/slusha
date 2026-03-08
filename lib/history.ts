@@ -30,7 +30,9 @@ const HISTORY_META_OPEN = '<slusha_meta>';
 const HISTORY_META_CLOSE = '</slusha_meta>';
 
 function buildHistoryMetadataBlock(metadata: Record<string, unknown>): string {
-    return `\n${HISTORY_META_OPEN}\n${JSON.stringify(metadata)}\n${HISTORY_META_CLOSE}`;
+    return `${HISTORY_META_OPEN}\n${
+        JSON.stringify(metadata)
+    }\n${HISTORY_META_CLOSE}`;
 }
 
 function collectReplyThread(
@@ -338,19 +340,22 @@ async function constructMsg(
     // const prettyInputMessage = JSON.stringify(inputMessage, null, 2);
     // const prettyInputMessage = JSON.stringify(inputMessage);
 
-    let prettyInputMessage = '';
-
     const authorId = typeof msg.info.from?.id === 'number'
         ? msg.info.from.id.toString()
         : 'unknown';
     const authorTag = user.username ?? firstName;
     const replyTargetId = msg.replyTo?.id;
-
-    prettyInputMessage += `[m${msg.id}][u${authorId}:${authorTag}]`;
+    const messageMeta: Record<string, unknown> = {
+        kind: 'history_message_meta',
+        message_id: msg.id,
+        author_id: authorId,
+        author_tag: authorTag,
+    };
     if (typeof replyTargetId === 'number') {
-        prettyInputMessage += `[reply_to:m${replyTargetId}]`;
+        messageMeta.reply_to_message_id = replyTargetId;
     }
-    prettyInputMessage += ' ';
+
+    let prettyInputMessage = '';
 
     if (characterName && msg.isMyself) {
         prettyInputMessage += `${characterName}`;
@@ -417,7 +422,9 @@ async function constructMsg(
                     type: 'emoji',
                     emoji: rec.emoji,
                     count: rec.count,
-                    by: rec.by.map((user) => user.username ? `@${user.username}` : user.name),
+                    by: rec.by.map((user) =>
+                        user.username ? `@${user.username}` : user.name
+                    ),
                 });
                 continue;
             }
@@ -427,18 +434,22 @@ async function constructMsg(
                     type: 'custom',
                     custom_emoji_id: rec.customEmojiId,
                     count: rec.count,
-                    by: rec.by.map((user) => user.username ? `@${user.username}` : user.name),
+                    by: rec.by.map((user) =>
+                        user.username ? `@${user.username}` : user.name
+                    ),
                 });
             }
         }
 
         if (reactions.length > 0) {
-            prettyInputMessage += buildHistoryMetadataBlock({
-                kind: 'history_message_meta',
-                message_id: msg.id,
-                reactions,
-            });
+            messageMeta.reactions = reactions;
         }
+    }
+
+    const messageBody = prettyInputMessage.trim();
+    prettyInputMessage = buildHistoryMetadataBlock(messageMeta);
+    if (messageBody.length > 0) {
+        prettyInputMessage += `\n${messageBody}`;
     }
 
     parts.push({

@@ -1,6 +1,11 @@
 import { ModelMessage } from 'ai';
 import { ChatMessage } from '../memory.ts';
 
+const HISTORY_META_OPEN = '<slusha_meta>';
+const HISTORY_META_CLOSE = '</slusha_meta>';
+const historyMetaPrefixRegex =
+    /^<slusha_meta>\s*\r?\n([\s\S]*?)\r?\n<\/slusha_meta>/;
+
 export interface TargetRef {
     ref: string;
     messageId: number;
@@ -88,10 +93,45 @@ export function annotateHistoryWithTargetRefs(
     );
 
     const annotateText = (text: string): string => {
-        return text.replace(/^\[m(\d+)\]/, (full, id) => {
-            const ref = refByMessageId.get(Number(id));
-            return ref ? `[${ref}]${full}` : full;
-        });
+        const metaMatch = text.match(historyMetaPrefixRegex);
+        if (!metaMatch) {
+            return text;
+        }
+
+        let parsedMeta: Record<string, unknown>;
+        try {
+            const parsed = JSON.parse(metaMatch[1]);
+            if (!parsed || typeof parsed !== 'object') {
+                return text;
+            }
+            parsedMeta = parsed as Record<string, unknown>;
+        } catch {
+            return text;
+        }
+
+        if (parsedMeta.kind !== 'history_message_meta') {
+            return text;
+        }
+
+        const messageId = parsedMeta.message_id;
+        if (typeof messageId !== 'number') {
+            return text;
+        }
+
+        const targetRef = refByMessageId.get(messageId);
+        if (!targetRef || parsedMeta.target_ref === targetRef) {
+            return text;
+        }
+
+        const nextMeta: Record<string, unknown> = {
+            ...parsedMeta,
+            target_ref: targetRef,
+        };
+
+        const nextMetaBlock = `${HISTORY_META_OPEN}\n${
+            JSON.stringify(nextMeta)
+        }\n${HISTORY_META_CLOSE}`;
+        return `${nextMetaBlock}${text.slice(metaMatch[0].length)}`;
     };
 
     return history.map((entry) => {

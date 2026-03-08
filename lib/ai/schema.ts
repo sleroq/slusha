@@ -10,7 +10,7 @@ export const chatEntrySchema = z.object({
     message: 'Reply action must include text',
 });
 
-const reactionEntrySchema = z.object({
+export const reactionEntrySchema = z.object({
     type: z.literal('react'),
     react: z.string(),
     target_ref: z.string().regex(/^t\d+$/).optional(),
@@ -24,6 +24,9 @@ export const chatActionSchema = z.union([
 export const chatResponseSchema = z.array(chatActionSchema);
 export const chatActionsToolInputSchema = z.object({
     entries: chatResponseSchema,
+});
+export const chatReactionsToolInputSchema = z.object({
+    entries: z.array(reactionEntrySchema),
 });
 
 const legacyChatEntrySchema = z.object({

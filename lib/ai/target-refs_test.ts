@@ -51,12 +51,20 @@ Deno.test('buildTargetRefsPrompt returns fallback when no targets', () => {
     assertStringIncludes(prompt, 'There are no explicit targets right now');
 });
 
-Deno.test('annotateHistoryWithTargetRefs annotates m-id prefixes', () => {
+Deno.test('annotateHistoryWithTargetRefs annotates history meta block', () => {
     const messages: ModelMessage[] = [
-        { role: 'user', content: '[m42][u1:@alice] Alice:\nhi' },
+        {
+            role: 'user',
+            content:
+                '<slusha_meta>\n{"kind":"history_message_meta","message_id":42,"author_id":"1","author_tag":"@alice"}\n</slusha_meta>\nAlice:\nhi',
+        },
         {
             role: 'assistant',
-            content: [{ type: 'text', text: '[m41] ok' }],
+            content: [{
+                type: 'text',
+                text:
+                    '<slusha_meta>\n{"kind":"history_message_meta","message_id":41,"author_id":"943542647","author_tag":"@sl_chatbot"}\n</slusha_meta>\nok',
+            }],
         },
     ];
 
@@ -72,11 +80,12 @@ Deno.test('annotateHistoryWithTargetRefs annotates m-id prefixes', () => {
 
     assertEquals(annotated[0], {
         role: 'user',
-        content: '[t0][m42][u1:@alice] Alice:\nhi',
+        content:
+            '<slusha_meta>\n{"kind":"history_message_meta","message_id":42,"author_id":"1","author_tag":"@alice","target_ref":"t0"}\n</slusha_meta>\nAlice:\nhi',
     });
     assertEquals(
         (annotated[1].content as Array<{ type: string; text: string }>)[0]
             .text,
-        '[t1][m41] ok',
+        '<slusha_meta>\n{"kind":"history_message_meta","message_id":41,"author_id":"943542647","author_tag":"@sl_chatbot","target_ref":"t1"}\n</slusha_meta>\nok',
     );
 });
