@@ -1,4 +1,10 @@
+function normalizeLocaleCode(localeCode: string): string {
+    const cleaned = localeCode.trim().toLowerCase().replaceAll('_', '-');
+    return cleaned.split('-')[0] ?? cleaned;
+}
+
 function getLanguageName(localeCode: string): string {
+    const normalizedLocale = normalizeLocaleCode(localeCode);
     const map: Record<string, string> = {
         ru: 'Russian',
         uk: 'Ukrainian',
@@ -7,7 +13,7 @@ function getLanguageName(localeCode: string): string {
         hi: 'Hindi',
         id: 'Indonesian',
     };
-    return map[localeCode] ?? 'the chat language';
+    return map[normalizedLocale] ?? 'the chat language';
 }
 
 export function buildLanguageProtocol(defaultLocale: string): string {

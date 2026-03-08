@@ -6,6 +6,11 @@ Deno.test('buildLanguageProtocol uses mapped language name', () => {
     assertStringIncludes(protocol, 'Default to Russian language');
 });
 
+Deno.test('buildLanguageProtocol supports region-specific locale codes', () => {
+    const protocol = buildLanguageProtocol('ru-RU');
+    assertStringIncludes(protocol, 'Default to Russian language');
+});
+
 Deno.test('buildLanguageProtocol falls back to generic language', () => {
     const protocol = buildLanguageProtocol('zz');
     assertStringIncludes(protocol, 'Default to the chat language language');

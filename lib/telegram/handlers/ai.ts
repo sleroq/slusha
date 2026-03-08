@@ -620,6 +620,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
 
         const isComments = isTelegramCommentsHistory(savedHistory);
         const currentLocale = chatState.locale ??
+            ctx.from?.language_code ??
             await ctx.i18n.getLocale();
         const character = chatState.character;
 
