@@ -23,6 +23,18 @@ import {
     buildTargetRefs,
     buildTargetRefsPrompt,
 } from '../../ai/target-refs.ts';
+import {
+    getGenerationFallbackPlans,
+    resolveCustomPrompt,
+    resolveReplyMethod,
+    splitTextByTwoLines,
+    type GenerationAttemptPlan,
+} from '../../ai/chat-generation.ts';
+import {
+    buildChatInfoBlock,
+    buildChatPromptAddition,
+    isTelegramCommentsHistory,
+} from '../../ai/chat-context.ts';
 import { canonicalizeReaction, resolveEnabledReactions } from '../reactions.ts';
 import { isMissingSendTextRightsError } from '../reply-rights.ts';
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
@@ -30,88 +42,12 @@ import { parseModelRef } from '../../ai/model-ref.ts';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
 import { buildLanguageProtocol } from '../../ai/language-protocol.ts';
 
-type ReplyMethod = 'json_actions' | 'plain_text_reactions';
-
-type GenerationFallbackLevel =
-    | 'full'
-    | 'short_history'
-    | 'short_history_no_notes';
-
-type GenerationAttemptPlan = {
-    level: GenerationFallbackLevel;
-    historyLimit: number;
-    includeBotNotes: boolean;
-};
-
 const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
 
 const DEFAULT_PLAIN_TEXT_OPTIONAL_REACTION_STEP =
     'Optional step: return only react actions (no reply actions) using target_ref from Reply Target Map. If no reaction is needed, return empty actions list.';
 
-function resolveReplyMethod(
-    configuredMethod: string | undefined,
-    useJsonResponses: boolean,
-): ReplyMethod {
-    if (configuredMethod === 'json_actions') {
-        return 'json_actions';
-    }
-    if (configuredMethod === 'plain_text_reactions') {
-        return 'plain_text_reactions';
-    }
-
-    return useJsonResponses ? 'json_actions' : 'plain_text_reactions';
-}
-
-function splitTextByTwoLines(text: string): string[] {
-    const lines = text
-        .split('\n')
-        .map((line) => line.trimEnd());
-    const chunks: string[] = [];
-
-    for (let i = 0; i < lines.length; i += 2) {
-        const chunk = lines.slice(i, i + 2)
-            .join('\n')
-            .trim();
-        if (chunk.length > 0) {
-            chunks.push(chunk);
-        }
-    }
-
-    return chunks;
-}
-
-function getGenerationFallbackPlans(
-    messagesToPass: number,
-): GenerationAttemptPlan[] {
-    const shortHistoryLimit = Math.max(2, Math.floor(messagesToPass / 2));
-
-    return [
-        {
-            level: 'full',
-            historyLimit: messagesToPass,
-            includeBotNotes: true,
-        },
-        {
-            level: 'short_history',
-            historyLimit: shortHistoryLimit,
-            includeBotNotes: true,
-        },
-        {
-            level: 'short_history_no_notes',
-            historyLimit: shortHistoryLimit,
-            includeBotNotes: false,
-        },
-    ];
-}
-
-function resolveCustomPrompt(
-    configured: string | undefined,
-    fallback: string,
-): string {
-    const trimmed = configured?.trim();
-    return trimmed && trimmed.length > 0 ? trimmed : fallback;
-}
 
 function createSendChatActionsTool(description: string) {
     return tool({
@@ -437,11 +373,7 @@ export default function registerAI(bot: Bot<SlushaContext>) {
             targetRefs.map((target) => [target.ref, target.messageId]),
         );
 
-        // TODO: Improve this check
-        const isComments = savedHistory.some((m) =>
-            m.info.forward_origin?.type === 'channel' &&
-            m.info.from?.first_name === 'Telegram'
-        );
+        const isComments = isTelegramCommentsHistory(savedHistory);
         const currentLocale = chatState.locale ??
             await ctx.i18n.getLocale();
         const character = chatState.character;
@@ -482,18 +414,15 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                     '\n\n';
             }
 
-            if (ctx.chat.type === 'private') {
-                if (effectiveConfig.ai.privateChatPromptAddition) {
-                    prompt += effectiveConfig.ai.privateChatPromptAddition;
-                }
-            } else if (
-                isComments &&
-                effectiveConfig.ai.commentsPromptAddition
-            ) {
-                prompt += effectiveConfig.ai.commentsPromptAddition;
-            } else if (effectiveConfig.ai.groupChatPromptAddition) {
-                prompt += effectiveConfig.ai.groupChatPromptAddition;
-            }
+            prompt += buildChatPromptAddition({
+                chatType: ctx.chat.type,
+                isComments,
+                privateChatPromptAddition:
+                    effectiveConfig.ai.privateChatPromptAddition,
+                commentsPromptAddition: effectiveConfig.ai.commentsPromptAddition,
+                groupChatPromptAddition:
+                    effectiveConfig.ai.groupChatPromptAddition,
+            });
 
             if (chatState.hateMode && effectiveConfig.ai.hateModePrompt) {
                 prompt += '\n' + effectiveConfig.ai.hateModePrompt;
@@ -511,30 +440,18 @@ export default function registerAI(bot: Bot<SlushaContext>) {
                         effectiveConfig.ai.prompt);
             }
 
-            let chatInfoMsg = `Date and time right now: ${prettyDate()}`;
-            if (ctx.chat.type === 'private') {
-                chatInfoMsg +=
-                    `\nЛичный чат с ${ctx.from.first_name} (@${ctx.from.username})`;
-            } else if (activeMembers.length > 0) {
-                const prettyMembersList = activeMembers.map((m) => {
-                    let text = `- ${m.first_name}`;
-                    if (m.username) {
-                        text += ` (@${m.username})`;
-                    }
-                    return text;
-                }).join('\n');
-
-                chatInfoMsg +=
-                    `\nChat: ${ctx.chat.title}, Active members:\n${prettyMembersList}`;
-            }
-
-            if (plan.includeBotNotes && chatState.notes.length > 0) {
-                chatInfoMsg += `\n\nChat notes:\n${chatState.notes.join('\n')}`;
-            }
-            if (plan.includeBotNotes && chatState.memory) {
-                chatInfoMsg +=
-                    `\n\nMY OWN PERSONAL NOTES AND MEMORY:\n${chatState.memory}`;
-            }
+            const chatInfoMsg = buildChatInfoBlock({
+                nowText: prettyDate(),
+                chatType: ctx.chat.type,
+                chatTitle: ctx.chat.title,
+                userFirstName: ctx.from.first_name,
+                userUsername: ctx.from.username,
+                activeMembers,
+                notes: chatState.notes,
+                memory: chatState.memory,
+                includeNotes: plan.includeBotNotes,
+                includeMemory: plan.includeBotNotes,
+            });
 
             prompt += `\n\n### Chat Info ###\n${chatInfoMsg}`;
             if (enabledReactions.length === 0) {

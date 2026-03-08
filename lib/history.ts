@@ -458,35 +458,54 @@ async function constructMsg(
     } as ModelMessage;
 }
 
-export async function makeHistoryV2(
+interface BuildHistoryContextOptions {
+    mode: 'chat' | 'notes';
+    symbolLimit: number;
+    messagesLimit: number;
+    bytesLimit: number;
+    attachments?: boolean;
+    resolveReplyThread?: boolean;
+    includeReactions?: boolean;
+    characterName?: string;
+}
+
+export async function buildHistoryContext(
     botInfo: { token: string; id: number },
     api: Api<RawApi>,
     logger: Logger,
     history: ChatMessage[],
-    options: HistoryOptions,
+    options: BuildHistoryContextOptions,
 ): Promise<ModelMessage[]> {
-    const { messagesLimit, bytesLimit, symbolLimit } = options;
-    const resolveReplies = options.resolveReplyThread ?? true;
+    const { mode, messagesLimit, bytesLimit, symbolLimit } = options;
+    const resolveReplies = mode === 'chat'
+        ? (options.resolveReplyThread ?? true)
+        : false;
 
     let totalBytes = 0;
     let totalAttachments = 0;
     const prompt: ModelMessage[] = [];
+    let textPart = '';
 
     const candidates = selectHistoryCandidates(history, {
         resolveReplyThread: resolveReplies,
+        maxRootMessages: mode === 'notes' ? messagesLimit : undefined,
     });
 
     for (const candidate of candidates) {
         const msg = candidate.msg;
-        let attachAttachments = options.attachments ?? true;
 
-        // If message is too old, don't attach attachments
-        if (candidate.rootIndex < history.length - 10 || totalAttachments > 2) {
-            attachAttachments = false;
+        let attachAttachments = false;
+        if (mode === 'chat') {
+            attachAttachments = options.attachments ?? true;
+            if (
+                candidate.rootIndex < history.length - 10 ||
+                totalAttachments > 2
+            ) {
+                attachAttachments = false;
+            }
         }
 
         let msgRes;
-
         try {
             msgRes = await constructMsg(
                 api,
@@ -496,11 +515,14 @@ export async function makeHistoryV2(
                     symbolLimit,
                     attachments: attachAttachments,
                     includeReactions: options.includeReactions,
+                    characterName: options.characterName,
                 },
             );
         } catch (error) {
             logger.error(
-                'Could not construct replied message',
+                mode === 'chat'
+                    ? 'Could not construct replied message'
+                    : 'Could not construct message',
                 {
                     error,
                     messageId: msg.id,
@@ -508,95 +530,27 @@ export async function makeHistoryV2(
                     hasText: Boolean(msg.text),
                     textLength: msg.text?.length ?? 0,
                     supportedFields: getSupportedContentFields(msg.info),
-                    unsupportedFields: getUnsupportedContentFields(
-                        msg.info,
-                    ),
+                    unsupportedFields: getUnsupportedContentFields(msg.info),
                 },
             );
             continue;
         }
 
-        if (Array.isArray(msgRes.content)) {
-            const attachmentsPart = msgRes.content.find((m) =>
-                m.type === 'file' || m.type === 'image'
-            );
+        if (mode === 'chat') {
+            if (Array.isArray(msgRes.content)) {
+                const attachmentsPart = msgRes.content.find((m) =>
+                    m.type === 'file' || m.type === 'image'
+                );
+                totalAttachments += attachmentsPart ? 1 : 0;
+            }
 
-            totalAttachments += attachmentsPart ? 1 : 0;
-        }
+            const size = JSON.stringify(msgRes).length;
+            if (totalBytes + size >= bytesLimit) {
+                break;
+            }
 
-        const size = JSON.stringify(msgRes).length;
-
-        if (totalBytes + size >= bytesLimit) {
-            // logger.info(
-            //     `Skipping old messages because prompt is too big ${size} (${
-            //         totalBytes + size
-            //     } > ${bytesLimit})`,
-            // );
-            break;
-        }
-
-        prompt.push(msgRes);
-        totalBytes += size;
-    }
-
-    // Reverse messages to make them in chronological order
-    prompt.reverse();
-
-    // Remove old messages to fit the limit
-    prompt.splice(0, prompt.length - messagesLimit);
-
-    return prompt;
-}
-
-interface NotesHistoryOptions {
-    symbolLimit: number;
-    messagesLimit: number;
-    bytesLimit: number;
-    characterName?: string;
-}
-
-export async function makeNotesHistory(
-    botInfo: { token: string; id: number },
-    api: Api<RawApi>,
-    logger: Logger,
-    history: ChatMessage[],
-    options: NotesHistoryOptions,
-): Promise<ModelMessage[]> {
-    const { messagesLimit, bytesLimit, symbolLimit, characterName } = options;
-
-    let totalBytes = 0;
-    let textPart = '';
-
-    const candidates = selectHistoryCandidates(history, {
-        resolveReplyThread: false,
-        maxRootMessages: messagesLimit,
-    });
-
-    for (const candidate of candidates) {
-        const msg = candidate.msg;
-
-        let msgRes;
-        try {
-            msgRes = await constructMsg(
-                api,
-                botInfo,
-                msg,
-                {
-                    symbolLimit,
-                    attachments: false,
-                    characterName,
-                },
-            );
-        } catch (error) {
-            logger.error('Could not construct message', {
-                error,
-                messageId: msg.id,
-                isMyself: msg.isMyself,
-                hasText: Boolean(msg.text),
-                textLength: msg.text?.length ?? 0,
-                supportedFields: getSupportedContentFields(msg.info),
-                unsupportedFields: getUnsupportedContentFields(msg.info),
-            });
+            prompt.push(msgRes);
+            totalBytes += size;
             continue;
         }
 
@@ -611,28 +565,83 @@ export async function makeNotesHistory(
         }
 
         const size = JSON.stringify(content).length;
-
         if (totalBytes + size >= bytesLimit) {
             logger.info(
                 `Skipping old messages because prompt is too big ${size} (${
                     totalBytes + size
                 } > ${bytesLimit})`,
             );
-
             break;
         }
 
         textPart += content;
-
         textPart += '\n--- ---\n';
-
         totalBytes += size;
     }
 
-    return [{
-        role: 'user',
-        content: textPart,
-    }];
+    if (mode === 'notes') {
+        return [{
+            role: 'user',
+            content: textPart,
+        }];
+    }
+
+    prompt.reverse();
+    prompt.splice(0, prompt.length - messagesLimit);
+    return prompt;
+}
+
+export function makeHistoryV2(
+    botInfo: { token: string; id: number },
+    api: Api<RawApi>,
+    logger: Logger,
+    history: ChatMessage[],
+    options: HistoryOptions,
+): Promise<ModelMessage[]> {
+    return buildHistoryContext(
+        botInfo,
+        api,
+        logger,
+        history,
+        {
+            mode: 'chat',
+            symbolLimit: options.symbolLimit,
+            messagesLimit: options.messagesLimit,
+            bytesLimit: options.bytesLimit,
+            attachments: options.attachments,
+            resolveReplyThread: options.resolveReplyThread,
+            includeReactions: options.includeReactions,
+        },
+    );
+}
+
+interface NotesHistoryOptions {
+    symbolLimit: number;
+    messagesLimit: number;
+    bytesLimit: number;
+    characterName?: string;
+}
+
+export function makeNotesHistory(
+    botInfo: { token: string; id: number },
+    api: Api<RawApi>,
+    logger: Logger,
+    history: ChatMessage[],
+    options: NotesHistoryOptions,
+): Promise<ModelMessage[]> {
+    return buildHistoryContext(
+        botInfo,
+        api,
+        logger,
+        history,
+        {
+            mode: 'notes',
+            symbolLimit: options.symbolLimit,
+            messagesLimit: options.messagesLimit,
+            bytesLimit: options.bytesLimit,
+            characterName: options.characterName,
+        },
+    );
 }
 
 async function getAttachments(
