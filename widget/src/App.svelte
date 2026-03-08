@@ -1,7 +1,7 @@
 <script lang="ts">
     import { hapticFeedback, themeParams } from '@tma.js/sdk';
     import { init } from '@tma.js/sdk-svelte';
-    import { fade, fly } from 'svelte/transition';
+    import { fade } from 'svelte/transition';
     import { onDestroy, onMount, untrack } from 'svelte';
     import ChatOverrideForm from '$lib/components/config/ChatOverrideForm.svelte';
     import ConfigToolbar from '$lib/components/config/ConfigToolbar.svelte';
@@ -167,7 +167,7 @@
             showSaveFeedback(ok);
 
             if (ok) {
-                savedGlobalSignature = globalPayloadSignature;
+                savedGlobalSignature = computeGlobalPayloadSignature();
             }
 
             return;
@@ -187,8 +187,8 @@
         showSaveFeedback(ok);
 
         if (ok) {
-            savedChatSignature = chatPayloadSignature;
-            savedChatInternalsSignature = chatInternalsSignature;
+            savedChatSignature = computeChatPayloadSignature();
+            savedChatInternalsSignature = computeChatInternalsSignature();
         }
     };
 
@@ -205,6 +205,20 @@
         notifyFromResult(ok);
     };
 
+    const computeChatPayloadSignature = (): string =>
+        JSON.stringify(
+            buildChatPayload(
+                controller.chatOverrideConfig,
+                controller.chatText,
+                controller.chatBaseConfig,
+            ),
+        );
+
+    const computeChatInternalsSignature = (): string => JSON.stringify(controller.chatInternals);
+
+    const computeGlobalPayloadSignature = (): string =>
+        JSON.stringify(buildGlobalPayload(controller.globalConfig, controller.globalText));
+
     let chatPayloadPreview = $derived(
         buildChatPayload(
             controller.chatOverrideConfig,
@@ -212,25 +226,18 @@
             controller.chatBaseConfig,
         ),
     );
-    let chatPayloadSignature = $derived(JSON.stringify(chatPayloadPreview));
-    let chatInternalsSignature = $derived(JSON.stringify(controller.chatInternals));
-    let globalPayloadSignature = $derived(
-        JSON.stringify(buildGlobalPayload(controller.globalConfig, controller.globalText)),
-    );
     let overriddenFieldPaths = $derived(collectChatOverridePaths(chatPayloadPreview));
     let hasUnsavedGlobal = $derived(
-        savedGlobalSignature !== null && globalPayloadSignature !== savedGlobalSignature,
+        savedGlobalSignature !== null && computeGlobalPayloadSignature() !== savedGlobalSignature,
     );
     let hasUnsavedChat = $derived(
         savedChatSignature !== null &&
-            (chatPayloadSignature !== savedChatSignature ||
+            (computeChatPayloadSignature() !== savedChatSignature ||
                 (controller.canEditChatInternals &&
                     savedChatInternalsSignature !== null &&
-                    chatInternalsSignature !== savedChatInternalsSignature)),
+                    computeChatInternalsSignature() !== savedChatInternalsSignature)),
     );
-    let activeHasUnsavedChanges = $derived(
-        controller.scope === 'global' ? hasUnsavedGlobal : hasUnsavedChat,
-    );
+    let activeHasUnsavedChanges = $derived(controller.scope === 'global' ? hasUnsavedGlobal : hasUnsavedChat);
     let activeCanSave = $derived(
         controller.scope === 'global' ? controller.canSaveGlobal : controller.canSaveChat,
     );
@@ -244,9 +251,9 @@
         }
 
         untrack(() => {
-            savedGlobalSignature = globalPayloadSignature;
-            savedChatSignature = chatPayloadSignature;
-            savedChatInternalsSignature = chatInternalsSignature;
+            savedGlobalSignature = computeGlobalPayloadSignature();
+            savedChatSignature = computeChatPayloadSignature();
+            savedChatInternalsSignature = computeChatInternalsSignature();
         });
     });
 
@@ -321,7 +328,7 @@
             />
         </section>
 
-        <section class="pt-6" aria-busy={isBusy}>
+        <section class="relative min-h-96 pt-6" aria-busy={isBusy}>
             {#if controller.isLoading && !controller.bootstrap}
                 <div class="space-y-4 rounded-lg border bg-muted/20 p-4" role="status" aria-live="polite">
                     <div class="h-5 w-44 animate-pulse rounded bg-muted"></div>
@@ -331,9 +338,13 @@
                     <p class="text-sm text-muted-foreground">{t('app.loadingConfiguration')}</p>
                 </div>
             {:else}
-                {#key controller.scope}
-                    <div in:fly={{ y: 8, duration: 160 }} out:fade={{ duration: 120 }}>
-                        {#if controller.scope === 'global' && controller.canViewGlobal}
+                <div class="relative">
+                    {#if controller.isLoading && controller.bootstrap}
+                        <div class="pointer-events-none absolute inset-0 z-20 rounded-lg bg-background/60 backdrop-blur-[1px]"></div>
+                    {/if}
+
+                    {#if controller.canViewGlobal}
+                        <div hidden={controller.scope !== 'global'} aria-hidden={controller.scope !== 'global'}>
                             <GlobalConfigForm
                                 bind:config={controller.globalConfig}
                                 bind:text={controller.globalText}
@@ -342,7 +353,9 @@
                                 isAdmin={controller.role === 'admin'}
                                 searchQuery={settingsSearch}
                             />
-                        {:else}
+                        </div>
+
+                        <div hidden={controller.scope !== 'chat'} aria-hidden={controller.scope !== 'chat'}>
                             <ChatOverrideForm
                                 bind:config={controller.chatOverrideConfig}
                                 bind:text={controller.chatText}
@@ -357,9 +370,24 @@
                                 overriddenFieldPaths={overriddenFieldPaths}
                                 searchQuery={settingsSearch}
                             />
-                        {/if}
-                    </div>
-                {/key}
+                        </div>
+                    {:else}
+                        <ChatOverrideForm
+                            bind:config={controller.chatOverrideConfig}
+                            bind:text={controller.chatText}
+                            baseConfig={controller.chatBaseConfig}
+                            availableModels={controller.availableModels}
+                            availableReactions={controller.availableReactions}
+                            chatInternals={controller.chatInternals}
+                            currentCharacter={controller.currentCharacter}
+                            canEditChatInternals={controller.canEditChatInternals}
+                            canConfigureTrustedSettings={controller.canConfigureTrustedSettings}
+                            canEditWindowOverrides={controller.role === 'admin'}
+                            overriddenFieldPaths={overriddenFieldPaths}
+                            searchQuery={settingsSearch}
+                        />
+                    {/if}
+                </div>
             {/if}
         </section>
     </main>

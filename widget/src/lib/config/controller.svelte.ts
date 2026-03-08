@@ -118,6 +118,7 @@ export class ConfigController {
   #retryTimer: ReturnType<typeof setTimeout> | undefined;
   #loadRequestVersion = 0;
   #bootstrapAbortController: AbortController | undefined;
+  #bootstrapCache: Record<string, BootstrapResponse> = Object.create(null);
 
   constructor() {
     const params = initialSearchParams();
@@ -169,6 +170,22 @@ export class ConfigController {
     this.#clearRetryTimer();
     this.#bootstrapAbortController?.abort();
     this.#bootstrapAbortController = undefined;
+  }
+
+  #cacheKeyForChatId(chatId: string): string {
+    return chatId.trim() || "__default__";
+  }
+
+  #setCachedBootstrap(chatId: string, data: BootstrapResponse): void {
+    this.#bootstrapCache[this.#cacheKeyForChatId(chatId)] = data;
+  }
+
+  #getCachedBootstrap(chatId: string): BootstrapResponse | undefined {
+    return this.#bootstrapCache[this.#cacheKeyForChatId(chatId)];
+  }
+
+  #clearBootstrapCache(): void {
+    this.#bootstrapCache = Object.create(null);
   }
 
   #hydrateForms(data: BootstrapResponse): void {
@@ -263,7 +280,14 @@ export class ConfigController {
     this.locale = normalizeLocale(parsedUser.languageCode);
 
     this.#clearRetryTimer();
-    this.status = translate(this.locale, "status.loading");
+    const cachedBootstrap = this.#getCachedBootstrap(this.chatId);
+    if (cachedBootstrap) {
+      this.bootstrap = cachedBootstrap;
+      this.#hydrateForms(cachedBootstrap);
+      this.status = "";
+    } else {
+      this.status = translate(this.locale, "status.loading");
+    }
 
     const requestedChatId = this.chatId.trim();
     const result = await fetchBootstrap(
@@ -282,10 +306,17 @@ export class ConfigController {
     }
 
     this.bootstrap = result.data;
+    this.#setCachedBootstrap(requestedChatId, result.data);
     this.#hydrateForms(result.data);
 
     const selectedChatId = this.chatId.trim();
     if (selectedChatId && selectedChatId !== requestedChatId) {
+      const cachedSelected = this.#getCachedBootstrap(selectedChatId);
+      if (cachedSelected) {
+        this.bootstrap = cachedSelected;
+        this.#hydrateForms(cachedSelected);
+      }
+
       const selectedResult = await fetchBootstrap(
         selectedChatId,
         rawInitData,
@@ -303,6 +334,7 @@ export class ConfigController {
       }
 
       this.bootstrap = selectedResult.data;
+      this.#setCachedBootstrap(selectedChatId, selectedResult.data);
       this.#hydrateForms(selectedResult.data);
     }
 
@@ -330,6 +362,9 @@ export class ConfigController {
     this.status = translate(this.locale, "status.savingGlobal");
     const payload = buildGlobalPayload(this.globalConfig, this.globalText);
     const result = await saveGlobalConfig(payload, rawInitData, this.locale);
+    if (result.ok) {
+      this.#clearBootstrapCache();
+    }
     this.status = result.ok
       ? translate(this.locale, "status.savedGlobal")
       : (result.error ?? translate(this.locale, "status.failedSaveGlobal"));
@@ -361,6 +396,9 @@ export class ConfigController {
       rawInitData,
       this.locale,
     );
+    if (result.ok) {
+      this.#clearBootstrapCache();
+    }
     this.status = result.ok
       ? translate(this.locale, "status.savedChat")
       : (result.error ?? translate(this.locale, "status.failedSaveChat"));
@@ -392,6 +430,9 @@ export class ConfigController {
       rawInitData,
       this.locale,
     );
+    if (result.ok) {
+      this.#clearBootstrapCache();
+    }
     this.status = result.ok
       ? translate(this.locale, "status.savedInternals")
       : (result.error ?? translate(this.locale, "status.failedSaveInternals"));
