@@ -244,12 +244,12 @@ const defaultConfig = {
             },
         },
         downgradeModel: 'gemini-3.1-flash-lite-preview',
-        disableLongContext: true,
+        disableLongContext: false,
         downgradeMessagesToPass: 4,
-        downgradeBytesLimit: 1024 * 1024,
-        disableNotes: true,
-        disableAttachments: true,
-        disableMemory: true,
+        downgradeBytesLimit: 20 * 1024 * 1024,
+        disableNotes: false,
+        disableAttachments: false,
+        disableMemory: false,
     },
 };
 
