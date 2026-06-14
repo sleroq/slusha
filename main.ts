@@ -14,9 +14,13 @@ import registerAll from './lib/telegram/register-all.ts';
 import { startTelemetry } from './lib/app/observability.ts';
 import { startSchedulers } from './lib/app/scheduler.ts';
 import { wireShutdown } from './lib/app/shutdown.ts';
+import { logMemoryUsage } from './lib/app/memory-debug.ts';
 import { startWebServer } from './lib/web/server.ts';
 
-const sdk = startTelemetry();
+logMemoryUsage('startup');
+
+const sdk = await startTelemetry();
+logMemoryUsage('after telemetry');
 
 // (schemas and reaction utilities moved to dedicated modules)
 
@@ -26,6 +30,7 @@ await migrateDb();
 
 const memory = await loadMemory();
 logger.info('Memory loaded');
+logMemoryUsage('after memory load');
 
 try {
     config = await resolveConfig(memory.db);
@@ -39,6 +44,7 @@ const runtimeConfig = {
 };
 
 const bot = await setupBot(config, memory);
+logMemoryUsage('after bot setup');
 
 startWebServer({
     bot,
@@ -48,6 +54,7 @@ startWebServer({
 
 // Register everything in correct order
 registerAll(bot, config);
+logMemoryUsage('after middleware registration');
 
 run(bot, {
     runner: {
@@ -81,6 +88,7 @@ run(bot, {
     },
 });
 logger.info('Bot started');
+logMemoryUsage('bot started');
 
 // TODO: Remind users about bot existence
 

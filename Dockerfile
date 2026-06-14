@@ -1,4 +1,15 @@
-FROM denoland/deno:latest AS builder
+FROM --platform=$BUILDPLATFORM denoland/deno:2.7.4 AS widget-builder
+
+WORKDIR /app
+
+COPY widget ./widget
+
+RUN deno task --config ./widget/deno.json build
+
+FROM denoland/deno:2.7.4
+
+ENV DENO_NO_UPDATE_CHECK=1
+ENV DENO_NO_PROMPT=1
 
 WORKDIR /app
 
@@ -6,33 +17,8 @@ COPY deno.json deno.lock main.ts ./
 COPY lib ./lib
 COPY locales ./locales
 COPY drizzle ./drizzle
-COPY widget ./widget
+COPY --from=widget-builder /app/widget/dist ./widget/dist
 
-RUN deno cache --allow-import --allow-scripts main.ts
-RUN deno task --config ./widget/deno.json build
+RUN mkdir -p ./tmp ./log
 
-RUN mkdir -p ./tmp ./log && \
-    deno compile \
-    --allow-env \
-    --allow-net \
-    --allow-read=. \
-    --allow-import \
-    --allow-write \
-    --allow-sys \
-    --allow-ffi \
-    --unstable-detect-cjs \
-    -o /app/slusha \
-    main.ts
-
-FROM gcr.io/distroless/cc-debian12:nonroot
-
-ENV DENO_NO_UPDATE_CHECK=1
-ENV DENO_NO_PROMPT=1
-
-WORKDIR /home/nonroot/app
-
-COPY --from=builder --chown=nonroot:nonroot /app/slusha ./slusha
-COPY --from=builder --chown=nonroot:nonroot /app/locales ./locales
-COPY --from=builder --chown=nonroot:nonroot /app/drizzle ./drizzle
-COPY --from=builder --chown=nonroot:nonroot /app/widget/dist ./widget/dist
-CMD ["/home/nonroot/app/slusha"]
+CMD ["deno", "run", "--allow-env", "--allow-net", "--allow-read=.", "--allow-import", "--allow-write", "--allow-sys", "--allow-ffi", "--unstable-detect-cjs", "main.ts"]

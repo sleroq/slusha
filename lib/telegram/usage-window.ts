@@ -2,11 +2,6 @@ import { and, eq, gte, lt, sql } from 'drizzle-orm';
 import { ChatConfigOverride, UserConfig } from '../config.ts';
 import { DbClient } from '../db/client.ts';
 import { requestWindowEvents } from '../db/schema.ts';
-import {
-    usageCleanupRunsTotal,
-    usageDowngradedTotal,
-    usageEventsRecordedTotal,
-} from '../app/metrics.ts';
 
 export type UsageTier = 'free' | 'trusted';
 
@@ -93,7 +88,6 @@ export async function cleanupUsageEvents(
     await db.delete(requestWindowEvents).where(
         lt(requestWindowEvents.createdAt, cutoff),
     );
-    usageCleanupRunsTotal.inc();
 }
 
 export async function recordUsageEvent(
@@ -104,9 +98,6 @@ export async function recordUsageEvent(
         chatId: input.chatId,
         userId: input.userId,
         createdAt: input.now ?? Date.now(),
-    });
-    usageEventsRecordedTotal.inc({
-        has_user_id: input.userId ? 'true' : 'false',
     });
 }
 
@@ -165,13 +156,6 @@ export async function getUsageSnapshot(
         : chatExceeded
         ? 'chat'
         : 'none';
-
-    if (downgradeReason !== 'none') {
-        usageDowngradedTotal.inc({
-            tier,
-            reason: downgradeReason,
-        });
-    }
 
     return {
         tier,

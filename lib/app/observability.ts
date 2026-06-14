@@ -1,8 +1,28 @@
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { LangfuseExporter } from 'langfuse-vercel';
+import type { NodeSDK } from '@opentelemetry/sdk-node';
 
-export function startTelemetry() {
+function hasLangfuseConfig(): boolean {
+    return [
+        'LANGFUSE_SECRET_KEY',
+        'LANGFUSE_PUBLIC_KEY',
+        'LANGFUSE_BASEURL',
+    ].every((key) => {
+        const value = Deno.env.get(key);
+        return typeof value === 'string' && value.trim().length > 0;
+    });
+}
+
+export async function startTelemetry(): Promise<NodeSDK | undefined> {
+    if (!hasLangfuseConfig()) {
+        return undefined;
+    }
+
+    const [{ NodeSDK }, { getNodeAutoInstrumentations }, { LangfuseExporter }] =
+        await Promise.all([
+            import('@opentelemetry/sdk-node'),
+            import('@opentelemetry/auto-instrumentations-node'),
+            import('langfuse-vercel'),
+        ]);
+
     const sdk = new NodeSDK({
         traceExporter: new LangfuseExporter(),
         instrumentations: [getNodeAutoInstrumentations()],
@@ -11,6 +31,10 @@ export function startTelemetry() {
     return sdk;
 }
 
-export async function shutdownTelemetry(sdk: NodeSDK) {
+export async function shutdownTelemetry(sdk?: NodeSDK) {
+    if (!sdk) {
+        return;
+    }
+
     await sdk.shutdown();
 }

@@ -1,9 +1,7 @@
 import { extname, join, normalize } from 'node:path';
 import {
-    httpRequestDurationSeconds,
-    httpRequestsTotal,
+    prometheusContentType,
     renderPrometheusMetrics,
-    statusClass,
 } from '../app/metrics.ts';
 import logger from '../logger.ts';
 import { jsonResponse } from './http.ts';
@@ -12,11 +10,7 @@ import { handlePutChatConfigRequest } from './handlers/chat-config.ts';
 import { handlePutChatInternalsRequest } from './handlers/chat-internals.ts';
 import { handlePutGlobalConfigRequest } from './handlers/global-config.ts';
 import { resolveRequestContext } from './request-context.ts';
-import {
-    parseChatConfigChatId,
-    parseChatInternalsChatId,
-    resolveRouteTemplate,
-} from './routes.ts';
+import { parseChatConfigChatId, parseChatInternalsChatId } from './routes.ts';
 import { StartWebServerOptions } from './types.ts';
 
 function contentType(filePath: string): string {
@@ -114,9 +108,7 @@ export function startWebServer(options: StartWebServerOptions) {
     const hostname = Deno.env.get('WEB_HOST') ?? '0.0.0.0';
 
     const server = Deno.serve({ port, hostname }, async (req) => {
-        const startedAt = performance.now();
         const url = new URL(req.url);
-        const routeTemplate = resolveRouteTemplate(url.pathname);
 
         let response: Response;
         try {
@@ -131,11 +123,10 @@ export function startWebServer(options: StartWebServerOptions) {
                 }
 
                 if (url.pathname === '/metrics') {
-                    return new Response(renderPrometheusMetrics(), {
+                    return new Response(await renderPrometheusMetrics(), {
                         status: 200,
                         headers: {
-                            'content-type':
-                                'text/plain; version=0.0.4; charset=utf-8',
+                            'content-type': prometheusContentType,
                             'cache-control': 'no-store',
                         },
                     });
@@ -159,19 +150,6 @@ export function startWebServer(options: StartWebServerOptions) {
             logger.error('Unhandled web server error: ', error);
             response = jsonResponse({ error: 'Internal server error' }, 500);
         }
-
-        const status = statusClass(response.status);
-        const durationSeconds = (performance.now() - startedAt) / 1000;
-        httpRequestsTotal.inc({
-            route: routeTemplate,
-            method: req.method,
-            status_class: status,
-        });
-        httpRequestDurationSeconds.observe({
-            route: routeTemplate,
-            method: req.method,
-            status_class: status,
-        }, durationSeconds);
 
         return response;
     });
