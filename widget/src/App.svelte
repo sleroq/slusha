@@ -5,7 +5,8 @@
     import { onDestroy, onMount, untrack } from 'svelte';
     import ChatOverrideForm from '$lib/components/config/ChatOverrideForm.svelte';
     import ConfigToolbar from '$lib/components/config/ConfigToolbar.svelte';
-    import { buildChatPayload, buildGlobalPayload, collectChatOverridePaths } from '$lib/config/model';
+    import { buildGlobalPayload } from '$lib/config/model';
+    import { buildChatPayload, collectChatOverridePaths } from '$lib/config/override';
     import GlobalConfigForm from '$lib/components/config/GlobalConfigForm.svelte';
     import { createConfigController } from '$lib/config/controller.svelte';
     import { Button } from '$lib/components/ui/button';
