@@ -1,51 +1,47 @@
 # AGENTS.md
 
-Deno-first monorepo with:
+Deno-first monorepo: the Telegram bot/backend lives at the root (`main.ts`,
+`lib/`, `scripts/`); the Telegram Mini App widget lives in `widget/` (Svelte 5
++ Vite). There is no npm `package.json`; dependency maps and tasks are in
+`deno.json` files.
 
-- root app (`main.ts`, `lib/`, `scripts/`)
-- widget app (`widget/`, Svelte 5 + Vite)
+## Navigation
 
-## Root Commands (run from repo root)
+- Startup flow: `main.ts` wires migrations, memory, bot setup, web server,
+  middleware, schedulers, and shutdown.
+- Telegram handlers/commands: `lib/telegram/`.
+- AI prompt/context/model code: `lib/ai/`.
+- Web API and widget serving: `lib/web/`; route matching is centralized in
+  `lib/web/routes.ts`.
+- Persistence: Drizzle schema in `lib/db/schema.ts`, migrations in `drizzle/`,
+  applied on boot by `lib/db/migrate.ts`.
+- Widget config UI: `widget/src/lib/components/config/`; shared UI wrappers in
+  `widget/src/lib/components/ui/`.
 
-- Typecheck: `deno check --allow-import main.ts`
-- Lint: `deno lint`
-- Format check: `deno fmt --check`
-- Format fix: `deno fmt`
-- Tests (all): `AI_TOKEN="test" deno test -A`
-- Tests (single file): `AI_TOKEN="test" deno test -A lib/helpers_test.ts`
-- Tests (single test): `AI_TOKEN="test" deno test -A lib/helpers_test.ts --filter "splitMessage - handles newlines as natural break points"`
-- Dev run: `scripts/run.bash` (long-running)
-- Build binaries: `scripts/build.bash`
-- Build widget assets: `scripts/build-widget.bash`
+## Commands
 
-## Widget Commands (run from `widget/`)
+Root checks: `deno check --allow-import main.ts`, `deno lint`,
+`AI_TOKEN="test" deno test -A`. Use `deno fmt` for formatting and
+`scripts/run.bash` for a long-running local bot.
 
-- Dev server: `deno task dev` (long-running)
-- Typecheck: `deno task check`
-- Lint: `deno task lint`
-- Lint (Deno only): `deno task lint:deno`
-- Lint (ESLint only): `deno task lint:eslint`
-- Build: `deno task build`
-- Preview: `deno task preview` (long-running)
+Widget checks, from `widget/`: `deno task check`, `deno task lint`,
+`deno task build`. Use `deno task dev` for the long-running Vite dev server.
 
-## Verification Order
+## Conventions / non-obvious notes
 
-1. Typecheck
-2. Lint
-3. Tests
-4. Build (if relevant)
-
-Minimum gates:
-
-- Root-only: `deno check --allow-import main.ts` + `deno lint` + `AI_TOKEN="test" deno test -A`
-- Widget-only: `deno task check` + `deno task lint` + `deno task build`
-
-## A note to the agent
-
-We are building this together. When you learn something non-obvious but actually important to know for future tasks, add it to the AGENTS.md file of the corresponding project so future changes can go faster.
-
-## Learned notes
-
-- Widget ESLint enables `svelte/prefer-svelte-reactivity`: avoid creating mutable `Set`/`Map` instances inside component scripts unless using Svelte reactive alternatives.
-- Widget uses Bits UI select wrappers in `widget/src/lib/components/ui/select`: prefer those over native `<select>` for mobile UX; use `onValueChange` for side effects like reload-on-select.
-- Backend exposes Prometheus metrics at `GET /metrics` from `lib/web/server.ts`; keep metric labels low-cardinality (use route templates, avoid user/chat IDs).
+- Verify in this order when relevant: typecheck, lint, tests, build.
+- Add root dependencies to the root `deno.json`; add widget dependencies/tasks to
+  `widget/deno.json`.
+- For DB changes, update `lib/db/schema.ts` and add a matching migration under
+  `drizzle/`; migrations are runtime startup behavior, not a separate app step.
+- For metrics, keep labels low-cardinality; use route templates, never user/chat
+  IDs.
+- Widget code uses Svelte 5 runes. ESLint enforces
+  `svelte/prefer-svelte-reactivity`, so avoid mutable `Set`/`Map` component
+  state unless using Svelte-reactive alternatives.
+- Prefer the Bits UI wrappers in `widget/src/lib/components/ui/` over raw form
+  controls when a wrapper exists; selects in particular live under
+  `widget/src/lib/components/ui/select`.
+- Keep this file for orientation and durable conventions only. If you learn a
+  non-obvious convention that would speed up future work, add it here; keep
+  runtime feature lists and one-off facts in README or code comments instead.
