@@ -1,4 +1,5 @@
 import { ChatConfigOverride, UserConfig } from '../config.ts';
+import { chatOverrideContract } from '../config-contract.ts';
 import { ConfigRole } from './permissions.ts';
 import { normalizeReactionBlacklist } from '../telegram/reactions.ts';
 
@@ -9,39 +10,12 @@ type ChatOverrideKey = keyof Omit<
 >;
 type ChatEditableAiKey = keyof ChatEditableAi;
 
-const regularDirectOverrideKeys = [
-    'names',
-    'tendToReply',
-    'tendToIgnore',
-    'blacklistedReactions',
-    'nepons',
-] as const satisfies readonly ChatOverrideKey[];
-
-const regularDeltaOverrideKeys = [
-    'tendToReplyProbability',
-    'tendToIgnoreProbability',
-    'randomReplyProbability',
-    'responseDelay',
-] as const satisfies readonly ChatOverrideKey[];
-
-const trustedAiKeys = [
-    'model',
-    'temperature',
-    'topK',
-    'topP',
-    'historyVersion',
-    'prompt',
-    'dumbPrompt',
-    'privateChatPromptAddition',
-    'groupChatPromptAddition',
-    'commentsPromptAddition',
-    'hateModePrompt',
-    'replyMethod',
-    'messagesToPass',
-    'messageMaxLength',
-    'includeAttachmentsInHistory',
-    'bytesLimit',
-] as const satisfies readonly ChatEditableAiKey[];
+const regularDirectOverrideKeys = chatOverrideContract
+    .regularDirect satisfies readonly ChatOverrideKey[];
+const regularDeltaOverrideKeys = chatOverrideContract
+    .regularDelta satisfies readonly ChatOverrideKey[];
+const trustedAiKeys = chatOverrideContract
+    .trustedAi satisfies readonly ChatEditableAiKey[];
 
 function uniqueModels(models: string[]): string[] {
     return Array.from(new Set(models.map((item) => item.trim()))).filter((

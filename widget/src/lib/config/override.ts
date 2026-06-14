@@ -1,4 +1,8 @@
 import {
+  chatOverrideContract,
+  type ChatOverridePath,
+} from "../../../../lib/config-contract";
+import {
   type ChatFormText,
   type ChatOverridePayload,
   type Matcher,
@@ -10,36 +14,7 @@ import {
   textareaToStringList,
 } from "./model";
 
-export type ChatOverridePath =
-  | "names"
-  | "tendToReply"
-  | "tendToReplyProbability"
-  | "tendToIgnore"
-  | "tendToIgnoreProbability"
-  | "randomReplyProbability"
-  | "blacklistedReactions"
-  | "nepons"
-  | "responseDelay"
-  | "requestWindowPerChat.free.maxRequests"
-  | "requestWindowPerChat.free.windowMinutes"
-  | "requestWindowPerChat.trusted.maxRequests"
-  | "requestWindowPerChat.trusted.windowMinutes"
-  | "ai.model"
-  | "ai.temperature"
-  | "ai.topK"
-  | "ai.topP"
-  | "ai.prompt"
-  | "ai.dumbPrompt"
-  | "ai.privateChatPromptAddition"
-  | "ai.groupChatPromptAddition"
-  | "ai.commentsPromptAddition"
-  | "ai.hateModePrompt"
-  | "ai.replyMethod"
-  | "ai.historyVersion"
-  | "ai.messagesToPass"
-  | "ai.messageMaxLength"
-  | "ai.includeAttachmentsInHistory"
-  | "ai.bytesLimit";
+export type { ChatOverridePath };
 
 type TextKey = keyof ChatFormText;
 
@@ -50,40 +25,37 @@ interface ChatOverrideField {
   fallback?: unknown;
 }
 
-export const CHAT_OVERRIDE_FIELDS: readonly ChatOverrideField[] = [
-  { path: "tendToReplyProbability" },
-  { path: "tendToIgnoreProbability" },
-  { path: "randomReplyProbability" },
-  { path: "responseDelay" },
-  { path: "ai.historyVersion", fallback: "v2" },
-  { path: "names", textKey: "names", textKind: "matcherList" },
-  { path: "tendToReply", textKey: "tendToReply", textKind: "matcherList" },
-  { path: "tendToIgnore", textKey: "tendToIgnore", textKind: "matcherList" },
-  {
-    path: "blacklistedReactions",
+const widgetFieldMeta: Partial<
+  Record<ChatOverridePath, Omit<ChatOverrideField, "path">>
+> = {
+  names: { textKey: "names", textKind: "matcherList" },
+  tendToReply: { textKey: "tendToReply", textKind: "matcherList" },
+  tendToIgnore: { textKey: "tendToIgnore", textKind: "matcherList" },
+  blacklistedReactions: {
     textKey: "blacklistedReactions",
     textKind: "stringList",
   },
-  { path: "nepons", textKey: "nepons", textKind: "stringList" },
-  { path: "ai.model" },
-  { path: "ai.temperature" },
-  { path: "ai.topK" },
-  { path: "ai.topP" },
-  { path: "ai.prompt", fallback: "" },
-  { path: "ai.dumbPrompt", fallback: "" },
-  { path: "ai.privateChatPromptAddition", fallback: "" },
-  { path: "ai.groupChatPromptAddition", fallback: "" },
-  { path: "ai.commentsPromptAddition", fallback: "" },
-  { path: "ai.hateModePrompt", fallback: "" },
-  { path: "ai.messagesToPass" },
-  { path: "ai.messageMaxLength" },
-  { path: "ai.bytesLimit" },
-  { path: "ai.replyMethod", fallback: "" },
-  { path: "ai.includeAttachmentsInHistory" },
-  { path: "requestWindowPerChat.free.maxRequests" },
-  { path: "requestWindowPerChat.free.windowMinutes" },
-  { path: "requestWindowPerChat.trusted.maxRequests" },
-  { path: "requestWindowPerChat.trusted.windowMinutes" },
+  nepons: { textKey: "nepons", textKind: "stringList" },
+  "ai.historyVersion": { fallback: "v2" },
+  "ai.prompt": { fallback: "" },
+  "ai.dumbPrompt": { fallback: "" },
+  "ai.privateChatPromptAddition": { fallback: "" },
+  "ai.groupChatPromptAddition": { fallback: "" },
+  "ai.commentsPromptAddition": { fallback: "" },
+  "ai.hateModePrompt": { fallback: "" },
+  "ai.replyMethod": { fallback: "" },
+};
+
+function buildField(path: ChatOverridePath): ChatOverrideField {
+  return { path, ...widgetFieldMeta[path] };
+}
+
+export const CHAT_OVERRIDE_FIELDS: readonly ChatOverrideField[] = [
+  ...chatOverrideContract.regularDelta.map(buildField),
+  ...chatOverrideContract.regularDirect.map(buildField),
+  ...chatOverrideContract.trustedAi
+    .map((key) => buildField(`ai.${key}` as ChatOverridePath)),
+  ...chatOverrideContract.adminWindow.map(buildField),
 ] as const;
 
 function getPath(source: unknown, path: ChatOverridePath): unknown {
