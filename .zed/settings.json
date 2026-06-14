@@ -56,5 +56,8 @@
             ],
             "formatter": "language_server"
         }
+    },
+    "agent": {
+        "commit_message_instructions": "You are an expert at writing Git commits. Your job is to write a short clear commit message that summarizes the changes. Only return the commit message in your response. Do not include any additional meta-commentary about the task. Do not include the raw diff output in the commit message. Follow good Git style: - Try to limit the subject line to 40 characters - Capitalize the subject line - Do not end the subject line with any punctuation - Use the imperative mood in the subject line",
     }
 }
