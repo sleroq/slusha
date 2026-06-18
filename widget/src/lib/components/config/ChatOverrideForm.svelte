@@ -14,7 +14,6 @@
         type ChatOverridePath,
     } from '$lib/config/override';
     import type {
-        ChatInternalsPayload,
         ChatFormText,
         CurrentCharacterPayload,
         ResolvedChatOverridePayload,
@@ -26,9 +25,7 @@
         baseConfig: ResolvedChatOverridePayload;
         availableModels: string[];
         availableReactions: string[];
-        chatInternals: ChatInternalsPayload;
         currentCharacter?: CurrentCharacterPayload;
-        canEditChatInternals: boolean;
         canConfigureTrustedSettings: boolean;
         canEditWindowOverrides: boolean;
         overriddenFieldPaths: ChatOverridePath[];
@@ -41,9 +38,7 @@
         baseConfig,
         availableModels = [],
         availableReactions = [],
-        chatInternals = $bindable(),
         currentCharacter,
-        canEditChatInternals,
         canConfigureTrustedSettings,
         canEditWindowOverrides,
         overriddenFieldPaths = [],
@@ -128,19 +123,9 @@
             'trusted tier per-chat window minutes',
         ),
     );
-    let showInternals = $derived(
-        matchesSection(
-            'internals',
-            'internal',
-            'summary',
-            'personal notes',
-            'memory',
-        ),
-    );
     let hasMatches = $derived(
         showCurrentCharacter ||
             showGeneral ||
-            (canEditChatInternals && showInternals) ||
             (canConfigureTrustedSettings &&
                 (showModel || showPrompts || showAdvanced || showUsageLimits)),
     );
@@ -340,32 +325,6 @@
                             bind:value={text.nepons}
                         />
                     </div>
-                </div>
-            </details>
-        {/if}
-
-        {#if canEditChatInternals && showInternals}
-            <details class="quick-details pt-4" open={hasSearch}>
-                <summary class="cursor-pointer select-none font-medium">Internal</summary>
-                <div class="mt-4 grid gap-3 md:grid-cols-2">
-                    <SettingTextareaField
-                        id="c-internal-summary"
-                        rows={7}
-                        containerClass="md:col-span-2"
-                        label="Summary"
-                        description="Internal chat summary used for long-term context."
-                        hidden={!matchesBlockItem('internals', 'summary')}
-                        bind:value={chatInternals.summary}
-                    />
-                    <SettingTextareaField
-                        id="c-internal-personal-notes"
-                        rows={7}
-                        containerClass="md:col-span-2"
-                        label="Personal notes"
-                        description="Private memory notes used by the bot."
-                        hidden={!matchesBlockItem('internals', 'personal notes', 'memory')}
-                        bind:value={chatInternals.personalNotes}
-                    />
                 </div>
             </details>
         {/if}

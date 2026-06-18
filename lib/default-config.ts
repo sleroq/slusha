@@ -34,23 +34,6 @@ const chatActionsToolDescription =
 const chatReactionsToolDescription =
     'Submit Telegram reactions once per turn. Return entries containing only {"type":"react","react":"❤","target_ref":"tN"}. Do not include reply text.';
 
-const notesPrompt =
-    'Напиши краткое обзор важных событий в трех-пяти пунктах без нумирации. Твой ответ должен содержать только пункты событий чата.';
-
-const memoryPrompt = `
-### IMPORTANT SYSTEM CONTEXT ###
-Right now your task is to write notes about this chat for future reference.
-
-Read through the history carefully and write down anything that you think is important. Your notes are private and visible only to you. Write down information crucial to your understanding of the chat members and your character. This documentation will be used for next ~150 messages. For example - you can write advice for your future self to avoid making mistakes.
-Take notes about information said by you or users which are crucial to remember for not breaking the character. Do not include basic system information about your character and reply style as it will be always accessible anyway. Treat it as your memory and behaviour guide for future roleplay. Limit them to no more that 2 pages of text, don't need to remember everything, only key information. Use chat language for this notes.
-
-Think this through and take your time. No rush.
-`.trim();
-
-const memoryPromptRepeat = `
-Here is your last notes. Treat them with respect to avoid loosing important context, but rewrite them and remove/update outdated and contradictory information, especially not in line with the system prompt at the beginning:
-`.trim();
-
 const commentsPromptAddition = `
 - You're in a comments section of telegram channel with multiple users discussing channel posts and topics
 `.trim() + '\n\n';
@@ -84,8 +67,6 @@ const defaultConfig = {
         model: 'gemini-3.1-flash-lite-preview',
         replyMethod: 'json_actions',
         historyVersion: 'v2',
-        notesModel: 'gemini-3.1-flash-lite-preview',
-        memoryModel: 'gemini-3.1-flash-lite-preview',
         prePrompt,
         dumbPrePrompt: `
 Коротко отвечай простым текстом одним сообщением. Не используй JSON.
@@ -101,9 +82,6 @@ const defaultConfig = {
         groupChatPromptAddition,
         commentsPromptAddition,
         hateModePrompt,
-        notesPrompt,
-        memoryPrompt,
-        memoryPromptRepeat,
         finalPrompt,
         chatActionsToolDescription,
         chatReactionsToolDescription,
@@ -112,8 +90,6 @@ const defaultConfig = {
         topK: 32,
         topP: 0.85,
         messagesToPass: 10,
-        notesFrequency: 190,
-        memoryFrequency: 150,
         messageMaxLength: 4096,
         reservedMessageTokens: [
             'slusha_meta',
@@ -133,12 +109,6 @@ const defaultConfig = {
                 maxOutputTokens: 512,
                 thinking: {
                     thinkingLevel: 'low',
-                },
-            },
-            notes: {},
-            memory: {
-                thinking: {
-                    thinkingLevel: 'medium',
                 },
             },
             character: {
@@ -221,10 +191,7 @@ const defaultConfig = {
     availableModels: [
         'gemini-3.1-flash-lite-preview',
     ],
-    maxNotesToStore: 3,
     maxMessagesToStore: 200,
-    chatLastUseNotes: 2,
-    chatLastUseMemory: 2,
     responseDelay: 1,
     requestWindow: {
         free: {
@@ -251,9 +218,7 @@ const defaultConfig = {
         disableLongContext: false,
         downgradeMessagesToPass: 4,
         downgradeBytesLimit: 20 * 1024 * 1024,
-        disableNotes: false,
         disableAttachments: false,
-        disableMemory: false,
     },
 };
 

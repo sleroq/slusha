@@ -38,9 +38,7 @@ export interface RequestWindowConfig {
   disableLongContext: boolean;
   downgradeMessagesToPass: number;
   downgradeBytesLimit: number;
-  disableNotes: boolean;
   disableAttachments: boolean;
-  disableMemory: boolean;
 }
 
 export interface RequestWindowLimitOverride {
@@ -62,13 +60,11 @@ export interface BootstrapResponse {
   canViewGlobal: boolean;
   canEditGlobal: boolean;
   canEditChat: boolean;
-  canEditChatInternals?: boolean;
   globalPayload?: unknown;
   chatBasePayload?: unknown;
   chatOverridePayload?: unknown;
   effectiveConfigPayload?: unknown;
   currentCharacter?: unknown;
-  chatInternalsPayload?: unknown;
   usageWindowStatus?: unknown;
 }
 
@@ -81,11 +77,6 @@ export interface CurrentCharacterPayload {
   postHistoryInstructions: string;
   firstMessage: string;
   messageExample: string;
-}
-
-export interface ChatInternalsPayload {
-  summary: string;
-  personalNotes: string;
 }
 
 export interface SerializedRegex {
@@ -121,8 +112,6 @@ export type HistoryVersion = "v2" | "v3";
 
 export interface AiPayload {
   model: string;
-  notesModel?: string;
-  memoryModel?: string;
   temperature: number;
   topK: number;
   topP: number;
@@ -140,12 +129,7 @@ export interface AiPayload {
   chatActionsToolDescription?: string;
   chatReactionsToolDescription?: string;
   dumbFinalPrompt?: string;
-  notesPrompt: string;
-  memoryPrompt: string;
-  memoryPromptRepeat: string;
   messagesToPass: number;
-  notesFrequency: number;
-  memoryFrequency: number;
   messageMaxLength: number;
   reservedMessageTokens: string[];
   includeAttachmentsInHistory: boolean;
@@ -159,8 +143,6 @@ export interface AiPayload {
   };
   generation: {
     chat: GenerationTaskConfig;
-    notes: GenerationTaskConfig;
-    memory: GenerationTaskConfig;
     character: GenerationTaskConfig;
   };
 }
@@ -199,10 +181,7 @@ export interface UserConfigPayload {
   adminIds?: number[];
   trustedIds?: number[];
   availableModels: string[];
-  maxNotesToStore: number;
   maxMessagesToStore: number;
-  chatLastUseNotes: number;
-  chatLastUseMemory: number;
   responseDelay: number;
   requestWindow: RequestWindowConfig;
 }
@@ -280,8 +259,6 @@ function normalizeGenerationConfig(
 
   return {
     chat: normalizeGenerationTaskConfig(obj.chat, base.chat),
-    notes: normalizeGenerationTaskConfig(obj.notes, base.notes),
-    memory: normalizeGenerationTaskConfig(obj.memory, base.memory),
     character: normalizeGenerationTaskConfig(obj.character, base.character),
   };
 }
@@ -326,8 +303,6 @@ export interface ChatFormText {
 export function defaultAiConfig(): AiPayload {
   return {
     model: "",
-    notesModel: "",
-    memoryModel: "",
     temperature: 0.8,
     topK: 40,
     topP: 0.95,
@@ -345,12 +320,7 @@ export function defaultAiConfig(): AiPayload {
     chatActionsToolDescription: "",
     chatReactionsToolDescription: "",
     dumbFinalPrompt: "",
-    notesPrompt: "",
-    memoryPrompt: "",
-    memoryPromptRepeat: "",
     messagesToPass: 5,
-    notesFrequency: 150,
-    memoryFrequency: 50,
     messageMaxLength: 4096,
     reservedMessageTokens: ["slusha_meta", "target_ref"],
     includeAttachmentsInHistory: true,
@@ -382,14 +352,6 @@ export function defaultAiConfig(): AiPayload {
     generation: {
       chat: {
         maxOutputTokens: 512,
-        thinking: {},
-        openrouterReasoning: {},
-      },
-      notes: {
-        thinking: {},
-        openrouterReasoning: {},
-      },
-      memory: {
         thinking: {},
         openrouterReasoning: {},
       },
@@ -467,9 +429,7 @@ export function defaultRequestWindowConfig(): RequestWindowConfig {
     disableLongContext: true,
     downgradeMessagesToPass: 4,
     downgradeBytesLimit: 1024 * 1024,
-    disableNotes: true,
     disableAttachments: true,
-    disableMemory: true,
   };
 }
 
@@ -532,15 +492,9 @@ function normalizeRequestWindowConfig(value: unknown): RequestWindowConfig {
     downgradeBytesLimit: typeof obj.downgradeBytesLimit === "number"
       ? obj.downgradeBytesLimit
       : base.downgradeBytesLimit,
-    disableNotes: typeof obj.disableNotes === "boolean"
-      ? obj.disableNotes
-      : base.disableNotes,
     disableAttachments: typeof obj.disableAttachments === "boolean"
       ? obj.disableAttachments
       : base.disableAttachments,
-    disableMemory: typeof obj.disableMemory === "boolean"
-      ? obj.disableMemory
-      : base.disableMemory,
   };
 }
 
@@ -611,10 +565,7 @@ export function defaultGlobalConfig(): UserConfigPayload {
     adminIds: [],
     trustedIds: [],
     availableModels: [],
-    maxNotesToStore: 5,
     maxMessagesToStore: 100,
-    chatLastUseNotes: 3,
-    chatLastUseMemory: 2,
     responseDelay: 1,
     requestWindow: defaultRequestWindowConfig(),
   };
@@ -813,30 +764,6 @@ export function fromUnknownCurrentCharacter(
     messageExample: typeof obj.messageExample === "string"
       ? obj.messageExample
       : "",
-  };
-}
-
-export function defaultChatInternals(): ChatInternalsPayload {
-  return {
-    summary: "",
-    personalNotes: "",
-  };
-}
-
-export function fromUnknownChatInternals(
-  payload: unknown,
-): ChatInternalsPayload {
-  const base = defaultChatInternals();
-  if (!payload || typeof payload !== "object") {
-    return base;
-  }
-
-  const obj = payload as Record<string, unknown>;
-  return {
-    summary: typeof obj.summary === "string" ? obj.summary : base.summary,
-    personalNotes: typeof obj.personalNotes === "string"
-      ? obj.personalNotes
-      : base.personalNotes,
   };
 }
 

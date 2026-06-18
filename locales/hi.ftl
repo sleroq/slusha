@@ -30,8 +30,7 @@ random-parse-error = नंबर समझ नहीं आया। फिर 
 random-set = नई प्रॉबेबिलिटी: { $probability }%
 
 # Notes command
-notes-too-few-messages = अभी तक काफी मैसेज नहीं हुए, खुद पढ़ लो
-notes-output = { $notes }
+summary-disabled = सारांश और दीर्घकालिक मेमोरी अस्थायी रूप से बंद हैं।
 
 # Hate mode
 hate-mode-status = हैट मोड अब { $status } है

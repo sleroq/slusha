@@ -33,7 +33,7 @@ Deno.test('getGenerationFallbackPlans uses short history second stage', () => {
     assertEquals(plans.map((p) => p.level), [
         'full',
         'short_history',
-        'short_history_no_notes',
+        'short_history_final',
     ]);
     assertEquals(plans[1].historyLimit, 4);
 });

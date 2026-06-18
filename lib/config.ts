@@ -84,8 +84,6 @@ const defaultGoogleSafetySettings: Array<
 export const configSchema = z.object({
     ai: z.object({
         model: z.string().min(1).max(200),
-        notesModel: z.string().min(1).max(200).optional(),
-        memoryModel: z.string().min(1).max(200).optional(),
         temperature: z.number().min(0).max(2),
         topK: z.number().min(1).max(200),
         topP: z.number().min(0).max(1),
@@ -121,12 +119,7 @@ export const configSchema = z.object({
          * Optional alternative final prompt for dumb models (plain text)
          */
         dumbFinalPrompt: z.string().max(10000).optional(),
-        notesPrompt: z.string().max(20000),
-        memoryPrompt: z.string().max(20000),
-        memoryPromptRepeat: z.string().max(20000),
         messagesToPass: boundedPositiveInt(1, 100).default(5),
-        notesFrequency: boundedPositiveInt(1, 5000).default(150),
-        memoryFrequency: boundedPositiveInt(1, 5000).default(50),
         messageMaxLength: boundedPositiveInt(200, 20000).default(4096),
         reservedMessageTokens: z.array(reservedMessageTokenSchema).max(64)
             .default([
@@ -160,13 +153,9 @@ export const configSchema = z.object({
         }),
         generation: z.object({
             chat: generationTaskSchema.default({}),
-            notes: generationTaskSchema.default({}),
-            memory: generationTaskSchema.default({}),
             character: generationTaskSchema.default({}),
         }).default({
             chat: {},
-            notes: {},
-            memory: {},
             character: {},
         }),
     }),
@@ -188,10 +177,7 @@ export const configSchema = z.object({
         .default([
             'gemini-3.1-flash-lite-preview',
         ]),
-    maxNotesToStore: boundedPositiveInt(1, 200).default(5),
     maxMessagesToStore: boundedPositiveInt(1, 10000).default(100),
-    chatLastUseNotes: boundedPositiveInt(1, 100).default(3),
-    chatLastUseMemory: boundedPositiveInt(1, 100).default(2),
     responseDelay: z.number().min(0).max(120).default(1),
     requestWindow: z.object({
         free: requestWindowTierSchema,
@@ -201,9 +187,7 @@ export const configSchema = z.object({
         downgradeMessagesToPass: boundedPositiveInt(1, 100).default(4),
         downgradeBytesLimit: boundedPositiveInt(1024, 100 * 1024 * 1024)
             .default(1024 * 1024),
-        disableNotes: z.boolean().default(true),
         disableAttachments: z.boolean().default(true),
-        disableMemory: z.boolean().default(true),
     }).default(defaultConfig.requestWindow),
 });
 
@@ -419,11 +403,7 @@ export async function setGlobalUserConfig(
         throw new Error('availableModels must contain at least one model');
     }
 
-    const modelsToCheck = [
-        parsed.data.ai.model,
-        parsed.data.ai.notesModel,
-        parsed.data.ai.memoryModel,
-    ].filter((item): item is string =>
+    const modelsToCheck = [parsed.data.ai.model].filter((item): item is string =>
         typeof item === 'string' && item.length > 0
     );
 

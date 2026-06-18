@@ -30,8 +30,7 @@ random-parse-error = Tidak bisa mengurai angka. Coba lagi
 random-set = Probabilitas respons baru: { $probability }%
 
 # Notes command
-notes-too-few-messages = Belum cukup pesan yang lewat, baca sendiri
-notes-output = { $notes }
+summary-disabled = Ringkasan dan memori jangka panjang sementara dinonaktifkan.
 
 # Hate mode
 hate-mode-status = benci sekarang { $status }

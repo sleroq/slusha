@@ -2,7 +2,6 @@ import { initData } from "@tma.js/sdk-svelte";
 import {
   fetchBootstrap,
   saveChatConfig,
-  saveChatInternals,
   saveGlobalConfig,
 } from "./api";
 import { buildChatPayload } from "./override";
@@ -17,13 +16,11 @@ import {
   type BootstrapResponse,
   buildGlobalPayload,
   type ChatFormText,
-  type ChatInternalsPayload,
   chatTextFromConfig,
   type ConfigRole,
   type ConfigScope,
   type CurrentCharacterPayload,
   defaultGlobalConfig,
-  fromUnknownChatInternals,
   fromUnknownCurrentCharacter,
   fromUnknownGlobal,
   fromUnknownUsageWindowStatus,
@@ -83,9 +80,6 @@ export class ConfigController {
   availableReactions = $state<string[]>([]);
   availableChats = $state<AvailableChat[]>([]);
   currentCharacter = $state<CurrentCharacterPayload | undefined>(undefined);
-  chatInternals = $state<ChatInternalsPayload>(
-    fromUnknownChatInternals(undefined),
-  );
   usageWindowStatus = $state<UsageWindowStatus | undefined>(undefined);
 
   globalConfig = $state(defaultGlobalConfig());
@@ -144,11 +138,6 @@ export class ConfigController {
 
   get canSaveChat(): boolean {
     return Boolean(this.bootstrap?.canEditChat) &&
-      this.chatId.trim().length > 0;
-  }
-
-  get canEditChatInternals(): boolean {
-    return Boolean(this.bootstrap?.canEditChatInternals) &&
       this.chatId.trim().length > 0;
   }
 
@@ -219,9 +208,6 @@ export class ConfigController {
     this.chatText = chatTextFromConfig(this.chatOverrideConfig);
     this.currentCharacter = fromUnknownCurrentCharacter(
       data.currentCharacter,
-    );
-    this.chatInternals = fromUnknownChatInternals(
-      data.chatInternalsPayload,
     );
     this.usageWindowStatus = fromUnknownUsageWindowStatus(
       data.usageWindowStatus,
@@ -405,39 +391,6 @@ export class ConfigController {
     return result.ok;
   }
 
-  async saveInternals(): Promise<boolean> {
-    const chatId = this.chatId.trim();
-    if (!chatId) {
-      this.status = translate(this.locale, "status.chatIdRequired");
-      return false;
-    }
-
-    if (!this.canEditChatInternals) {
-      this.status = translate(this.locale, "status.readOnlyInternals");
-      return false;
-    }
-
-    const rawInitData = this.ensureInitDataRaw();
-    if (!rawInitData) {
-      this.status = translate(this.locale, "status.missingInitData");
-      return false;
-    }
-
-    this.status = translate(this.locale, "status.savingInternals");
-    const result = await saveChatInternals(
-      chatId,
-      this.chatInternals,
-      rawInitData,
-      this.locale,
-    );
-    if (result.ok) {
-      this.#clearBootstrapCache();
-    }
-    this.status = result.ok
-      ? translate(this.locale, "status.savedInternals")
-      : (result.error ?? translate(this.locale, "status.failedSaveInternals"));
-    return result.ok;
-  }
 }
 
 export function createConfigController(): ConfigController {
