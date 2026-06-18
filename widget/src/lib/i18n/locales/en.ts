@@ -29,16 +29,11 @@ const en = {
   "status.savingChat": "Saving chat override...",
   "status.savedChat": "Chat override saved",
   "status.failedSaveChat": "Failed to save chat override",
-  "status.readOnlyInternals": "Chat internals are read-only for your role",
-  "status.savingInternals": "Saving chat internals...",
-  "status.savedInternals": "Chat internals saved",
-  "status.failedSaveInternals": "Failed to save chat internals",
 
   "api.networkFailed": "Network request failed",
   "api.failedLoad": "Failed to load",
   "api.failedSaveGlobal": "Failed to save global config",
   "api.failedSaveChat": "Failed to save chat override",
-  "api.failedSaveInternals": "Failed to save chat internals",
 
   "toolbar.role": "Role: {role}",
   "toolbar.usage": "Usage ({tier})",
