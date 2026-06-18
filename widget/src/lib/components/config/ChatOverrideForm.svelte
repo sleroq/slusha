@@ -97,10 +97,8 @@
     let showPrompts = $derived(
         matchesSection(
             'prompts',
-            'json-actions chat prompt',
-            'plain-text chat prompt',
+            'chat prompt',
             'primary chat prompt',
-            'low-context chat prompt',
             'private chat prompt addition',
             'group chat prompt addition',
             'comment prompt addition',
@@ -111,7 +109,6 @@
         matchesSection(
             'advanced',
             'messages passed to ai',
-            'reply method',
             'max reply length',
             'attachment byte limit',
             'include attachments in history',
@@ -413,21 +410,11 @@
                             id="c-ai-prompt"
                             rows={4}
                             containerClass="md:col-span-2"
-                            label="JSON-actions chat prompt"
-                            description="Core behavior/persona prompt used only when reply method is json_actions."
+                            label="Chat prompt"
+                            description="Core behavior/persona prompt for this chat."
                             sourceState={sourceStateFor('ai.prompt')}
-                            hidden={!matchesBlockItem('prompts', 'json-actions chat prompt', 'primary chat prompt')}
+                            hidden={!matchesBlockItem('prompts', 'chat prompt', 'primary chat prompt')}
                             bind:value={config.ai.prompt}
-                        />
-                        <SettingTextareaField
-                            id="c-ai-dumb-prompt"
-                            rows={3}
-                            containerClass="md:col-span-2"
-                            label="Plain-text chat prompt"
-                            description="Core behavior/persona prompt used only when reply method is plain_text_reactions."
-                            sourceState={sourceStateFor('ai.dumbPrompt')}
-                            hidden={!matchesBlockItem('prompts', 'plain-text chat prompt', 'low-context chat prompt', 'dumb prompt')}
-                            bind:value={config.ai.dumbPrompt}
                         />
                         <SettingTextareaField
                             id="c-ai-private-addition"
@@ -503,15 +490,6 @@
                             sourceState={sourceStateFor('ai.bytesLimit')}
                             hidden={!matchesBlockItem('advanced', 'attachment byte limit', 'bytes limit')}
                             bind:value={config.ai.bytesLimit}
-                        />
-                        <SettingSelectField
-                            id="c-ai-reply-method"
-                            label="Reply method"
-                            description="Chooses how replies and reactions are generated in this chat."
-                            options={['json_actions', 'plain_text_reactions']}
-                            sourceState={sourceStateFor('ai.replyMethod')}
-                            hidden={!matchesBlockItem('advanced', 'reply method', 'ai.replyMethod')}
-                            bind:value={config.ai.replyMethod}
                         />
                         <SettingToggleField
                             id="c-ai-attachments"

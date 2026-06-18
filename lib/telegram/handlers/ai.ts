@@ -15,7 +15,6 @@ import { ReplyTo } from '../../memory.ts';
 import {
     chatActionsToolInputSchema,
     ChatEntry,
-    chatReactionsToolInputSchema,
     isReactEntry,
     isTextEntry,
 } from '../../ai/schema.ts';
@@ -28,8 +27,6 @@ import {
     type GenerationAttemptPlan,
     getGenerationFallbackPlans,
     resolveCustomPrompt,
-    resolveReplyMethod,
-    splitTextByTwoLines,
 } from '../../ai/chat-generation.ts';
 import {
     buildChatInfoBlock,
@@ -51,32 +48,12 @@ import {
 const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
 
-const DEFAULT_CHAT_REACTIONS_TOOL_DESCRIPTION =
-    'Submit Telegram reactions once per turn. Return entries containing only {"type":"react","react":"❤","target_ref":"tN"}. Do not include reply text.';
-
-const PLAIN_TEXT_META_OPEN = '<slusha_meta>';
-const PLAIN_TEXT_META_CLOSE = '</slusha_meta>';
-
-const plainTextTargetRefLineRegex = /^@@target_ref=(t\d+)\s*\r?\n([\s\S]*)$/;
-const plainTextMetadataBlockRegex =
-    /^<slusha_meta>\s*\r?\n([\s\S]*?)\r?\n<\/slusha_meta>\s*/;
 const defaultReservedMessageTokens = [
     'slusha_meta',
     'target_ref',
 ];
 const RESERVED_MESSAGE_TOKEN_ERROR =
     'Generated output contains reserved metadata token';
-
-function parseJsonRecord(text: string): Record<string, unknown> | undefined {
-    try {
-        const parsed = JSON.parse(text);
-        return parsed && typeof parsed === 'object'
-            ? parsed as Record<string, unknown>
-            : undefined;
-    } catch {
-        return undefined;
-    }
-}
 
 function createSendChatActionsTool(description: string) {
     return tool({
@@ -152,31 +129,6 @@ function createSendChatActionsTool(description: string) {
     });
 }
 
-function createSendChatReactionsTool(description: string) {
-    return tool({
-        description,
-        inputSchema: chatReactionsToolInputSchema,
-        inputExamples: [
-            {
-                input: {
-                    entries: [
-                        {
-                            type: 'react',
-                            react: '❤',
-                            target_ref: 't1',
-                        },
-                    ],
-                },
-            },
-            {
-                input: {
-                    entries: [],
-                },
-            },
-        ],
-    });
-}
-
 function parseSendChatActionsEntries(
     toolCalls: Array<{ toolName: string; input: unknown }>,
 ): ChatEntry[] | undefined {
@@ -194,104 +146,6 @@ function parseSendChatActionsEntries(
     }
 
     return undefined;
-}
-
-function parseSendChatReactionsEntries(
-    toolCalls: Array<{ toolName: string; input: unknown }>,
-): ChatEntry[] | undefined {
-    const chatReactionsToolCall = toolCalls.find((call) =>
-        call.toolName === 'send_chat_reactions'
-    );
-    const parsedToolCallInput = chatReactionsToolCall
-        ? chatReactionsToolInputSchema.safeParse(
-            chatReactionsToolCall.input,
-        )
-        : undefined;
-
-    if (parsedToolCallInput?.success) {
-        return parsedToolCallInput.data.entries;
-    }
-
-    return undefined;
-}
-
-function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
-    const chunks = splitTextByTwoLines(rawText.trim());
-    const entries: ChatEntry[] = [];
-    let pendingTargetRef: string | undefined;
-
-    for (const chunk of chunks) {
-        const trimmed = chunk.trim();
-        if (!trimmed) {
-            continue;
-        }
-
-        let candidateText = trimmed;
-        let targetRef: string | undefined;
-
-        while (true) {
-            const metadataMatch = candidateText.match(
-                plainTextMetadataBlockRegex,
-            );
-            if (!metadataMatch) {
-                break;
-            }
-
-            const metadataPayload = metadataMatch[1].trim();
-            const metadata = parseJsonRecord(metadataPayload);
-            if (
-                !targetRef &&
-                metadata &&
-                typeof metadata.target_ref === 'string'
-            ) {
-                const parsedTargetRef = metadata.target_ref;
-                if (/^t\d+$/.test(parsedTargetRef)) {
-                    targetRef = parsedTargetRef;
-                }
-            }
-
-            candidateText = candidateText.slice(metadataMatch[0].length)
-                .trimStart();
-        }
-
-        const targetMatch = candidateText.match(plainTextTargetRefLineRegex);
-        if (targetMatch) {
-            targetRef = targetMatch[1] ?? targetRef ?? pendingTargetRef;
-            pendingTargetRef = undefined;
-            const text = targetMatch[2].trim();
-            if (!text) {
-                continue;
-            }
-
-            entries.push({
-                type: 'reply',
-                text,
-                target_ref: targetRef,
-            });
-            continue;
-        }
-
-        const visibleText = candidateText
-            .replace(/<slusha_meta>[\s\S]*?<\/slusha_meta>/g, '')
-            .trim();
-        if (!visibleText) {
-            if (targetRef) {
-                pendingTargetRef = targetRef;
-            }
-            continue;
-        }
-
-        const resolvedTargetRef = targetRef ?? pendingTargetRef;
-        pendingTargetRef = undefined;
-
-        entries.push({
-            type: 'reply',
-            text: visibleText,
-            target_ref: resolvedTargetRef,
-        });
-    }
-
-    return entries;
 }
 
 function normalizeReservedMessageTokens(rawTokens: string[]): string[] {
@@ -614,15 +468,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION,
             ),
         );
-        const sendChatReactionsTool = createSendChatReactionsTool(
-            resolveCustomPrompt(
-                effectiveConfig.ai.chatReactionsToolDescription,
-                DEFAULT_CHAT_REACTIONS_TOOL_DESCRIPTION,
-            ),
-        );
-        const replyMethod = resolveReplyMethod(
-            effectiveConfig.ai.replyMethod,
-        );
         const enabledReactions = resolveEnabledReactions(
             effectiveConfig.blacklistedReactions,
         );
@@ -700,17 +545,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
         ): Promise<ModelMessage[]> => {
             const messages: ModelMessage[] = [];
 
-            let prompt = '';
-            if (replyMethod === 'json_actions') {
-                prompt = (effectiveConfig.ai.prePrompt ?? '') + '\n\n';
-            } else {
-                const fallbackDumbPre =
-                    'Отвечай простым текстом без какого-либо JSON.' +
-                    '\nНе описывай действия и не пиши служебные команды.' +
-                    '\nИспользуй Telegram markdown, но без заголовков.';
-                prompt = (effectiveConfig.ai.dumbPrePrompt ?? fallbackDumbPre) +
-                    '\n\n';
-            }
+            let prompt = (effectiveConfig.ai.prePrompt ?? '') + '\n\n';
 
             prompt += buildChatPromptAddition({
                 chatType: ctx.chat.type,
@@ -733,10 +568,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             if (character) {
                 prompt += '### Character ###\n' + character.description;
             } else {
-                prompt += replyMethod === 'json_actions'
-                    ? effectiveConfig.ai.prompt
-                    : (effectiveConfig.ai.dumbPrompt ??
-                        effectiveConfig.ai.prompt);
+                prompt += effectiveConfig.ai.prompt;
             }
 
             const chatInfoMsg = buildChatInfoBlock({
@@ -793,28 +625,8 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             );
             messages.push(...annotatedHistory);
 
-            let finalPrompt = replyMethod === 'json_actions'
-                ? effectiveConfig.ai.finalPrompt
-                : (effectiveConfig.ai.dumbFinalPrompt ??
-                    'Ответь простым текстом.');
-            if (replyMethod === 'json_actions') {
-                finalPrompt +=
-                    ' Return only actions array using typed entries and target_ref values from Reply Target Map.';
-            }
-            if (replyMethod !== 'json_actions' && ctx.info.userToReply) {
-                finalPrompt +=
-                    ` Ответь на сообщение от ${ctx.info.userToReply}.`;
-            }
-            if (replyMethod !== 'json_actions') {
-                finalPrompt +=
-                    ` If you need to reply to a specific message from Reply Target Map, start that reply block with ${PLAIN_TEXT_META_OPEN} on a separate line, then a one-line JSON object like {"target_ref":"tN"}, then ${PLAIN_TEXT_META_CLOSE}, then put reply text on the next line.`;
-                finalPrompt +=
-                    ` Never include ${PLAIN_TEXT_META_OPEN}...${PLAIN_TEXT_META_CLOSE} in user-facing text body. It is machine-only metadata.`;
-                if (enabledReactions.length > 0) {
-                    finalPrompt +=
-                        ' Reply as plain text in assistant content. Optionally call send_chat_reactions only for react entries. Do not put reply text inside tool calls.';
-                }
-            }
+            const finalPrompt = effectiveConfig.ai.finalPrompt +
+                ' Return only actions array using typed entries and target_ref values from Reply Target Map.';
 
             messages.push({
                 role: 'user',
@@ -822,69 +634,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             });
 
             return messages;
-        };
-
-        const generatePlainTextAndReactionsOutput = async (
-            messages: ModelMessage[],
-        ): Promise<ChatEntry[]> => {
-            const generationPolicy = resolveGenerationPolicy({
-                modelRef,
-                config: effectiveConfig.ai,
-                task: 'chat',
-                expectsStructuredOutput: false,
-            });
-            const providerOptions = generationPolicy
-                .providerOptions as Parameters<
-                    typeof generateText
-                >[0]['providerOptions'];
-            const response = await generateText({
-                model: generationPolicy.model,
-                providerOptions,
-                maxRetries: maxGenerationRetries,
-                tools: enabledReactions.length > 0
-                    ? {
-                        send_chat_reactions: sendChatReactionsTool,
-                    }
-                    : undefined,
-                messages,
-                temperature: effectiveConfig.ai.temperature,
-                topK: effectiveConfig.ai.topK,
-                topP: effectiveConfig.ai.topP,
-                maxOutputTokens: generationPolicy.maxOutputTokens,
-                experimental_telemetry: {
-                    isEnabled: true,
-                    functionId: 'user-message-dumb',
-                    metadata: buildTelemetryMetadata(
-                        ctx,
-                        chatName,
-                        tags,
-                        effectiveConfig,
-                        generationPolicy,
-                    ),
-                },
-            });
-
-            const plainTextResponse = response.text.trim();
-            const replyEntries = parsePlainTextRepliesWithTargets(
-                plainTextResponse,
-            );
-
-            if (enabledReactions.length === 0) {
-                return replyEntries;
-            }
-
-            const reactionEntries = parseSendChatReactionsEntries(
-                response.toolCalls,
-            );
-            if (!reactionEntries) {
-                return replyEntries;
-            }
-
-            const filteredReactionEntries = reactionEntries.filter((entry) =>
-                isReactEntry(entry)
-            );
-
-            return [...replyEntries, ...filteredReactionEntries];
         };
 
         const generateStructuredActionsOutput = async (
@@ -971,11 +720,9 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             }
 
             try {
-                const generatedOutput = replyMethod === 'json_actions'
-                    ? await generateStructuredActionsOutput(attemptMessages)
-                    : await generatePlainTextAndReactionsOutput(
-                        attemptMessages,
-                    );
+                const generatedOutput = await generateStructuredActionsOutput(
+                    attemptMessages,
+                );
                 if (
                     hasReservedMessageToken(
                         generatedOutput,
@@ -992,7 +739,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                     level: attempt.level,
                     historyLimit: attempt.historyLimit,
                     includeBotNotes: attempt.includeBotNotes,
-                    replyMethod,
                     reservedMessageToken: isReservedMessageTokenError(error),
                     error,
                 });

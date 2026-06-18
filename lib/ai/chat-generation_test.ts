@@ -2,21 +2,7 @@ import { assertEquals } from '@std/assert';
 import {
     getGenerationFallbackPlans,
     resolveCustomPrompt,
-    splitTextByTwoLines,
 } from './chat-generation.ts';
-
-Deno.test('splitTextByTwoLines splits by blank lines', () => {
-    assertEquals(splitTextByTwoLines('a\nb\n\n c\n\n'), ['a\nb', 'c']);
-});
-
-Deno.test('splitTextByTwoLines keeps metadata block with text', () => {
-    assertEquals(
-        splitTextByTwoLines(
-            '<slusha_meta>\n{"target_ref":"t0"}\n</slusha_meta>\nreply',
-        ),
-        ['<slusha_meta>\n{"target_ref":"t0"}\n</slusha_meta>\nreply'],
-    );
-});
 
 Deno.test('getGenerationFallbackPlans uses short history second stage', () => {
     const plans = getGenerationFallbackPlans(9);

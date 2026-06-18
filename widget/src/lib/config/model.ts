@@ -116,7 +116,6 @@ export interface GenerationTaskConfig {
   maxOutputTokens?: number;
 }
 
-export type ReplyMethod = "json_actions" | "plain_text_reactions";
 export interface AiPayload {
   model: string;
   notesModel?: string;
@@ -126,17 +125,12 @@ export interface AiPayload {
   topP: number;
   prePrompt: string;
   prompt: string;
-  dumbPrompt?: string;
-  replyMethod?: ReplyMethod;
-  dumbPrePrompt?: string;
   privateChatPromptAddition?: string;
   groupChatPromptAddition?: string;
   commentsPromptAddition?: string;
   hateModePrompt?: string;
   finalPrompt: string;
   chatActionsToolDescription?: string;
-  chatReactionsToolDescription?: string;
-  dumbFinalPrompt?: string;
   notesPrompt: string;
   memoryPrompt: string;
   memoryPromptRepeat: string;
@@ -168,12 +162,10 @@ export interface ChatEditableAiPayload {
   topK: number;
   topP: number;
   prompt?: string;
-  dumbPrompt?: string;
   privateChatPromptAddition?: string;
   groupChatPromptAddition?: string;
   commentsPromptAddition?: string;
   hateModePrompt?: string;
-  replyMethod?: ReplyMethod;
   messagesToPass: number;
   messageMaxLength: number;
   includeAttachmentsInHistory: boolean;
@@ -329,17 +321,12 @@ export function defaultAiConfig(): AiPayload {
     topP: 0.95,
     prePrompt: "",
     prompt: "",
-    dumbPrompt: "",
-    replyMethod: "json_actions",
-    dumbPrePrompt: "",
     privateChatPromptAddition: "",
     groupChatPromptAddition: "",
     commentsPromptAddition: "",
     hateModePrompt: "",
     finalPrompt: "",
     chatActionsToolDescription: "",
-    chatReactionsToolDescription: "",
-    dumbFinalPrompt: "",
     notesPrompt: "",
     memoryPrompt: "",
     memoryPromptRepeat: "",
@@ -406,7 +393,6 @@ export function defaultChatEditableAiConfig(
     topK: typeof base.topK === "number" ? base.topK : 40,
     topP: typeof base.topP === "number" ? base.topP : 0.95,
     prompt: typeof base.prompt === "string" ? base.prompt : "",
-    dumbPrompt: typeof base.dumbPrompt === "string" ? base.dumbPrompt : "",
     privateChatPromptAddition:
       typeof base.privateChatPromptAddition === "string"
         ? base.privateChatPromptAddition
@@ -420,10 +406,6 @@ export function defaultChatEditableAiConfig(
     hateModePrompt: typeof base.hateModePrompt === "string"
       ? base.hateModePrompt
       : "",
-    replyMethod: base.replyMethod === "plain_text_reactions" ||
-        base.replyMethod === "json_actions"
-      ? base.replyMethod
-      : "json_actions",
     messagesToPass: typeof base.messagesToPass === "number"
       ? base.messagesToPass
       : 5,

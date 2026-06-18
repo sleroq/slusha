@@ -67,24 +67,17 @@
     let showPrompts = $derived(
         matchesSection(
             'prompts',
-            'json-actions preface prompt',
-            'plain-text preface prompt',
-            'json-actions chat prompt',
-            'plain-text chat prompt',
+            'preface prompt',
+            'chat prompt',
             'system preface prompt',
             'primary chat prompt',
-            'low-context chat prompt',
-            'low-context preface prompt',
             'private chat prompt addition',
             'group chat prompt addition',
             'comment prompt addition',
             'hate mode prompt',
-            'json-actions final prompt wrapper',
-            'plain-text final prompt wrapper',
+            'final prompt wrapper',
             'final prompt wrapper',
             'chat actions tool description',
-            'chat reactions tool description',
-            'low-context final wrapper',
             'notes extraction prompt',
             'memory prompt',
             'memory repeat prompt',
@@ -98,7 +91,6 @@
             'recent messages for notes',
             'recent messages for memory',
             'messages passed to ai',
-            'reply method',
             'max output tokens',
             'notes max output tokens',
             'notes thinking budget',
@@ -313,37 +305,19 @@
                         id="g-ai-preprompt"
                         rows={4}
                         containerClass="md:col-span-2"
-                        label="JSON-actions preface prompt"
-                        description="Prepended context used only when reply method is json_actions."
-                        hidden={!matchesBlockItem('prompts', 'json-actions preface prompt', 'system preface prompt', 'preprompt')}
+                        label="Preface prompt"
+                        description="Prepended system context for chat responses."
+                        hidden={!matchesBlockItem('prompts', 'preface prompt', 'system preface prompt', 'preprompt')}
                         bind:value={config.ai.prePrompt}
-                    />
-                    <SettingTextareaField
-                        id="g-ai-dumb-preprompt"
-                        rows={3}
-                        containerClass="md:col-span-2"
-                        label="Plain-text preface prompt"
-                        description="Prepended context used only when reply method is plain_text_reactions."
-                        hidden={!matchesBlockItem('prompts', 'plain-text preface prompt', 'low-context preface prompt', 'dumb preprompt')}
-                        bind:value={config.ai.dumbPrePrompt}
                     />
                     <SettingTextareaField
                         id="g-ai-prompt"
                         rows={4}
                         containerClass="md:col-span-2"
-                        label="JSON-actions chat prompt"
-                        description="Core behavior/persona prompt used only in json_actions mode."
-                        hidden={!matchesBlockItem('prompts', 'json-actions chat prompt', 'primary chat prompt')}
+                        label="Chat prompt"
+                        description="Core behavior/persona prompt."
+                        hidden={!matchesBlockItem('prompts', 'chat prompt', 'primary chat prompt')}
                         bind:value={config.ai.prompt}
-                    />
-                    <SettingTextareaField
-                        id="g-ai-dumb-prompt"
-                        rows={3}
-                        containerClass="md:col-span-2"
-                        label="Plain-text chat prompt"
-                        description="Core behavior/persona prompt used only in plain_text_reactions mode."
-                        hidden={!matchesBlockItem('prompts', 'plain-text chat prompt', 'low-context chat prompt', 'dumb prompt')}
-                        bind:value={config.ai.dumbPrompt}
                     />
                     <SettingTextareaField
                         id="g-ai-private-addition"
@@ -385,19 +359,10 @@
                         id="g-ai-final-prompt"
                         rows={4}
                         containerClass="md:col-span-2"
-                        label="JSON-actions final prompt wrapper"
-                        description="Last instruction template used only in json_actions mode."
-                        hidden={!matchesBlockItem('prompts', 'json-actions final prompt wrapper', 'final prompt wrapper', 'final prompt')}
+                        label="Final prompt wrapper"
+                        description="Last instruction template before generation."
+                        hidden={!matchesBlockItem('prompts', 'final prompt wrapper', 'final prompt')}
                         bind:value={config.ai.finalPrompt}
-                    />
-                    <SettingTextareaField
-                        id="g-ai-dumb-final"
-                        rows={3}
-                        containerClass="md:col-span-2"
-                        label="Plain-text final prompt wrapper"
-                        description="Last instruction template used only in plain_text_reactions mode."
-                        hidden={!matchesBlockItem('prompts', 'plain-text final prompt wrapper', 'low-context final wrapper', 'dumb final prompt')}
-                        bind:value={config.ai.dumbFinalPrompt}
                     />
                     <SettingTextareaField
                         id="g-ai-tool-description"
@@ -407,15 +372,6 @@
                         description="Schema and guidance injected into send_chat_actions tool description."
                         hidden={!matchesBlockItem('prompts', 'chat actions tool description', 'tool description', 'chatActionsToolDescription')}
                         bind:value={config.ai.chatActionsToolDescription}
-                    />
-                    <SettingTextareaField
-                        id="g-ai-chat-reactions"
-                        rows={3}
-                        containerClass="md:col-span-2"
-                        label="Chat reactions tool description"
-                        description="Tool description for send_chat_reactions used in plain_text_reactions mode to add reactions after text replies."
-                        hidden={!matchesBlockItem('prompts', 'chat reactions tool description', 'reactions tool', 'chatReactionsToolDescription')}
-                        bind:value={config.ai.chatReactionsToolDescription}
                     />
                     <SettingTextareaField
                         id="g-ai-notes-prompt"
@@ -603,14 +559,6 @@
                         description="Maximum attachment size included in processing."
                         hidden={!matchesBlockItem('advanced', 'attachment byte limit', 'bytes limit')}
                         bind:value={config.ai.bytesLimit}
-                    />
-                    <SettingSelectField
-                        id="g-ai-reply-method"
-                        label="Reply method"
-                        description="Chooses how replies and reactions are generated."
-                        options={['json_actions', 'plain_text_reactions']}
-                        hidden={!matchesBlockItem('advanced', 'reply method', 'ai.replyMethod')}
-                        bind:value={config.ai.replyMethod}
                     />
                     <SettingToggleField
                         id="g-ai-attachments"

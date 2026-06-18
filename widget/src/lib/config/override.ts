@@ -37,12 +37,10 @@ const widgetFieldMeta: Partial<
   },
   nepons: { textKey: "nepons", textKind: "stringList" },
   "ai.prompt": { fallback: "" },
-  "ai.dumbPrompt": { fallback: "" },
   "ai.privateChatPromptAddition": { fallback: "" },
   "ai.groupChatPromptAddition": { fallback: "" },
   "ai.commentsPromptAddition": { fallback: "" },
   "ai.hateModePrompt": { fallback: "" },
-  "ai.replyMethod": { fallback: "" },
 };
 
 function buildField(path: ChatOverridePath): ChatOverrideField {

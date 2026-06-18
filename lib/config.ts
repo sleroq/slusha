@@ -24,10 +24,6 @@ const matcherSchema = z.union([
 ]);
 
 const thinkingLevelSchema = z.enum(['minimal', 'low', 'medium', 'high']);
-const replyMethodSchema = z.enum([
-    'json_actions',
-    'plain_text_reactions',
-]);
 const reservedMessageTokenSchema = z.string().min(1).max(128);
 const googleThinkingConfigSchema = z.object({
     thinkingLevel: thinkingLevelSchema.optional(),
@@ -90,15 +86,6 @@ export const configSchema = z.object({
         topP: z.number().min(0).max(1),
         prePrompt: z.string().max(20000),
         prompt: z.string().max(20000),
-        dumbPrompt: z.string().max(10000).optional(),
-        /**
-         * Selects chat reply strategy for message generation and tool usage.
-         */
-        replyMethod: replyMethodSchema.optional(),
-        /**
-         * Optional alternative pre-prompt for dumb models that don't output JSON
-         */
-        dumbPrePrompt: z.string().max(10000).optional(),
         privateChatPromptAddition: z.string().max(10000).optional(),
         groupChatPromptAddition: z.string().max(10000).optional(),
         commentsPromptAddition: z.string().max(10000).optional(),
@@ -111,14 +98,6 @@ export const configSchema = z.object({
          * Optional override for send_chat_actions tool description.
          */
         chatActionsToolDescription: z.string().max(20000).optional(),
-        /**
-         * Optional override for send_chat_reactions tool description in plain_text_reactions mode.
-         */
-        chatReactionsToolDescription: z.string().max(20000).optional(),
-        /**
-         * Optional alternative final prompt for dumb models (plain text)
-         */
-        dumbFinalPrompt: z.string().max(10000).optional(),
         notesPrompt: z.string().max(20000),
         memoryPrompt: z.string().max(20000),
         memoryPromptRepeat: z.string().max(20000),
@@ -211,12 +190,10 @@ const chatOverrideAiSchema = z.object({
     topK: z.number().min(1).max(200).optional(),
     topP: z.number().min(0).max(1).optional(),
     prompt: z.string().max(20000).optional(),
-    dumbPrompt: z.string().max(10000).optional(),
     privateChatPromptAddition: z.string().max(10000).optional(),
     groupChatPromptAddition: z.string().max(10000).optional(),
     commentsPromptAddition: z.string().max(10000).optional(),
     hateModePrompt: z.string().max(10000).optional(),
-    replyMethod: replyMethodSchema.optional(),
     messagesToPass: boundedPositiveInt(1, 100).optional(),
     messageMaxLength: boundedPositiveInt(200, 20000).optional(),
     includeAttachmentsInHistory: z.boolean().optional(),

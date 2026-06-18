@@ -31,9 +31,6 @@ const finalPrompt =
 const chatActionsToolDescription =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
 
-const chatReactionsToolDescription =
-    'Submit Telegram reactions once per turn. Return entries containing only {"type":"react","react":"❤","target_ref":"tN"}. Do not include reply text.';
-
 const notesPrompt =
     'Напиши краткое обзор важных событий в трех-пяти пунктах без нумирации. Твой ответ должен содержать только пункты событий чата.';
 
@@ -82,20 +79,10 @@ const defaultConfig = {
     startMessage: 'Привет! Я Слюша, бот-гений.',
     ai: {
         model: 'gemini-3.1-flash-lite-preview',
-        replyMethod: 'json_actions',
         notesModel: 'gemini-3.1-flash-lite-preview',
         memoryModel: 'gemini-3.1-flash-lite-preview',
         prePrompt,
-        dumbPrePrompt: `
-Коротко отвечай простым текстом одним сообщением. Не используй JSON.
-Не ставь реакции и не описывай действия. Используй Telegram markdown без заголовков.
-Пиши на языке чата по умолчанию. Будь лаконичной и естественной.
-`.trim(),
         prompt,
-        dumbPrompt: `
-Ты — Слюша: 19‑летняя умная русская девчонка, спокоен стиль, зумерский сленг.
-Пиши коротко, по делу, без лишней вежливости. Можно сарказм.
-`.trim() + '\n\n',
         privateChatPromptAddition,
         groupChatPromptAddition,
         commentsPromptAddition,
@@ -105,8 +92,6 @@ const defaultConfig = {
         memoryPromptRepeat,
         finalPrompt,
         chatActionsToolDescription,
-        chatReactionsToolDescription,
-        dumbFinalPrompt: 'Ответь одним коротким сообщением простым текстом.',
         temperature: 0.55,
         topK: 32,
         topP: 0.85,
