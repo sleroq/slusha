@@ -5,6 +5,7 @@ import {
   saveChatInternals,
   saveGlobalConfig,
 } from "./api";
+import { buildChatPayload } from "./override";
 import {
   DEFAULT_LOCALE,
   normalizeLocale,
@@ -14,7 +15,6 @@ import {
 import {
   type AvailableChat,
   type BootstrapResponse,
-  buildChatPayload,
   buildGlobalPayload,
   type ChatFormText,
   type ChatInternalsPayload,
@@ -24,13 +24,13 @@ import {
   type CurrentCharacterPayload,
   defaultGlobalConfig,
   fromUnknownChatInternals,
-  fromUnknownChatOverride,
   fromUnknownCurrentCharacter,
   fromUnknownGlobal,
   fromUnknownUsageWindowStatus,
   type GlobalFormText,
   globalTextFromConfig,
   parseChatIdFromStartParam,
+  resolveChatOverridePayload,
   type ResolvedChatOverridePayload,
   type UsageWindowStatus,
 } from "./model";
@@ -102,10 +102,10 @@ export class ConfigController {
   });
 
   chatOverrideConfig = $state(
-    fromUnknownChatOverride({}, defaultGlobalConfig()),
+    resolveChatOverridePayload({}, defaultGlobalConfig()),
   );
   chatBaseConfig = $state<ResolvedChatOverridePayload>(
-    fromUnknownChatOverride({}, defaultGlobalConfig()),
+    resolveChatOverridePayload({}, defaultGlobalConfig()),
   );
   chatText = $state<ChatFormText>({
     names: "",
@@ -211,8 +211,8 @@ export class ConfigController {
     const baseConfig = fromUnknownGlobal(
       data.chatBasePayload ?? data.globalPayload ?? data.effectiveConfigPayload,
     );
-    this.chatBaseConfig = fromUnknownChatOverride({}, baseConfig);
-    this.chatOverrideConfig = fromUnknownChatOverride(
+    this.chatBaseConfig = resolveChatOverridePayload({}, baseConfig);
+    this.chatOverrideConfig = resolveChatOverridePayload(
       data.chatOverridePayload,
       baseConfig,
     );

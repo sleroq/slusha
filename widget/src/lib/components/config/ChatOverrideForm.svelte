@@ -10,9 +10,9 @@
     import { createSectionMatcher } from '$lib/components/config/search';
     import { useI18n } from '$lib/i18n/context.svelte';
     import {
-        matcherListToTextarea,
-        stringListToTextarea,
-    } from '$lib/config/model';
+        resetChatOverridePath,
+        type ChatOverridePath,
+    } from '$lib/config/override';
     import type {
         ChatInternalsPayload,
         ChatFormText,
@@ -31,7 +31,7 @@
         canEditChatInternals: boolean;
         canConfigureTrustedSettings: boolean;
         canEditWindowOverrides: boolean;
-        overriddenFieldPaths: string[];
+        overriddenFieldPaths: ChatOverridePath[];
         searchQuery: string;
     }
 
@@ -146,20 +146,20 @@
     );
     let overriddenPathSet = $derived(new Set(overriddenFieldPaths));
 
-    const isOverridden = (path: string): boolean => overriddenPathSet.has(path);
+    const isOverridden = (path: ChatOverridePath): boolean => overriddenPathSet.has(path);
 
-    const unsetIfOverridden = (path: string, onUnset: () => void): void => {
+    const unsetIfOverridden = (path: ChatOverridePath): void => {
         if (!isOverridden(path)) {
             return;
         }
 
-        onUnset();
+        resetChatOverridePath(path, config, text, baseConfig);
     };
 
-    const sourceStateFor = (path: string, onUnset: () => void) => ({
+    const sourceStateFor = (path: ChatOverridePath) => ({
         overridden: isOverridden(path),
         label: 'Unset chat override (inherit global value)',
-        onUnset: () => unsetIfOverridden(path, onUnset),
+        onUnset: () => unsetIfOverridden(path),
     });
 
 </script>
@@ -253,9 +253,7 @@
                             type="number"
                             label="Reply tendency (%)"
                             description="Chance to answer when tend-to-reply patterns match."
-                            sourceState={sourceStateFor('tendToReplyProbability', () => {
-                                config.tendToReplyProbability = baseConfig.tendToReplyProbability;
-                            })}
+                            sourceState={sourceStateFor('tendToReplyProbability')}
                             hidden={!matchesBlockItem('general', 'reply tendency', 'tend to reply probability')}
                             bind:value={config.tendToReplyProbability}
                         />
@@ -264,9 +262,7 @@
                             type="number"
                             label="Ignore tendency (%)"
                             description="Chance to ignore when tend-to-ignore patterns match."
-                            sourceState={sourceStateFor('tendToIgnoreProbability', () => {
-                                config.tendToIgnoreProbability = baseConfig.tendToIgnoreProbability;
-                            })}
+                            sourceState={sourceStateFor('tendToIgnoreProbability')}
                             hidden={!matchesBlockItem('general', 'ignore tendency', 'tend to ignore probability')}
                             bind:value={config.tendToIgnoreProbability}
                         />
@@ -275,9 +271,7 @@
                             type="number"
                             label="Random reply chance (%)"
                             description="Fallback probability to respond without a match."
-                            sourceState={sourceStateFor('randomReplyProbability', () => {
-                                config.randomReplyProbability = baseConfig.randomReplyProbability;
-                            })}
+                            sourceState={sourceStateFor('randomReplyProbability')}
                             hidden={!matchesBlockItem('general', 'random reply chance', 'random reply probability')}
                             bind:value={config.randomReplyProbability}
                         />
@@ -286,9 +280,7 @@
                             type="number"
                             label="Response delay (seconds)"
                             description="Wait time before sending the reply."
-                            sourceState={sourceStateFor('responseDelay', () => {
-                                config.responseDelay = baseConfig.responseDelay;
-                            })}
+                            sourceState={sourceStateFor('responseDelay')}
                             hidden={!matchesBlockItem('general', 'response delay')}
                             bind:value={config.responseDelay}
                         />
@@ -297,9 +289,7 @@
                             label="History version"
                             description="Selects conversation history builder for this chat."
                             options={['v2', 'v3']}
-                            sourceState={sourceStateFor('ai.historyVersion', () => {
-                                config.ai.historyVersion = baseConfig.ai.historyVersion;
-                            })}
+                            sourceState={sourceStateFor('ai.historyVersion')}
                             hidden={!matchesBlockItem('general', 'history version', 'ai.historyVersion')}
                             bind:value={config.ai.historyVersion}
                         />
@@ -310,10 +300,7 @@
                             id="c-names"
                             label="Bot names"
                             description="One name or regex per line; used for mentions."
-                            sourceState={sourceStateFor('names', () => {
-                                config.names = [...baseConfig.names];
-                                text.names = matcherListToTextarea(baseConfig.names);
-                            })}
+                            sourceState={sourceStateFor('names')}
                             hidden={!matchesBlockItem('general', 'bot names', 'names')}
                             bind:value={text.names}
                         />
@@ -321,10 +308,7 @@
                             id="c-tend-reply"
                             label="Reply trigger patterns"
                             description="One pattern per line; supports /regex/flags."
-                            sourceState={sourceStateFor('tendToReply', () => {
-                                config.tendToReply = [...baseConfig.tendToReply];
-                                text.tendToReply = matcherListToTextarea(baseConfig.tendToReply);
-                            })}
+                            sourceState={sourceStateFor('tendToReply')}
                             hidden={!matchesBlockItem('general', 'reply trigger patterns', 'tend to reply')}
                             bind:value={text.tendToReply}
                         />
@@ -332,10 +316,7 @@
                             id="c-tend-ignore"
                             label="Ignore trigger patterns"
                             description="One pattern per line; supports /regex/flags."
-                            sourceState={sourceStateFor('tendToIgnore', () => {
-                                config.tendToIgnore = [...baseConfig.tendToIgnore];
-                                text.tendToIgnore = matcherListToTextarea(baseConfig.tendToIgnore);
-                            })}
+                            sourceState={sourceStateFor('tendToIgnore')}
                             hidden={!matchesBlockItem('general', 'ignore trigger patterns', 'tend to ignore')}
                             bind:value={text.tendToIgnore}
                         />
@@ -344,10 +325,7 @@
                             label="Blacklisted reactions"
                             description="Select reactions to block in this chat. Unselected reactions stay allowed."
                             reactions={availableReactions}
-                            sourceState={sourceStateFor('blacklistedReactions', () => {
-                                config.blacklistedReactions = [...baseConfig.blacklistedReactions];
-                                text.blacklistedReactions = stringListToTextarea(baseConfig.blacklistedReactions);
-                            })}
+                            sourceState={sourceStateFor('blacklistedReactions')}
                             hidden={!matchesBlockItem('general', 'blacklisted reactions', 'reactions')}
                             bind:value={text.blacklistedReactions}
                         />
@@ -357,10 +335,7 @@
                             description="Add, reorder, and remove canned fallback replies."
                             itemPlaceholder="Fallback reply"
                             addLabel="Add reply"
-                            sourceState={sourceStateFor('nepons', () => {
-                                config.nepons = [...baseConfig.nepons];
-                                text.nepons = stringListToTextarea(baseConfig.nepons);
-                            })}
+                            sourceState={sourceStateFor('nepons')}
                             hidden={!matchesBlockItem('general', 'nepon replies', 'nepons')}
                             bind:value={text.nepons}
                         />
@@ -405,9 +380,7 @@
                             label="Model"
                             description="Model used for this chat override."
                             options={availableModels}
-                            sourceState={sourceStateFor('ai.model', () => {
-                                config.ai.model = baseConfig.ai.model;
-                            })}
+                            sourceState={sourceStateFor('ai.model')}
                             hidden={!matchesBlockItem('model', 'model', 'ai model')}
                             bind:value={config.ai.model}
                         />
@@ -416,9 +389,7 @@
                             type="number"
                             label="Temperature"
                             description="Higher values increase randomness."
-                            sourceState={sourceStateFor('ai.temperature', () => {
-                                config.ai.temperature = baseConfig.ai.temperature;
-                            })}
+                            sourceState={sourceStateFor('ai.temperature')}
                             hidden={!matchesBlockItem('model', 'temperature')}
                             bind:value={config.ai.temperature}
                         />
@@ -427,9 +398,7 @@
                             type="number"
                             label="Top-K"
                             description="Limits token choices to the top K candidates."
-                            sourceState={sourceStateFor('ai.topK', () => {
-                                config.ai.topK = baseConfig.ai.topK;
-                            })}
+                            sourceState={sourceStateFor('ai.topK')}
                             hidden={!matchesBlockItem('model', 'top-k', 'topk')}
                             bind:value={config.ai.topK}
                         />
@@ -438,9 +407,7 @@
                             type="number"
                             label="Top-P"
                             description="Uses nucleus sampling with cumulative probability P."
-                            sourceState={sourceStateFor('ai.topP', () => {
-                                config.ai.topP = baseConfig.ai.topP;
-                            })}
+                            sourceState={sourceStateFor('ai.topP')}
                             hidden={!matchesBlockItem('model', 'top-p', 'topp')}
                             bind:value={config.ai.topP}
                         />
@@ -458,9 +425,7 @@
                             containerClass="md:col-span-2"
                             label="JSON-actions chat prompt"
                             description="Core behavior/persona prompt used only when reply method is json_actions."
-                            sourceState={sourceStateFor('ai.prompt', () => {
-                                config.ai.prompt = baseConfig.ai.prompt;
-                            })}
+                            sourceState={sourceStateFor('ai.prompt')}
                             hidden={!matchesBlockItem('prompts', 'json-actions chat prompt', 'primary chat prompt')}
                             bind:value={config.ai.prompt}
                         />
@@ -470,9 +435,7 @@
                             containerClass="md:col-span-2"
                             label="Plain-text chat prompt"
                             description="Core behavior/persona prompt used only when reply method is plain_text_reactions."
-                            sourceState={sourceStateFor('ai.dumbPrompt', () => {
-                                config.ai.dumbPrompt = baseConfig.ai.dumbPrompt;
-                            })}
+                            sourceState={sourceStateFor('ai.dumbPrompt')}
                             hidden={!matchesBlockItem('prompts', 'plain-text chat prompt', 'low-context chat prompt', 'dumb prompt')}
                             bind:value={config.ai.dumbPrompt}
                         />
@@ -482,9 +445,7 @@
                             containerClass="md:col-span-2"
                             label="Private chat prompt addition"
                             description="Extra instructions for private chats in this chat."
-                            sourceState={sourceStateFor('ai.privateChatPromptAddition', () => {
-                                config.ai.privateChatPromptAddition = baseConfig.ai.privateChatPromptAddition;
-                            })}
+                            sourceState={sourceStateFor('ai.privateChatPromptAddition')}
                             hidden={!matchesBlockItem('prompts', 'private chat prompt addition')}
                             bind:value={config.ai.privateChatPromptAddition}
                         />
@@ -494,9 +455,7 @@
                             containerClass="md:col-span-2"
                             label="Group chat prompt addition"
                             description="Extra instructions for group chats in this chat."
-                            sourceState={sourceStateFor('ai.groupChatPromptAddition', () => {
-                                config.ai.groupChatPromptAddition = baseConfig.ai.groupChatPromptAddition;
-                            })}
+                            sourceState={sourceStateFor('ai.groupChatPromptAddition')}
                             hidden={!matchesBlockItem('prompts', 'group chat prompt addition')}
                             bind:value={config.ai.groupChatPromptAddition}
                         />
@@ -506,9 +465,7 @@
                             containerClass="md:col-span-2"
                             label="Comment prompt addition"
                             description="Extra guidance for comment-style messages."
-                            sourceState={sourceStateFor('ai.commentsPromptAddition', () => {
-                                config.ai.commentsPromptAddition = baseConfig.ai.commentsPromptAddition;
-                            })}
+                            sourceState={sourceStateFor('ai.commentsPromptAddition')}
                             hidden={!matchesBlockItem('prompts', 'comment prompt addition', 'comments prompt addition')}
                             bind:value={config.ai.commentsPromptAddition}
                         />
@@ -518,9 +475,7 @@
                             containerClass="md:col-span-2"
                             label="Hate mode prompt"
                             description="Special prompt used when hate mode is enabled."
-                            sourceState={sourceStateFor('ai.hateModePrompt', () => {
-                                config.ai.hateModePrompt = baseConfig.ai.hateModePrompt;
-                            })}
+                            sourceState={sourceStateFor('ai.hateModePrompt')}
                             hidden={!matchesBlockItem('prompts', 'hate mode prompt')}
                             bind:value={config.ai.hateModePrompt}
                         />
@@ -537,9 +492,7 @@
                             type="number"
                             label="Messages passed to AI"
                             description="Number of recent messages sent to the model."
-                            sourceState={sourceStateFor('ai.messagesToPass', () => {
-                                config.ai.messagesToPass = baseConfig.ai.messagesToPass;
-                            })}
+                            sourceState={sourceStateFor('ai.messagesToPass')}
                             hidden={!matchesBlockItem('advanced', 'messages passed to ai')}
                             bind:value={config.ai.messagesToPass}
                         />
@@ -548,9 +501,7 @@
                             type="number"
                             label="Max reply length (chars)"
                             description="Soft limit for generated response length."
-                            sourceState={sourceStateFor('ai.messageMaxLength', () => {
-                                config.ai.messageMaxLength = baseConfig.ai.messageMaxLength;
-                            })}
+                            sourceState={sourceStateFor('ai.messageMaxLength')}
                             hidden={!matchesBlockItem('advanced', 'max reply length', 'message max length')}
                             bind:value={config.ai.messageMaxLength}
                         />
@@ -559,9 +510,7 @@
                             type="number"
                             label="Attachment byte limit"
                             description="Maximum attachment size included in processing."
-                            sourceState={sourceStateFor('ai.bytesLimit', () => {
-                                config.ai.bytesLimit = baseConfig.ai.bytesLimit;
-                            })}
+                            sourceState={sourceStateFor('ai.bytesLimit')}
                             hidden={!matchesBlockItem('advanced', 'attachment byte limit', 'bytes limit')}
                             bind:value={config.ai.bytesLimit}
                         />
@@ -570,9 +519,7 @@
                             label="Reply method"
                             description="Chooses how replies and reactions are generated in this chat."
                             options={['json_actions', 'plain_text_reactions']}
-                            sourceState={sourceStateFor('ai.replyMethod', () => {
-                                config.ai.replyMethod = baseConfig.ai.replyMethod;
-                            })}
+                            sourceState={sourceStateFor('ai.replyMethod')}
                             hidden={!matchesBlockItem('advanced', 'reply method', 'ai.replyMethod')}
                             bind:value={config.ai.replyMethod}
                         />
@@ -580,9 +527,7 @@
                             id="c-ai-attachments"
                             label="Include attachments in history"
                             description="Adds attachment text to model context when possible."
-                            sourceState={sourceStateFor('ai.includeAttachmentsInHistory', () => {
-                                config.ai.includeAttachmentsInHistory = baseConfig.ai.includeAttachmentsInHistory;
-                            })}
+                            sourceState={sourceStateFor('ai.includeAttachmentsInHistory')}
                             hidden={!matchesBlockItem('advanced', 'include attachments in history')}
                             bind:checked={config.ai.includeAttachmentsInHistory}
                         />
@@ -599,10 +544,7 @@
                             type="number"
                             label="Free tier per-chat max requests"
                             description="Chat-wide free-tier limit before cost mode."
-                            sourceState={sourceStateFor('requestWindowPerChat.free.maxRequests', () => {
-                                config.requestWindowPerChat.free.maxRequests =
-                                    baseConfig.requestWindowPerChat.free.maxRequests;
-                            })}
+                            sourceState={sourceStateFor('requestWindowPerChat.free.maxRequests')}
                             hidden={!matchesBlockItem('usage limits', 'free tier per-chat max requests')}
                             bind:value={config.requestWindowPerChat.free.maxRequests}
                         />
@@ -611,10 +553,7 @@
                             type="number"
                             label="Free tier per-chat window (minutes)"
                             description="Rolling window for free-tier chat usage."
-                            sourceState={sourceStateFor('requestWindowPerChat.free.windowMinutes', () => {
-                                config.requestWindowPerChat.free.windowMinutes =
-                                    baseConfig.requestWindowPerChat.free.windowMinutes;
-                            })}
+                            sourceState={sourceStateFor('requestWindowPerChat.free.windowMinutes')}
                             hidden={!matchesBlockItem('usage limits', 'free tier per-chat window minutes')}
                             bind:value={config.requestWindowPerChat.free.windowMinutes}
                         />
@@ -623,10 +562,7 @@
                             type="number"
                             label="Trusted tier per-chat max requests"
                             description="Chat-wide trusted-tier limit before cost mode."
-                            sourceState={sourceStateFor('requestWindowPerChat.trusted.maxRequests', () => {
-                                config.requestWindowPerChat.trusted.maxRequests =
-                                    baseConfig.requestWindowPerChat.trusted.maxRequests;
-                            })}
+                            sourceState={sourceStateFor('requestWindowPerChat.trusted.maxRequests')}
                             hidden={!matchesBlockItem('usage limits', 'trusted tier per-chat max requests')}
                             bind:value={config.requestWindowPerChat.trusted.maxRequests}
                         />
@@ -635,10 +571,7 @@
                             type="number"
                             label="Trusted tier per-chat window (minutes)"
                             description="Rolling window for trusted-tier chat usage."
-                            sourceState={sourceStateFor('requestWindowPerChat.trusted.windowMinutes', () => {
-                                config.requestWindowPerChat.trusted.windowMinutes =
-                                    baseConfig.requestWindowPerChat.trusted.windowMinutes;
-                            })}
+                            sourceState={sourceStateFor('requestWindowPerChat.trusted.windowMinutes')}
                             hidden={!matchesBlockItem('usage limits', 'trusted tier per-chat window minutes')}
                             bind:value={config.requestWindowPerChat.trusted.windowMinutes}
                         />

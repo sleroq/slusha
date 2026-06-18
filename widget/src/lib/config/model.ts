@@ -744,7 +744,7 @@ export function fromUnknownGlobal(payload: unknown): UserConfigPayload {
   };
 }
 
-export function fromUnknownChatOverride(
+export function resolveChatOverridePayload(
   payload: unknown,
   global: UserConfigPayload,
 ): ResolvedChatOverridePayload {
@@ -781,6 +781,8 @@ export function fromUnknownChatOverride(
     ),
   };
 }
+
+export const fromUnknownChatOverride = resolveChatOverridePayload;
 
 export function fromUnknownCurrentCharacter(
   payload: unknown,
@@ -922,223 +924,13 @@ export function buildGlobalPayload(
     blacklistedReactions: textareaToStringList(text.blacklistedReactions),
     ai: {
       ...config.ai,
-      reservedMessageTokens: textareaToStringList(text.reservedMessageTokens),
+      reservedMessageTokens: textareaToStringList(
+        text.reservedMessageTokens,
+      ),
     },
     nepons: textareaToStringList(text.nepons),
     adminIds: textareaToNumberList(text.adminIds),
     trustedIds: textareaToNumberList(text.trustedIds),
     availableModels: textareaToStringList(text.availableModels),
   };
-}
-
-function equalMatcherList(a: Matcher[], b: Matcher[]): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((item, index) =>
-    matcherToLine(item) === matcherToLine(b[index])
-  );
-}
-
-function equalStringList(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((item, index) => item === b[index]);
-}
-
-export function buildChatPayload(
-  config: ResolvedChatOverridePayload,
-  text: ChatFormText,
-  base: ResolvedChatOverridePayload,
-): ChatOverridePayload {
-  const names = matcherTextareaToList(text.names);
-  const tendToReply = matcherTextareaToList(text.tendToReply);
-  const tendToIgnore = matcherTextareaToList(text.tendToIgnore);
-  const blacklistedReactions = textareaToStringList(
-    text.blacklistedReactions,
-  );
-  const nepons = textareaToStringList(text.nepons);
-
-  const payload: ChatOverridePayload = {};
-  if (!equalMatcherList(names, base.names)) payload.names = names;
-  if (!equalMatcherList(tendToReply, base.tendToReply)) {
-    payload.tendToReply = tendToReply;
-  }
-  if (!equalMatcherList(tendToIgnore, base.tendToIgnore)) {
-    payload.tendToIgnore = tendToIgnore;
-  }
-  if (!equalStringList(blacklistedReactions, base.blacklistedReactions)) {
-    payload.blacklistedReactions = blacklistedReactions;
-  }
-  if (!equalStringList(nepons, base.nepons)) payload.nepons = nepons;
-  if (config.tendToReplyProbability !== base.tendToReplyProbability) {
-    payload.tendToReplyProbability = config.tendToReplyProbability;
-  }
-  if (config.tendToIgnoreProbability !== base.tendToIgnoreProbability) {
-    payload.tendToIgnoreProbability = config.tendToIgnoreProbability;
-  }
-  if (config.randomReplyProbability !== base.randomReplyProbability) {
-    payload.randomReplyProbability = config.randomReplyProbability;
-  }
-  if (config.responseDelay !== base.responseDelay) {
-    payload.responseDelay = config.responseDelay;
-  }
-
-  const requestWindowPerChat: RequestWindowPerChatOverride = {};
-  if (
-    config.requestWindowPerChat.free.maxRequests !==
-      base.requestWindowPerChat.free.maxRequests ||
-    config.requestWindowPerChat.free.windowMinutes !==
-      base.requestWindowPerChat.free.windowMinutes
-  ) {
-    requestWindowPerChat.free = {
-      maxRequests: config.requestWindowPerChat.free.maxRequests,
-      windowMinutes: config.requestWindowPerChat.free.windowMinutes,
-    };
-  }
-  if (
-    config.requestWindowPerChat.trusted.maxRequests !==
-      base.requestWindowPerChat.trusted.maxRequests ||
-    config.requestWindowPerChat.trusted.windowMinutes !==
-      base.requestWindowPerChat.trusted.windowMinutes
-  ) {
-    requestWindowPerChat.trusted = {
-      maxRequests: config.requestWindowPerChat.trusted.maxRequests,
-      windowMinutes: config.requestWindowPerChat.trusted.windowMinutes,
-    };
-  }
-  if (Object.keys(requestWindowPerChat).length > 0) {
-    payload.requestWindowPerChat = requestWindowPerChat;
-  }
-
-  const aiPayload: Partial<ChatEditableAiPayload> = {};
-  if (config.ai.model !== base.ai.model) aiPayload.model = config.ai.model;
-  if (config.ai.temperature !== base.ai.temperature) {
-    aiPayload.temperature = config.ai.temperature;
-  }
-  if (config.ai.topK !== base.ai.topK) aiPayload.topK = config.ai.topK;
-  if (config.ai.topP !== base.ai.topP) aiPayload.topP = config.ai.topP;
-  if ((config.ai.prompt ?? "") !== (base.ai.prompt ?? "")) {
-    aiPayload.prompt = config.ai.prompt;
-  }
-  if ((config.ai.dumbPrompt ?? "") !== (base.ai.dumbPrompt ?? "")) {
-    aiPayload.dumbPrompt = config.ai.dumbPrompt;
-  }
-  if (
-    (config.ai.privateChatPromptAddition ?? "") !==
-      (base.ai.privateChatPromptAddition ?? "")
-  ) {
-    aiPayload.privateChatPromptAddition = config.ai.privateChatPromptAddition;
-  }
-  if (
-    (config.ai.groupChatPromptAddition ?? "") !==
-      (base.ai.groupChatPromptAddition ?? "")
-  ) {
-    aiPayload.groupChatPromptAddition = config.ai.groupChatPromptAddition;
-  }
-  if (
-    (config.ai.commentsPromptAddition ?? "") !==
-      (base.ai.commentsPromptAddition ?? "")
-  ) {
-    aiPayload.commentsPromptAddition = config.ai.commentsPromptAddition;
-  }
-  if ((config.ai.hateModePrompt ?? "") !== (base.ai.hateModePrompt ?? "")) {
-    aiPayload.hateModePrompt = config.ai.hateModePrompt;
-  }
-  if ((config.ai.replyMethod ?? "") !== (base.ai.replyMethod ?? "")) {
-    aiPayload.replyMethod = config.ai.replyMethod;
-  }
-  if ((config.ai.historyVersion ?? "v2") !== (base.ai.historyVersion ?? "v2")) {
-    aiPayload.historyVersion = config.ai.historyVersion;
-  }
-  if (config.ai.messagesToPass !== base.ai.messagesToPass) {
-    aiPayload.messagesToPass = config.ai.messagesToPass;
-  }
-  if (config.ai.messageMaxLength !== base.ai.messageMaxLength) {
-    aiPayload.messageMaxLength = config.ai.messageMaxLength;
-  }
-  if (
-    config.ai.includeAttachmentsInHistory !==
-      base.ai.includeAttachmentsInHistory
-  ) {
-    aiPayload.includeAttachmentsInHistory =
-      config.ai.includeAttachmentsInHistory;
-  }
-  if (config.ai.bytesLimit !== base.ai.bytesLimit) {
-    aiPayload.bytesLimit = config.ai.bytesLimit;
-  }
-
-  if (Object.keys(aiPayload).length > 0) {
-    payload.ai = aiPayload;
-  }
-
-  return payload;
-}
-
-export function collectChatOverridePaths(
-  payload: ChatOverridePayload,
-): string[] {
-  const paths: string[] = [];
-
-  if (payload.names) paths.push("names");
-  if (payload.tendToReply) paths.push("tendToReply");
-  if (payload.tendToReplyProbability !== undefined) {
-    paths.push("tendToReplyProbability");
-  }
-  if (payload.tendToIgnore) paths.push("tendToIgnore");
-  if (payload.tendToIgnoreProbability !== undefined) {
-    paths.push("tendToIgnoreProbability");
-  }
-  if (payload.randomReplyProbability !== undefined) {
-    paths.push("randomReplyProbability");
-  }
-  if (payload.blacklistedReactions) paths.push("blacklistedReactions");
-  if (payload.nepons) paths.push("nepons");
-  if (payload.responseDelay !== undefined) paths.push("responseDelay");
-  if (payload.requestWindowPerChat?.free?.maxRequests !== undefined) {
-    paths.push("requestWindowPerChat.free.maxRequests");
-  }
-  if (payload.requestWindowPerChat?.free?.windowMinutes !== undefined) {
-    paths.push("requestWindowPerChat.free.windowMinutes");
-  }
-  if (payload.requestWindowPerChat?.trusted?.maxRequests !== undefined) {
-    paths.push("requestWindowPerChat.trusted.maxRequests");
-  }
-  if (payload.requestWindowPerChat?.trusted?.windowMinutes !== undefined) {
-    paths.push("requestWindowPerChat.trusted.windowMinutes");
-  }
-
-  if (!payload.ai) {
-    return paths;
-  }
-
-  if (payload.ai.model !== undefined) paths.push("ai.model");
-  if (payload.ai.temperature !== undefined) paths.push("ai.temperature");
-  if (payload.ai.topK !== undefined) paths.push("ai.topK");
-  if (payload.ai.topP !== undefined) paths.push("ai.topP");
-  if (payload.ai.prompt !== undefined) paths.push("ai.prompt");
-  if (payload.ai.dumbPrompt !== undefined) paths.push("ai.dumbPrompt");
-  if (payload.ai.privateChatPromptAddition !== undefined) {
-    paths.push("ai.privateChatPromptAddition");
-  }
-  if (payload.ai.groupChatPromptAddition !== undefined) {
-    paths.push("ai.groupChatPromptAddition");
-  }
-  if (payload.ai.commentsPromptAddition !== undefined) {
-    paths.push("ai.commentsPromptAddition");
-  }
-  if (payload.ai.hateModePrompt !== undefined) {
-    paths.push("ai.hateModePrompt");
-  }
-  if (payload.ai.replyMethod !== undefined) paths.push("ai.replyMethod");
-  if (payload.ai.historyVersion !== undefined) paths.push("ai.historyVersion");
-  if (payload.ai.messagesToPass !== undefined) {
-    paths.push("ai.messagesToPass");
-  }
-  if (payload.ai.messageMaxLength !== undefined) {
-    paths.push("ai.messageMaxLength");
-  }
-  if (payload.ai.includeAttachmentsInHistory !== undefined) {
-    paths.push("ai.includeAttachmentsInHistory");
-  }
-  if (payload.ai.bytesLimit !== undefined) paths.push("ai.bytesLimit");
-
-  return paths;
 }

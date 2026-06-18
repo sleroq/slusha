@@ -16,6 +16,7 @@ import {
 import {
     buildBootstrapCapabilities,
     getModelOptionsForRole,
+    projectChatBaseConfigForRole,
     projectEffectiveConfigForRole,
     projectGlobalConfigForRole,
     sanitizeChatOverrideForRole,
@@ -183,16 +184,10 @@ export async function handleBootstrapRequest(
         serializedGlobalConfig,
         role,
     );
-    let chatBasePayload = projectEffectiveConfigForRole(
+    const chatBasePayload = projectChatBaseConfigForRole(
         serializedGlobalConfig,
         role,
     );
-    if (role === 'admin') {
-        chatBasePayload = {
-            ...chatBasePayload,
-            requestWindow: serializedGlobalConfig.requestWindow,
-        };
-    }
 
     let chatOverridePayload: unknown = undefined;
     let effectiveConfigPayload: unknown = undefined;
