@@ -26,11 +26,7 @@ function uniqueModels(models: string[]): string[] {
 function resolveAvailableModels(config: UserConfig): string[] {
     const models = uniqueModels(config.availableModels ?? []);
     if (models.length > 0) return models;
-    return uniqueModels([
-        config.ai.model,
-        config.ai.notesModel ?? '',
-        config.ai.memoryModel ?? '',
-    ]);
+    return uniqueModels([config.ai.model]);
 }
 
 function pickTrustedAi(config: Partial<UserConfig['ai']>): ChatEditableAi {

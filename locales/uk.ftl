@@ -30,8 +30,7 @@ random-parse-error = Не розпарилося число. Спробуй зн
 random-set = Нова ймовірність відповіді: { $probability }%
 
 # Notes command
-notes-too-few-messages = Поки замало повідомлень пройшло, сам прочитай
-notes-output = { $notes }
+summary-disabled = Самарі та довготривала памʼять тимчасово вимкнені.
 
 # Hate mode
 hate-mode-status = хейт тепер { $status }

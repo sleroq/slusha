@@ -7,10 +7,9 @@ import logger from '../logger.ts';
 import { jsonResponse } from './http.ts';
 import { handleBootstrapRequest } from './handlers/bootstrap.ts';
 import { handlePutChatConfigRequest } from './handlers/chat-config.ts';
-import { handlePutChatInternalsRequest } from './handlers/chat-internals.ts';
 import { handlePutGlobalConfigRequest } from './handlers/global-config.ts';
 import { resolveRequestContext } from './request-context.ts';
-import { parseChatConfigChatId, parseChatInternalsChatId } from './routes.ts';
+import { parseChatConfigChatId } from './routes.ts';
 import { StartWebServerOptions } from './types.ts';
 
 function contentType(filePath: string): string {
@@ -78,16 +77,6 @@ async function dispatchApiConfigRoute(
 
     if (pathname === '/api/config/global' && req.method === 'PUT') {
         return await handlePutGlobalConfigRequest(req, options, context);
-    }
-
-    const internalsChatId = parseChatInternalsChatId(pathname);
-    if (internalsChatId !== undefined && req.method === 'PUT') {
-        return await handlePutChatInternalsRequest(
-            req,
-            options,
-            context,
-            internalsChatId,
-        );
     }
 
     const chatConfigId = parseChatConfigChatId(pathname);

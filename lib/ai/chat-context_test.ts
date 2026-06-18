@@ -58,7 +58,7 @@ Deno.test('buildChatPromptAddition resolves by chat mode', () => {
     );
 });
 
-Deno.test('buildChatInfoBlock renders active members and notes', () => {
+Deno.test('buildChatInfoBlock renders active members', () => {
     const members: Member[] = [
         createMember('Ann', 'ann'),
         createMember('Bob'),
@@ -69,15 +69,9 @@ Deno.test('buildChatInfoBlock renders active members and notes', () => {
         chatType: 'group',
         chatTitle: 'Test chat',
         activeMembers: members,
-        notes: ['n1'],
-        memory: 'm1',
-        includeNotes: true,
-        includeMemory: true,
     });
 
     assertEquals(text.includes('Date and time right now: now'), true);
     assertEquals(text.includes('Chat: Test chat, Active members:'), true);
     assertEquals(text.includes('- Ann (@ann)'), true);
-    assertEquals(text.includes('Chat notes:\nn1'), true);
-    assertEquals(text.includes('MY OWN PERSONAL NOTES AND MEMORY:\nm1'), true);
 });

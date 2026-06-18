@@ -5,7 +5,6 @@ import {
     chatCharacters,
     chatMembers,
     chatMessages,
-    chatNotes,
     chatOptOutUsers,
     chats,
     messageReactions,
@@ -27,9 +26,6 @@ async function upsertChat(db: DbClient, chatId: number, chat: Chat) {
         id: chatId,
         info: JSON.stringify(chat.info),
         lastUse: chat.lastUse,
-        lastNotes: chat.lastNotes,
-        lastMemory: chat.lastMemory,
-        memory: chat.memory ?? null,
         chatModel: chat.chatModel ?? null,
         messagesToPass: chat.messagesToPass ?? null,
         randomReplyProbability: chat.randomReplyProbability ?? null,
@@ -40,9 +36,6 @@ async function upsertChat(db: DbClient, chatId: number, chat: Chat) {
         set: {
             info: JSON.stringify(chat.info),
             lastUse: chat.lastUse,
-            lastNotes: chat.lastNotes,
-            lastMemory: chat.lastMemory,
-            memory: chat.memory ?? null,
             chatModel: chat.chatModel ?? null,
             messagesToPass: chat.messagesToPass ?? null,
             randomReplyProbability: chat.randomReplyProbability ?? null,
@@ -50,15 +43,6 @@ async function upsertChat(db: DbClient, chatId: number, chat: Chat) {
             locale: chat.locale ?? null,
         },
     });
-
-    await db.delete(chatNotes).where(eq(chatNotes.chatId, chatId));
-    if (chat.notes.length > 0) {
-        await db.insert(chatNotes).values(chat.notes.map((note, index) => ({
-            chatId,
-            noteIndex: index,
-            text: note,
-        })));
-    }
 
     await db.delete(chatMembers).where(eq(chatMembers.chatId, chatId));
     if (chat.members.length > 0) {

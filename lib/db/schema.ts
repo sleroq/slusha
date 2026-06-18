@@ -10,9 +10,6 @@ export const chats = sqliteTable('chats', {
     id: integer('id', { mode: 'number' }).primaryKey(),
     info: text('info').notNull(),
     lastUse: integer('last_use', { mode: 'number' }).notNull().default(0),
-    lastNotes: integer('last_notes', { mode: 'number' }).notNull().default(0),
-    lastMemory: integer('last_memory', { mode: 'number' }).notNull().default(0),
-    memory: text('memory'),
     chatModel: text('chat_model'),
     messagesToPass: integer('messages_to_pass', { mode: 'number' }),
     randomReplyProbability: real('random_reply_probability'),
@@ -35,16 +32,6 @@ export const chatConfigOverrides = sqliteTable('chat_config_overrides', {
     payload: text('payload').notNull(),
     updatedBy: integer('updated_by', { mode: 'number' }),
     updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(0),
-});
-
-export const chatNotes = sqliteTable('chat_notes', {
-    id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
-    chatId: integer('chat_id', { mode: 'number' }).notNull().references(
-        () => chats.id,
-        { onDelete: 'cascade' },
-    ),
-    noteIndex: integer('note_index', { mode: 'number' }).notNull(),
-    text: text('text').notNull(),
 });
 
 export const chatMembers = sqliteTable('chat_members', {

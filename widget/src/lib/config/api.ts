@@ -1,6 +1,5 @@
 import type {
   BootstrapResponse,
-  ChatInternalsPayload,
   ChatOverridePayload,
   UserConfigPayload,
 } from "./model";
@@ -159,44 +158,6 @@ export async function saveChatConfig(
     return {
       ok: false,
       error: errorFromResponse(body, translate(locale, "api.failedSaveChat")),
-    };
-  }
-
-  return { ok: true };
-}
-
-export async function saveChatInternals(
-  chatId: string,
-  payload: ChatInternalsPayload,
-  initDataRaw: string,
-  locale: WidgetLocale,
-): Promise<ApiResult<undefined>> {
-  const request = await safeFetch(
-    `/api/config/chat/${chatId}/internals`,
-    locale,
-    {
-      method: "PUT",
-      headers: buildHeaders(initDataRaw),
-      body: JSON.stringify({ payload }),
-    },
-  );
-  if (!request.ok || !request.response) {
-    return {
-      ok: false,
-      error: request.error ?? translate(locale, "api.failedSaveInternals"),
-    };
-  }
-
-  const response = request.response;
-  const body = await parseJsonResponse(response);
-
-  if (!response.ok) {
-    return {
-      ok: false,
-      error: errorFromResponse(
-        body,
-        translate(locale, "api.failedSaveInternals"),
-      ),
     };
   }
 

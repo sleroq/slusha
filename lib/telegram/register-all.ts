@@ -52,7 +52,7 @@ function shouldLoadCommandHandlers(ctx: SlushaContext): boolean {
     return ctx.msg?.text?.startsWith('/') ?? false;
 }
 
-export default function registerAll(bot: Bot<SlushaContext>, config: Config) {
+export default function registerAll(bot: Bot<SlushaContext>, _config: Config) {
     const i18n = createI18n();
     let commandHandlersPromise:
         | Promise<typeof import('./register-commands.ts')>
@@ -92,11 +92,6 @@ export default function registerAll(bot: Bot<SlushaContext>, config: Config) {
         registerLateCommands(composer);
         return composer.middleware();
     }, shouldLoadCommandHandlers));
-
-    bot.use(createLazyMiddleware(async () => {
-        const { default: notes } = await import('./bot/notes.ts');
-        return notes(config, bot.botInfo.id).middleware();
-    }));
 
     bot.on(
         'message',

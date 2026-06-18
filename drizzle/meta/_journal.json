@@ -50,6 +50,13 @@
             "when": 1772978400000,
             "tag": "0006_request_window_usage",
             "breakpoints": true
+        },
+        {
+            "idx": 7,
+            "version": "7",
+            "when": 1773064800000,
+            "tag": "0007_remove_summary_memory",
+            "breakpoints": true
         }
     ]
 }

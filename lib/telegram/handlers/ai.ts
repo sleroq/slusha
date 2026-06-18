@@ -602,10 +602,8 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             userId: ctx.from?.id,
             chatOverride,
         });
-        const usageConfig = effectiveConfig.requestWindow;
         const isDowngraded = usageSnapshot.downgraded;
-        const includeNotes = !isDowngraded || !usageConfig.disableNotes;
-        const includeMemory = !isDowngraded || !usageConfig.disableMemory;
+        const usageConfig = effectiveConfig.requestWindow;
         const includeAttachments = !isDowngraded ||
             !usageConfig.disableAttachments;
         const sendChatActionsTool = createSendChatActionsTool(
@@ -746,10 +744,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 userFirstName: ctx.from.first_name,
                 userUsername: ctx.from.username,
                 activeMembers,
-                notes: chatState.notes,
-                memory: chatState.memory,
-                includeNotes: plan.includeBotNotes && includeNotes,
-                includeMemory: plan.includeBotNotes && includeMemory,
             });
 
             prompt += `\n\n### Chat Info ###\n${chatInfoMsg}`;
@@ -968,7 +962,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 logger.warn('Could not get history for generation attempt', {
                     level: attempt.level,
                     historyLimit: attempt.historyLimit,
-                    includeBotNotes: attempt.includeBotNotes,
                     error,
                 });
                 continue;
@@ -995,7 +988,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 logger.warn('Generation attempt failed', {
                     level: attempt.level,
                     historyLimit: attempt.historyLimit,
-                    includeBotNotes: attempt.includeBotNotes,
                     replyMethod,
                     reservedMessageToken: isReservedMessageTokenError(error),
                     error,
