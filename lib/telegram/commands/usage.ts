@@ -39,15 +39,9 @@ export function registerUsage(composer: Composer<SlushaContext>) {
             ),
         ];
 
-        if (snapshot.downgraded) {
-            lines.push(
-                ctx.t('usage-downgraded', {
-                    model: effectiveConfig.requestWindow.downgradeModel,
-                }),
-            );
-        } else {
-            lines.push(ctx.t('usage-normal'));
-        }
+        lines.push(
+            ctx.t(snapshot.downgraded ? 'usage-limited' : 'usage-normal'),
+        );
 
         return ctx.reply(lines.join('\n'));
     });

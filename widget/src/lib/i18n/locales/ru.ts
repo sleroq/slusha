@@ -45,7 +45,7 @@ const ru = {
 
   "toolbar.role": "Роль: {role}",
   "toolbar.usage": "Лимиты ({tier})",
-  "toolbar.costMode": "эконом-режим",
+  "toolbar.limited": "лимит",
   "toolbar.perUser": "На пользователя",
   "toolbar.perChat": "На чат",
   "toolbar.scope": "Область",

@@ -27,7 +27,6 @@ const thinkingLevelSchema = z.enum(['minimal', 'low', 'medium', 'high']);
 const reservedMessageTokenSchema = z.string().min(1).max(128);
 const googleThinkingConfigSchema = z.object({
     thinkingLevel: thinkingLevelSchema.optional(),
-    thinkingBudget: z.number().int().min(0).max(65536).optional(),
     includeThoughts: z.boolean().optional(),
 });
 const openrouterReasoningSchema = z.object({
@@ -173,14 +172,6 @@ export const configSchema = z.object({
     requestWindow: z.object({
         free: requestWindowTierSchema,
         trusted: requestWindowTierSchema,
-        downgradeModel: z.string().min(1).max(200),
-        disableLongContext: z.boolean().default(true),
-        downgradeMessagesToPass: boundedPositiveInt(1, 100).default(4),
-        downgradeBytesLimit: boundedPositiveInt(1024, 100 * 1024 * 1024)
-            .default(1024 * 1024),
-        disableNotes: z.boolean().default(true),
-        disableAttachments: z.boolean().default(true),
-        disableMemory: z.boolean().default(true),
     }).default(defaultConfig.requestWindow),
 });
 

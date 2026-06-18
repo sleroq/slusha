@@ -93,13 +93,10 @@
             'messages passed to ai',
             'max output tokens',
             'notes max output tokens',
-            'notes thinking budget',
             'notes thinking level',
             'memory max output tokens',
-            'memory thinking budget',
             'memory thinking level',
             'thinking level',
-            'thinking budget',
             'reasoning max tokens',
             'notes update frequency',
             'memory update frequency',
@@ -120,13 +117,6 @@
             'trusted user per-user window minutes',
             'trusted user per-chat max requests',
             'trusted user per-chat window minutes',
-            'downgrade model',
-            'downgraded messages to pass',
-            'downgraded bytes limit',
-            'disable long context',
-            'disable notes',
-            'disable attachments',
-            'disable memory',
         ),
     );
     let showAdmin = $derived(
@@ -464,14 +454,6 @@
                         hidden={!matchesBlockItem('advanced', 'notes max output tokens')}
                         bind:value={config.ai.generation.notes.maxOutputTokens}
                     />
-                    <SettingInputField
-                        id="g-ai-notes-thinking-budget"
-                        type="number"
-                        label="Notes thinking budget"
-                        description="Google thinking token budget for notes generation (used by Gemini 2.5 models)."
-                        hidden={!matchesBlockItem('advanced', 'notes thinking budget', 'thinking budget')}
-                        bind:value={config.ai.generation.notes.thinking.thinkingBudget}
-                    />
                     <SettingSelectField
                         id="g-ai-notes-thinking-level"
                         label="Notes thinking level"
@@ -479,14 +461,6 @@
                         options={['minimal', 'low', 'medium', 'high']}
                         hidden={!matchesBlockItem('advanced', 'notes thinking level', 'thinking level')}
                         bind:value={config.ai.generation.notes.thinking.thinkingLevel}
-                    />
-                    <SettingInputField
-                        id="g-ai-thinking-budget"
-                        type="number"
-                        label="Thinking budget"
-                        description="Google thinking token budget for chat generation (used by Gemini 2.5 models)."
-                        hidden={!matchesBlockItem('advanced', 'thinking budget')}
-                        bind:value={config.ai.generation.chat.thinking.thinkingBudget}
                     />
                     <SettingSelectField
                         id="g-ai-thinking-level"
@@ -527,14 +501,6 @@
                         description="Hard cap for generated tokens in memory updates."
                         hidden={!matchesBlockItem('advanced', 'memory max output tokens')}
                         bind:value={config.ai.generation.memory.maxOutputTokens}
-                    />
-                    <SettingInputField
-                        id="g-ai-memory-thinking-budget"
-                        type="number"
-                        label="Memory thinking budget"
-                        description="Google thinking token budget for memory generation (used by Gemini 2.5 models)."
-                        hidden={!matchesBlockItem('advanced', 'memory thinking budget', 'thinking budget')}
-                        bind:value={config.ai.generation.memory.thinking.thinkingBudget}
                     />
                     <SettingSelectField
                         id="g-ai-memory-thinking-level"
@@ -627,7 +593,7 @@
                         id="g-req-trusted-chat-max"
                         type="number"
                         label="Trusted user per-chat max requests"
-                        description="Chat-wide limit for trusted tier before downgrade mode."
+                        description="Chat-wide limit for trusted tier."
                         hidden={!matchesBlockItem('usage limits', 'trusted user per-chat max requests')}
                         bind:value={config.requestWindow.trusted.perChat.maxRequests}
                     />
@@ -638,58 +604,6 @@
                         description="Rolling window for trusted tier chat usage."
                         hidden={!matchesBlockItem('usage limits', 'trusted user per-chat window minutes')}
                         bind:value={config.requestWindow.trusted.perChat.windowMinutes}
-                    />
-                    <SettingSelectField
-                        id="g-req-downgrade-model"
-                        label="Downgrade model"
-                        description="Model used when either window limit is exhausted."
-                        options={availableModels}
-                        hidden={!matchesBlockItem('usage limits', 'downgrade model')}
-                        bind:value={config.requestWindow.downgradeModel}
-                    />
-                    <SettingInputField
-                        id="g-req-downgrade-messages"
-                        type="number"
-                        label="Downgraded messages to pass"
-                        description="Maximum messages included when long context is disabled."
-                        hidden={!matchesBlockItem('usage limits', 'downgraded messages to pass')}
-                        bind:value={config.requestWindow.downgradeMessagesToPass}
-                    />
-                    <SettingInputField
-                        id="g-req-downgrade-bytes"
-                        type="number"
-                        label="Downgraded bytes limit"
-                        description="Max bytes included when long context is disabled."
-                        hidden={!matchesBlockItem('usage limits', 'downgraded bytes limit')}
-                        bind:value={config.requestWindow.downgradeBytesLimit}
-                    />
-                    <SettingToggleField
-                        id="g-req-disable-long-context"
-                        label="Disable long context in cost mode"
-                        description="Reduces history size when windows are exhausted."
-                        hidden={!matchesBlockItem('usage limits', 'disable long context')}
-                        bind:checked={config.requestWindow.disableLongContext}
-                    />
-                    <SettingToggleField
-                        id="g-req-disable-notes"
-                        label="Disable notes in cost mode"
-                        description="Skips notes generation and inclusion while downgraded."
-                        hidden={!matchesBlockItem('usage limits', 'disable notes')}
-                        bind:checked={config.requestWindow.disableNotes}
-                    />
-                    <SettingToggleField
-                        id="g-req-disable-attachments"
-                        label="Disable attachments in cost mode"
-                        description="Excludes attachments from history while downgraded."
-                        hidden={!matchesBlockItem('usage limits', 'disable attachments')}
-                        bind:checked={config.requestWindow.disableAttachments}
-                    />
-                    <SettingToggleField
-                        id="g-req-disable-memory"
-                        label="Disable memory in cost mode"
-                        description="Skips memory generation and inclusion while downgraded."
-                        hidden={!matchesBlockItem('usage limits', 'disable memory')}
-                        bind:checked={config.requestWindow.disableMemory}
                     />
                 </div>
             </details>

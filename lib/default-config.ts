@@ -231,13 +231,6 @@ const defaultConfig = {
                 windowMinutes: 180,
             },
         },
-        downgradeModel: 'gemini-3.1-flash-lite-preview',
-        disableLongContext: false,
-        downgradeMessagesToPass: 4,
-        downgradeBytesLimit: 20 * 1024 * 1024,
-        disableNotes: false,
-        disableAttachments: false,
-        disableMemory: false,
     },
 };
 

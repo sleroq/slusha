@@ -34,13 +34,6 @@ export interface RequestWindowTier {
 export interface RequestWindowConfig {
   free: RequestWindowTier;
   trusted: RequestWindowTier;
-  downgradeModel: string;
-  disableLongContext: boolean;
-  downgradeMessagesToPass: number;
-  downgradeBytesLimit: number;
-  disableNotes: boolean;
-  disableAttachments: boolean;
-  disableMemory: boolean;
 }
 
 export interface RequestWindowLimitOverride {
@@ -102,7 +95,6 @@ export interface GoogleSafetySetting {
 
 export interface GoogleThinkingConfig {
   thinkingLevel?: "minimal" | "low" | "medium" | "high";
-  thinkingBudget?: number;
   includeThoughts?: boolean;
 }
 
@@ -217,7 +209,6 @@ function normalizeThinkingConfig(value: unknown): GoogleThinkingConfig {
   const obj = value as Partial<GoogleThinkingConfig>;
   return {
     thinkingLevel: obj.thinkingLevel,
-    thinkingBudget: obj.thinkingBudget,
     includeThoughts: obj.includeThoughts,
   };
 }
@@ -439,13 +430,6 @@ export function defaultRequestWindowConfig(): RequestWindowConfig {
       perUser: defaultRequestWindowLimit(300, 180),
       perChat: defaultRequestWindowLimit(1200, 180),
     },
-    downgradeModel: "",
-    disableLongContext: true,
-    downgradeMessagesToPass: 4,
-    downgradeBytesLimit: 1024 * 1024,
-    disableNotes: true,
-    disableAttachments: true,
-    disableMemory: true,
   };
 }
 
@@ -496,27 +480,6 @@ function normalizeRequestWindowConfig(value: unknown): RequestWindowConfig {
         base.trusted.perChat,
       ),
     },
-    downgradeModel: typeof obj.downgradeModel === "string"
-      ? obj.downgradeModel
-      : base.downgradeModel,
-    disableLongContext: typeof obj.disableLongContext === "boolean"
-      ? obj.disableLongContext
-      : base.disableLongContext,
-    downgradeMessagesToPass: typeof obj.downgradeMessagesToPass === "number"
-      ? obj.downgradeMessagesToPass
-      : base.downgradeMessagesToPass,
-    downgradeBytesLimit: typeof obj.downgradeBytesLimit === "number"
-      ? obj.downgradeBytesLimit
-      : base.downgradeBytesLimit,
-    disableNotes: typeof obj.disableNotes === "boolean"
-      ? obj.disableNotes
-      : base.disableNotes,
-    disableAttachments: typeof obj.disableAttachments === "boolean"
-      ? obj.disableAttachments
-      : base.disableAttachments,
-    disableMemory: typeof obj.disableMemory === "boolean"
-      ? obj.disableMemory
-      : base.disableMemory,
   };
 }
 

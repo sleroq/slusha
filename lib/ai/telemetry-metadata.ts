@@ -57,11 +57,6 @@ export function buildGenerationTelemetryMetadata(
     );
     assignIfDefined(
         metadata,
-        'llm.google.thinking_budget',
-        input.policy.telemetry.googleThinkingBudget,
-    );
-    assignIfDefined(
-        metadata,
         'llm.google.include_thoughts',
         input.policy.telemetry.googleIncludeThoughts,
     );

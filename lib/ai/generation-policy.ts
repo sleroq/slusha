@@ -13,7 +13,6 @@ export interface GenerationPolicyTelemetry {
     task: GenerationTask;
     maxOutputTokens?: number;
     googleThinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
-    googleThinkingBudget?: number;
     googleIncludeThoughts?: boolean;
     openrouterUsageInclude?: boolean;
     openrouterReasoningMaxTokens?: number;
@@ -40,10 +39,6 @@ function isGemini3Model(modelId: string): boolean {
     return modelId.startsWith('gemini-3');
 }
 
-function isGemini25Model(modelId: string): boolean {
-    return modelId.startsWith('gemini-2.5');
-}
-
 function buildGoogleOptions(
     modelId: string,
     config: UserConfig['ai'],
@@ -55,7 +50,6 @@ function buildGoogleOptions(
         structuredOutputs?: boolean;
         thinkingConfig?: {
             thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
-            thinkingBudget?: number;
             includeThoughts?: boolean;
         };
     } = {};
@@ -76,19 +70,6 @@ function buildGoogleOptions(
             > = {};
             if (thinking.thinkingLevel) {
                 thinkingConfig.thinkingLevel = thinking.thinkingLevel;
-            }
-            if (thinking.includeThoughts !== undefined) {
-                thinkingConfig.includeThoughts = thinking.includeThoughts;
-            }
-            if (Object.keys(thinkingConfig).length > 0) {
-                googleOptions.thinkingConfig = thinkingConfig;
-            }
-        } else if (isGemini25Model(modelId)) {
-            const thinkingConfig: NonNullable<
-                typeof googleOptions.thinkingConfig
-            > = {};
-            if (thinking.thinkingBudget !== undefined) {
-                thinkingConfig.thinkingBudget = thinking.thinkingBudget;
             }
             if (thinking.includeThoughts !== undefined) {
                 thinkingConfig.includeThoughts = thinking.includeThoughts;
@@ -171,9 +152,6 @@ export function resolveGenerationPolicy(input: GenerationPolicyInput): {
         if (thinking) {
             if (isGemini3Model(parsed.modelId)) {
                 telemetry.googleThinkingLevel = thinking.thinkingLevel;
-                telemetry.googleIncludeThoughts = thinking.includeThoughts;
-            } else if (isGemini25Model(parsed.modelId)) {
-                telemetry.googleThinkingBudget = thinking.thinkingBudget;
                 telemetry.googleIncludeThoughts = thinking.includeThoughts;
             }
         }

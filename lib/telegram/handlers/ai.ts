@@ -456,12 +456,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             userId: ctx.from?.id,
             chatOverride,
         });
-        const usageConfig = effectiveConfig.requestWindow;
         const isDowngraded = usageSnapshot.downgraded;
-        const includeNotes = !isDowngraded || !usageConfig.disableNotes;
-        const includeMemory = !isDowngraded || !usageConfig.disableMemory;
-        const includeAttachments = !isDowngraded ||
-            !usageConfig.disableAttachments;
         const sendChatActionsTool = createSendChatActionsTool(
             resolveCustomPrompt(
                 effectiveConfig.ai.chatActionsToolDescription,
@@ -477,15 +472,8 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
 
         const baseMessagesToPass = chatState.messagesToPass ??
             effectiveConfig.ai.messagesToPass;
-        const messagesToPass = isDowngraded && usageConfig.disableLongContext
-            ? Math.min(baseMessagesToPass, usageConfig.downgradeMessagesToPass)
-            : baseMessagesToPass;
-        const bytesLimit = isDowngraded && usageConfig.disableLongContext
-            ? Math.min(
-                effectiveConfig.ai.bytesLimit,
-                usageConfig.downgradeBytesLimit,
-            )
-            : effectiveConfig.ai.bytesLimit;
+        const messagesToPass = baseMessagesToPass;
+        const bytesLimit = effectiveConfig.ai.bytesLimit;
         const maxTargetCount = Math.min(
             Math.max(messagesToPass * 2, 12),
             40,
@@ -516,9 +504,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             await ctx.i18n.getLocale();
         const character = chatState.character;
 
-        const modelRef = isDowngraded
-            ? usageConfig.downgradeModel
-            : (chatState.chatModel ?? effectiveConfig.ai.model);
+        const modelRef = chatState.chatModel ?? effectiveConfig.ai.model;
         const parsedModel = parseModelRef(modelRef);
 
         const time = new Date().getTime();
@@ -580,8 +566,8 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 activeMembers,
                 notes: chatState.notes,
                 memory: chatState.memory,
-                includeNotes: plan.includeBotNotes && includeNotes,
-                includeMemory: plan.includeBotNotes && includeMemory,
+                includeNotes: plan.includeBotNotes,
+                includeMemory: plan.includeBotNotes,
             });
 
             prompt += `\n\n### Chat Info ###\n${chatInfoMsg}`;
@@ -614,7 +600,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                     activeMessageId: ctx.msg.message_id,
                     attachments:
                         effectiveConfig.ai.includeAttachmentsInHistory &&
-                        includeAttachments &&
                         parsedModel.provider === 'google',
                 },
             );

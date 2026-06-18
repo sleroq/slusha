@@ -154,5 +154,5 @@ config-widget-unavailable = Config widget is unavailable right now
 usage-title = Usage window ({ $tier } tier)
 usage-user-window = Per-user
 usage-chat-window = Per-chat
-usage-downgraded = Cost mode is active. Expensive features are disabled and model switched to { $model }.
+usage-limited = Usage limits are exhausted. Requests continue with the normal configuration.
 usage-normal = Normal mode is active.

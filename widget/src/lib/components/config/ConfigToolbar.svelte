@@ -98,7 +98,7 @@
                         </span>
                         {#if usageWindowStatus.downgraded}
                             <span class="rounded bg-destructive/12 px-2 py-0.5 text-[11px] font-medium text-destructive">
-                                {t('toolbar.costMode')}
+                                {t('toolbar.limited')}
                             </span>
                         {/if}
                 </div>

@@ -511,7 +511,7 @@
                             id="c-req-free-chat-max"
                             type="number"
                             label="Free tier per-chat max requests"
-                            description="Chat-wide free-tier limit before cost mode."
+                            description="Chat-wide free-tier usage limit."
                             sourceState={sourceStateFor('requestWindowPerChat.free.maxRequests')}
                             hidden={!matchesBlockItem('usage limits', 'free tier per-chat max requests')}
                             bind:value={config.requestWindowPerChat.free.maxRequests}
@@ -529,7 +529,7 @@
                             id="c-req-trusted-chat-max"
                             type="number"
                             label="Trusted tier per-chat max requests"
-                            description="Chat-wide trusted-tier limit before cost mode."
+                            description="Chat-wide trusted-tier usage limit."
                             sourceState={sourceStateFor('requestWindowPerChat.trusted.maxRequests')}
                             hidden={!matchesBlockItem('usage limits', 'trusted tier per-chat max requests')}
                             bind:value={config.requestWindowPerChat.trusted.maxRequests}

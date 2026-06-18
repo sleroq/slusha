@@ -42,7 +42,7 @@ const en = {
 
   "toolbar.role": "Role: {role}",
   "toolbar.usage": "Usage ({tier})",
-  "toolbar.costMode": "cost mode",
+  "toolbar.limited": "limited",
   "toolbar.perUser": "Per-user",
   "toolbar.perChat": "Per-chat",
   "toolbar.scope": "Scope",
