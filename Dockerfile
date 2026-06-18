@@ -3,6 +3,7 @@ FROM --platform=$BUILDPLATFORM denoland/deno:2.7.4 AS widget-builder
 WORKDIR /app
 
 COPY widget ./widget
+COPY lib/config-contract.ts ./lib/config-contract.ts
 
 RUN deno task --config ./widget/deno.json build
 
