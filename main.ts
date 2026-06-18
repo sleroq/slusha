@@ -3,7 +3,7 @@ import logger from './lib/logger.ts';
 import resolveConfig, { Config } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
 import { run } from '@grammyjs/runner';
-import { loadMemory } from './lib/memory.ts';
+import { Memory } from './lib/memory.ts';
 import { migrateDb } from './lib/db/migrate.ts';
 
 // AI runtime details moved to handler module
@@ -28,7 +28,7 @@ let config: Config;
 
 await migrateDb();
 
-const memory = await loadMemory();
+const memory = new Memory();
 logger.info('Memory loaded');
 logMemoryUsage('after memory load');
 

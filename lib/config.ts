@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import defaultConfig from './default-config.ts';
-import { DbClient, ensureSqlitePragmas, getDb } from './db/client.ts';
+import { DbClient, getDb } from './db/client.ts';
 import { globalConfig } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
 import {
@@ -363,8 +363,6 @@ export function parseChatOverridePayload(payload: string): ChatConfigOverride {
 export async function getGlobalUserConfig(
     db: DbClient = getDb(),
 ): Promise<UserConfig> {
-    await ensureSqlitePragmas();
-
     let row = await db.query.globalConfig.findFirst({
         where: eq(globalConfig.id, 1),
     });
@@ -402,8 +400,6 @@ export async function setGlobalUserConfig(
     updatedBy?: number,
     db: DbClient = getDb(),
 ): Promise<UserConfig> {
-    await ensureSqlitePragmas();
-
     const parsed = configSchema.safeParse(value);
     if (!parsed.success) {
         throw new Error(

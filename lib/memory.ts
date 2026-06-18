@@ -1,12 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Chat as TgChat, Message, User } from 'grammy_types';
 import { Character } from './charhub/api.ts';
-import {
-    DbClient,
-    ensureDatabaseWritable,
-    ensureSqlitePragmas,
-    getDb,
-} from './db/client.ts';
+import { DbClient, getDb } from './db/client.ts';
 import {
     chatCharacters,
     chatConfigOverrides,
@@ -18,7 +13,6 @@ import {
     messageReactions,
     messageReactionUsers,
 } from './db/schema.ts';
-import logger from './logger.ts';
 import { ReplyMessage } from './telegram/helpers.ts';
 import {
     ChatConfigOverride,
@@ -1247,20 +1241,4 @@ export class ChatMemory {
 
         msg.reactions[key] = rec;
     }
-}
-
-export async function loadMemory(): Promise<Memory> {
-    const memory = new Memory();
-    await ensureSqlitePragmas();
-    await ensureDatabaseWritable();
-
-    try {
-        // Ensure DB connection is valid.
-        await memory.db.select({ id: chats.id }).from(chats).limit(1);
-    } catch (error) {
-        logger.error('Database is not ready: ', error);
-        throw error;
-    }
-
-    return memory;
 }
