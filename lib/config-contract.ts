@@ -17,7 +17,6 @@ export const chatOverrideContract = {
         'temperature',
         'topK',
         'topP',
-        'historyVersion',
         'prompt',
         'dumbPrompt',
         'privateChatPromptAddition',

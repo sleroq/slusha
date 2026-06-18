@@ -141,9 +141,7 @@ export function projectEffectiveConfigForRole(
         blacklistedReactions: config.blacklistedReactions,
         nepons: config.nepons,
         responseDelay: config.responseDelay,
-        ai: {
-            historyVersion: config.ai.historyVersion,
-        },
+        ai: {},
     };
 
     if (role === 'trusted' || role === 'admin') {
@@ -191,19 +189,6 @@ export function sanitizeChatOverrideForRole(
         next.blacklistedReactions = normalizeReactionBlacklist(
             next.blacklistedReactions,
         );
-    }
-
-    if (override.ai && role === 'regular') {
-        if (
-            hasDefinedPrimitiveDelta(
-                override.ai.historyVersion,
-                globalConfig.ai.historyVersion,
-            )
-        ) {
-            next.ai = {
-                historyVersion: override.ai.historyVersion,
-            };
-        }
     }
 
     if ((role === 'trusted' || role === 'admin') && override.ai) {

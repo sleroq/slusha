@@ -19,7 +19,6 @@ interface HistoryOptions {
     attachments?: boolean;
     resolveReplyThread?: boolean;
     includeReactions?: boolean;
-    historyVersion?: 'v2' | 'v3';
     activeMessageId?: number;
 }
 
@@ -620,7 +619,6 @@ interface BuildHistoryContextOptions {
     resolveReplyThread?: boolean;
     includeReactions?: boolean;
     characterName?: string;
-    historyVersion?: 'v2' | 'v3';
     activeMessageId?: number;
 }
 
@@ -641,7 +639,7 @@ export async function buildHistoryContext(
     const prompt: ModelMessage[] = [];
     let textPart = '';
 
-    const candidates = mode === 'chat' && options.historyVersion === 'v3'
+    const candidates = mode === 'chat'
         ? selectHistoryCandidatesV3(history, {
             maxRootMessages: undefined,
             activeMessageId: options.activeMessageId,
@@ -751,32 +749,6 @@ export async function buildHistoryContext(
     return prompt;
 }
 
-export function makeHistoryV2(
-    botInfo: { token: string; id: number },
-    api: Api<RawApi>,
-    logger: Logger,
-    history: ChatMessage[],
-    options: HistoryOptions,
-): Promise<ModelMessage[]> {
-    return buildHistoryContext(
-        botInfo,
-        api,
-        logger,
-        history,
-        {
-            mode: 'chat',
-            symbolLimit: options.symbolLimit,
-            messagesLimit: options.messagesLimit,
-            bytesLimit: options.bytesLimit,
-            attachments: options.attachments,
-            resolveReplyThread: options.resolveReplyThread,
-            includeReactions: options.includeReactions,
-            historyVersion: 'v2',
-            activeMessageId: options.activeMessageId,
-        },
-    );
-}
-
 export function makeHistoryV3(
     botInfo: { token: string; id: number },
     api: Api<RawApi>,
@@ -797,7 +769,6 @@ export function makeHistoryV3(
             attachments: options.attachments,
             resolveReplyThread: options.resolveReplyThread,
             includeReactions: options.includeReactions,
-            historyVersion: 'v3',
             activeMessageId: options.activeMessageId,
         },
     );

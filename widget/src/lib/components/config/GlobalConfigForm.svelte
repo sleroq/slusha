@@ -93,7 +93,6 @@
     let showAdvanced = $derived(
         matchesSection(
             'advanced',
-            'history version',
             'max notes to store',
             'max messages to store',
             'recent messages for notes',
@@ -604,14 +603,6 @@
                         description="Maximum attachment size included in processing."
                         hidden={!matchesBlockItem('advanced', 'attachment byte limit', 'bytes limit')}
                         bind:value={config.ai.bytesLimit}
-                    />
-                    <SettingSelectField
-                        id="g-ai-history-version"
-                        label="History version"
-                        description="Selects history builder strategy used in chat generation."
-                        options={['v2', 'v3']}
-                        hidden={!matchesBlockItem('advanced', 'history version', 'ai.historyVersion')}
-                        bind:value={config.ai.historyVersion}
                     />
                     <SettingSelectField
                         id="g-ai-reply-method"

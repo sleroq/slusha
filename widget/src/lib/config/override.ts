@@ -36,7 +36,6 @@ const widgetFieldMeta: Partial<
     textKind: "stringList",
   },
   nepons: { textKey: "nepons", textKind: "stringList" },
-  "ai.historyVersion": { fallback: "v2" },
   "ai.prompt": { fallback: "" },
   "ai.dumbPrompt": { fallback: "" },
   "ai.privateChatPromptAddition": { fallback: "" },

@@ -8,7 +8,7 @@ import {
     ModelMessage,
     tool,
 } from 'ai';
-import { makeHistoryV2, makeHistoryV3 } from '../../history.ts';
+import { makeHistoryV3 } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
 import { ReplyTo } from '../../memory.ts';
@@ -769,11 +769,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 content: prompt,
             });
 
-            const historyBuilder = effectiveConfig.ai.historyVersion === 'v3'
-                ? makeHistoryV3
-                : makeHistoryV2;
-
-            const history = await historyBuilder(
+            const history = await makeHistoryV3(
                 { token: bot.token, id: bot.botInfo.id },
                 bot.api,
                 logger,

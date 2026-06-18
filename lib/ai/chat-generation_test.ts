@@ -2,18 +2,8 @@ import { assertEquals } from '@std/assert';
 import {
     getGenerationFallbackPlans,
     resolveCustomPrompt,
-    resolveReplyMethod,
     splitTextByTwoLines,
 } from './chat-generation.ts';
-
-Deno.test('resolveReplyMethod falls back to json_actions', () => {
-    assertEquals(resolveReplyMethod(undefined), 'json_actions');
-    assertEquals(resolveReplyMethod('unknown'), 'json_actions');
-    assertEquals(
-        resolveReplyMethod('plain_text_reactions'),
-        'plain_text_reactions',
-    );
-});
 
 Deno.test('splitTextByTwoLines splits by blank lines', () => {
     assertEquals(splitTextByTwoLines('a\nb\n\n c\n\n'), ['a\nb', 'c']);

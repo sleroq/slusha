@@ -112,7 +112,7 @@ Deno.test('selectHistoryCandidatesV3 prioritizes active thread', () => {
     assertEquals(selected.map((m) => m.msg.id), [5, 3, 1, 4, 2]);
 });
 
-Deno.test('selectHistoryCandidatesV3 falls back to V2 without metadata', () => {
+Deno.test('selectHistoryCandidatesV3 falls back to reply threads without metadata', () => {
     const history: ChatMessage[] = [
         createMessage(1),
         createMessage(2, 1),

@@ -83,7 +83,6 @@ const defaultConfig = {
     ai: {
         model: 'gemini-3.1-flash-lite-preview',
         replyMethod: 'json_actions',
-        historyVersion: 'v2',
         notesModel: 'gemini-3.1-flash-lite-preview',
         memoryModel: 'gemini-3.1-flash-lite-preview',
         prePrompt,
