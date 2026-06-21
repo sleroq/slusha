@@ -150,8 +150,3 @@ config-open-chat = Открыть конфигурацию текущего ча
 config-widget-unavailable = Виджет конфигурации сейчас недоступен
 
 # Usage window
-usage-title = Usage window ({ $tier } tier)
-usage-user-window = Per-user
-usage-chat-window = Per-chat
-usage-downgraded = Cost mode is active. Expensive features are disabled and model switched to { $model }.
-usage-normal = Normal mode is active.

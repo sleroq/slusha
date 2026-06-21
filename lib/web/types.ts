@@ -1,6 +1,6 @@
 import { Bot } from 'grammy';
 import type { Chat as TgChat } from 'grammy_types';
-import { Memory } from '../memory.ts';
+import type { DbClient } from '../db/client.ts';
 import { SlushaContext } from '../telegram/setup-bot.ts';
 
 export interface RuntimeConfigAccess {
@@ -9,7 +9,7 @@ export interface RuntimeConfigAccess {
 
 export interface StartWebServerOptions {
     bot: Bot<SlushaContext>;
-    memory: Memory;
+    db: DbClient;
     runtimeConfig: RuntimeConfigAccess;
 }
 
@@ -29,17 +29,4 @@ export interface CurrentCharacterPayload {
     postHistoryInstructions: string;
     firstMessage: string;
     messageExample: string;
-}
-
-export interface UsageWindowStatusPayload {
-    tier: 'free' | 'trusted';
-    downgraded: boolean;
-    userUsed: number;
-    userMax: number;
-    userWindowMinutes: number;
-    userBar: string;
-    chatUsed: number;
-    chatMax: number;
-    chatWindowMinutes: number;
-    chatBar: string;
 }

@@ -80,7 +80,6 @@ scripts/build-widget.bash
 - `slusha_ai_finish_reason_total`
 - `slusha_ai_tokens_total`
 - `slusha_rate_limit_exceeded_total`
-- `slusha_usage_downgraded_total`
 - `slusha_process_uptime_seconds`
 - `slusha_process_resident_memory_bytes`
 

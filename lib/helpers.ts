@@ -7,7 +7,7 @@ import { exists } from '@std/fs';
 import { Message, PhotoSize, Sticker } from 'grammy_types';
 import { GoogleGenAI } from '@google/genai';
 import { ImagePart, ModelMessage } from 'ai';
-import { BotCharacter } from './memory.ts';
+import type { BotCharacter } from './persistence/types.ts';
 // import { encodeBase64 } from "@std/encoding/base64";
 
 export function getRandomInt(min: number, max: number) {

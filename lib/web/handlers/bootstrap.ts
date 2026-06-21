@@ -1,18 +1,14 @@
-import { desc, eq, inArray } from 'drizzle-orm';
 import type { Chat as TgChat } from 'grammy_types';
 import {
     mergeWithChatOverride,
-    serializeChatOverride,
-    serializeUserConfig,
+    toStoredChatOverride,
+    toStoredUserConfig,
     UserConfig,
 } from '../../config.ts';
-import { type BotCharacter, ChatMemory } from '../../memory.ts';
-import { chatMembers, chats } from '../../db/schema.ts';
+import type { BotCharacter } from '../../persistence/types.ts';
+import { ChatConfigRepository } from '../../persistence/chat-config.ts';
+import { ChatRepository } from '../../persistence/chats.ts';
 import { ALLOWED_REACTIONS } from '../../telegram/reactions.ts';
-import {
-    getUsageSnapshot,
-    renderProgressBar,
-} from '../../telegram/usage-window.ts';
 import {
     buildBootstrapCapabilities,
     getModelOptionsForRole,
@@ -28,7 +24,6 @@ import {
     AvailableChat,
     CurrentCharacterPayload,
     StartWebServerOptions,
-    UsageWindowStatusPayload,
 } from '../types.ts';
 
 function projectCurrentCharacter(
@@ -81,56 +76,25 @@ async function resolveAvailableChats(
     userId: number,
     includeAllChats: boolean,
 ): Promise<AvailableChat[]> {
+    const chats = new ChatRepository(options.db);
     if (includeAllChats) {
-        const chatRows = await options.memory.db
-            .select({
-                id: chats.id,
-                info: chats.info,
-            })
-            .from(chats)
-            .orderBy(desc(chats.lastUse));
-
+        const chatRows = await chats.listAvailableChats();
         return chatRows.map((chat) => readChatSummary(chat.id, chat.info));
     }
 
-    const memberRows = await options.memory.db
-        .select({
-            chatId: chatMembers.chatId,
-            lastUse: chatMembers.lastUse,
-        })
-        .from(chatMembers)
-        .where(eq(chatMembers.userId, userId))
-        .orderBy(desc(chatMembers.lastUse));
-
-    if (memberRows.length === 0) {
-        return [];
-    }
-
-    const candidateChatIds = memberRows.map((row) => row.chatId);
-    const chatRows = await options.memory.db
-        .select({
-            id: chats.id,
-            info: chats.info,
-        })
-        .from(chats)
-        .where(inArray(chats.id, candidateChatIds));
+    const chatRows = await chats.listChatsForMember(userId);
 
     if (chatRows.length === 0) {
         return [];
     }
 
-    const chatMap = new Map(chatRows.map((row) => [row.id, row]));
     const seen = new Set<number>();
-    const filtered = await Promise.all(memberRows.map(async ({ chatId }) => {
+    const filtered = await Promise.all(chatRows.map(async (chat) => {
+        const chatId = chat.id;
         if (seen.has(chatId)) {
             return undefined;
         }
         seen.add(chatId);
-
-        const chat = chatMap.get(chatId);
-        if (!chat) {
-            return undefined;
-        }
 
         if (chatId === userId) {
             return readChatSummary(chatId, chat.info);
@@ -173,7 +137,7 @@ export async function handleBootstrapRequest(
         ? await resolveAvailableChats(options, userId, canEditGlobal)
         : [];
     const serializedGlobalConfig = JSON.parse(
-        serializeUserConfig(globalConfig),
+        JSON.stringify(toStoredUserConfig(globalConfig)),
     ) as UserConfig;
     const globalPayload = projectGlobalConfigForRole(
         serializedGlobalConfig,
@@ -188,7 +152,6 @@ export async function handleBootstrapRequest(
     let effectiveConfigPayload: unknown = undefined;
     let currentCharacter: unknown = undefined;
     let canEditChat = false;
-    let usageWindowStatus: UsageWindowStatusPayload | undefined;
 
     if (chatId !== undefined && Number.isFinite(chatId)) {
         canEditChat = await canEditChatConfig(
@@ -199,20 +162,22 @@ export async function handleBootstrapRequest(
         );
         if (canEditChat) {
             const chat = await options.bot.api.getChat(chatId);
-            const chatMemory = new ChatMemory(options.memory, chat);
-            const currentChat = await chatMemory.getChat();
+            const chats = new ChatRepository(options.db);
+            await chats.ensureChat(chat);
+            const currentChat = await chats.getChat(chat);
             currentCharacter = projectCurrentCharacter(currentChat.character);
-            const chatOverride = await chatMemory.getChatConfigOverride();
+            const chatConfig = new ChatConfigRepository(options.db, chatId);
+            const chatOverride = await chatConfig.getChatConfigOverride();
             chatOverridePayload = chatOverride
                 ? JSON.parse(
-                    serializeChatOverride(
+                    JSON.stringify(toStoredChatOverride(
                         sanitizeChatOverrideForRole(
                             chatOverride,
                             role,
                             globalConfig,
                             false,
                         ),
-                    ),
+                    )),
                 )
                 : {};
 
@@ -221,44 +186,12 @@ export async function handleBootstrapRequest(
                 chatOverride,
             );
             const serializedEffectiveConfig = JSON.parse(
-                serializeUserConfig(effectiveConfig),
+                JSON.stringify(toStoredUserConfig(effectiveConfig)),
             ) as UserConfig;
             effectiveConfigPayload = projectEffectiveConfigForRole(
                 serializedEffectiveConfig,
                 role,
             );
-
-            if (userId) {
-                const usageSnapshot = await getUsageSnapshot(
-                    options.memory.db,
-                    {
-                        config: globalConfig,
-                        chatId,
-                        userId,
-                        chatOverride,
-                    },
-                );
-                usageWindowStatus = {
-                    tier: usageSnapshot.tier,
-                    downgraded: usageSnapshot.downgraded,
-                    userUsed: usageSnapshot.user.used,
-                    userMax: usageSnapshot.user.maxRequests,
-                    userWindowMinutes: usageSnapshot.user.windowMinutes,
-                    userBar: renderProgressBar(
-                        usageSnapshot.user.used,
-                        usageSnapshot.user.maxRequests,
-                        16,
-                    ),
-                    chatUsed: usageSnapshot.chat.used,
-                    chatMax: usageSnapshot.chat.maxRequests,
-                    chatWindowMinutes: usageSnapshot.chat.windowMinutes,
-                    chatBar: renderProgressBar(
-                        usageSnapshot.chat.used,
-                        usageSnapshot.chat.maxRequests,
-                        16,
-                    ),
-                };
-            }
         }
     }
 
@@ -278,6 +211,5 @@ export async function handleBootstrapRequest(
         chatOverridePayload,
         effectiveConfigPayload,
         currentCharacter,
-        usageWindowStatus,
     });
 }

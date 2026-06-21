@@ -2,13 +2,18 @@ import { Bot, Context } from 'grammy';
 import { I18nFlavor } from '@grammyjs/i18n';
 import logger from '../logger.ts';
 import { Config } from '../config.ts';
-import {
-    ChatMemory,
-    Memory,
+import type { DbClient } from '../db/client.ts';
+import { ChatConfigRepository } from '../persistence/chat-config.ts';
+import { CharacterRepository } from '../persistence/characters.ts';
+import { ChatRepository } from '../persistence/chats.ts';
+import { MemberRepository } from '../persistence/members.ts';
+import { MessageRepository } from '../persistence/messages.ts';
+import { OptOutRepository } from '../persistence/opt-outs.ts';
+import type {
     ReactionCountEntry,
     ReactionDelta,
     ReplyTo,
-} from '../memory.ts';
+} from '../persistence/types.ts';
 import { sequentialize } from '@grammyjs/runner';
 import { canMemberSendTextMessages } from './reply-rights.ts';
 import { Message } from 'grammy_types';
@@ -28,8 +33,13 @@ interface ThreadResolution {
 
 export type SlushaContext = Context & I18nFlavor & {
     info: RequestInfo;
-    memory: Memory;
-    m: ChatMemory;
+    db: DbClient;
+    chats: ChatRepository;
+    chatConfig: ChatConfigRepository;
+    characters: CharacterRepository;
+    members: MemberRepository;
+    messages: MessageRepository;
+    optOuts: OptOutRepository;
 };
 
 function isEmojiReactionType(
@@ -132,12 +142,12 @@ function isSameTopic(left: Message, right: Message): boolean {
 }
 
 async function resolveThreadForIncomingMessage(
-    memory: ChatMemory,
+    messages: MessageRepository,
     incoming: Message,
     replyToId?: number,
 ): Promise<ThreadResolution> {
     if (typeof replyToId === 'number') {
-        const parent = await memory.getMessageById(replyToId);
+        const parent = await messages.getMessageById(replyToId);
         const inheritedRoot = parent?.threadRootMessageId ?? replyToId;
         const inheritedThread = parent?.threadId ?? `thread:${inheritedRoot}`;
 
@@ -155,7 +165,7 @@ async function resolveThreadForIncomingMessage(
     const maxInterveningMessages = 6;
 
     if (typeof incomingAuthorId === 'number') {
-        const candidate = await memory.getLastMessageByAuthorInTopic(
+        const candidate = await messages.getLastMessageByAuthorInTopic(
             incomingAuthorId,
             incoming.message_thread_id,
             maxInterveningMessages + 1,
@@ -195,12 +205,14 @@ const commands = [
     '/summary',
     '/language',
     '/config',
-    '/usage',
 ];
 
 const startDate = new Date();
 
-export default async function setupBot(config: Config, memory: Memory) {
+export default async function setupBot(
+    config: Config,
+    db: DbClient,
+) {
     Deno.mkdir('./tmp', { recursive: true });
 
     const bot = new Bot<SlushaContext>(config.botToken);
@@ -208,7 +220,15 @@ export default async function setupBot(config: Config, memory: Memory) {
     bot.catch((error) => {
         logger.error({
             ...error,
-            ctx: { ...error.ctx, m: undefined, memory: undefined },
+            ctx: {
+                ...error.ctx,
+                chats: undefined,
+                chatConfig: undefined,
+                characters: undefined,
+                members: undefined,
+                messages: undefined,
+                optOuts: undefined,
+            },
         });
     });
 
@@ -221,11 +241,17 @@ export default async function setupBot(config: Config, memory: Memory) {
 
     bot.use(async (ctx, next) => {
         // Init custom context
-        ctx.memory = memory;
+        ctx.db = db;
+        ctx.chats = new ChatRepository(db);
         let aiConfig = config.ai;
         if (ctx.chat) {
-            ctx.m = new ChatMemory(memory, ctx.chat);
-            const effective = await ctx.m.getEffectiveConfig();
+            await ctx.chats.ensureChat(ctx.chat);
+            ctx.chatConfig = new ChatConfigRepository(db, ctx.chat.id);
+            ctx.characters = new CharacterRepository(db, ctx.chat.id);
+            ctx.members = new MemberRepository(db, ctx.chat.id);
+            ctx.messages = new MessageRepository(db, ctx.chat.id);
+            ctx.optOuts = new OptOutRepository(db, ctx.chat.id);
+            const effective = await ctx.chatConfig.getEffectiveConfig();
             aiConfig = effective.ai;
         }
         ctx.info = { isRandom: false, config: aiConfig };
@@ -250,7 +276,7 @@ export default async function setupBot(config: Config, memory: Memory) {
                     first_name: ctx.from.first_name,
                 }
                 : undefined;
-            await ctx.m.applyReactionDelta(messageId, delta, by);
+            await ctx.messages.applyReactionDelta(messageId, delta, by);
         } catch (error) {
             logger.warn('Could not process message_reaction: ', error);
         }
@@ -265,7 +291,7 @@ export default async function setupBot(config: Config, memory: Memory) {
             if (!mrc) return next();
             const messageId = mrc.message_id;
             const counts = parseReactionCounts(mrc);
-            await ctx.m.replaceReactionCounts(messageId, counts);
+            await ctx.messages.replaceReactionCounts(messageId, counts);
         } catch (error) {
             logger.warn('Could not process message_reaction_count: ', error);
         }
@@ -292,9 +318,7 @@ export default async function setupBot(config: Config, memory: Memory) {
 
         // Ignore opted out users and commands
         if (
-            (await ctx.m.getChat()).optOutUsers.some((u) =>
-                u.id === ctx.from?.id
-            ) &&
+            (await ctx.optOuts.list()).some((u) => u.id === ctx.from?.id) &&
             !ctx.msg.text?.startsWith('/optin')
         ) {
             return;
@@ -321,13 +345,13 @@ export default async function setupBot(config: Config, memory: Memory) {
         }
 
         const threadResolution = await resolveThreadForIncomingMessage(
-            ctx.m,
+            ctx.messages,
             ctx.msg,
             replyToId,
         );
 
         // Save every message to memory
-        await ctx.m.addMessage({
+        await ctx.messages.addMessage({
             id: ctx.msg.message_id,
             text: ctx.msg.text ?? ctx.msg.caption ?? '',
             replyTo,
@@ -340,11 +364,13 @@ export default async function setupBot(config: Config, memory: Memory) {
         });
 
         if (ctx.from) {
-            await ctx.m.updateUser(ctx.from);
+            await ctx.members.updateUser(ctx.from);
         }
 
-        const effectiveConfig = await ctx.m.getEffectiveConfig();
-        await ctx.m.removeOldMessages(effectiveConfig.maxMessagesToStore);
+        const effectiveConfig = await ctx.chatConfig.getEffectiveConfig();
+        await ctx.messages.removeOldMessages(
+            effectiveConfig.maxMessagesToStore,
+        );
 
         return next();
     });
@@ -355,11 +381,13 @@ export default async function setupBot(config: Config, memory: Memory) {
             if (!update) return next();
 
             if (canMemberSendTextMessages(update.new_chat_member)) {
-                await ctx.m.setDisableRepliesDueToRights(false);
-                await ctx.m.setDisabledReplyRightsLastProbeAt(undefined);
+                await ctx.chatConfig.clearDisableRepliesDueToRights();
+                await ctx.chatConfig.clearDisabledReplyRightsLastProbeAt();
             } else {
-                await ctx.m.setDisableRepliesDueToRights(true);
-                await ctx.m.setDisabledReplyRightsLastProbeAt(Date.now());
+                await ctx.chatConfig.disableRepliesDueToRights();
+                await ctx.chatConfig.setDisabledReplyRightsLastProbeAt(
+                    Date.now(),
+                );
             }
         } catch (error) {
             logger.warn('Could not process my_chat_member update: ', error);
@@ -370,14 +398,14 @@ export default async function setupBot(config: Config, memory: Memory) {
 
     bot.on(':left_chat_member', async (ctx, next) => {
         if (ctx.from?.id) {
-            await ctx.m.removeMember(ctx.from.id);
+            await ctx.members.removeMember(ctx.from.id);
         }
 
         return next();
     });
 
     bot.on('edit:text', async (ctx, next) => {
-        await ctx.m.updateMessageText(
+        await ctx.messages.updateMessageText(
             ctx.msg.message_id,
             ctx.msg.text ?? ctx.msg.caption ?? '',
         );
@@ -389,7 +417,7 @@ export default async function setupBot(config: Config, memory: Memory) {
         const from = ctx.msg.migrate_from_chat_id;
         const to = ctx.chat.id;
 
-        await ctx.memory.migrateChat(from, to, ctx.chat);
+        await ctx.chats.migrateChat(from, to, ctx.chat);
 
         logger.debug(
             `Successfully migrated "${ctx.chat.title}" from ${from} to ${to}`,

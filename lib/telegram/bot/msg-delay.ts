@@ -15,52 +15,19 @@ export default function msgDelay() {
             }
         }
 
-        // TODO: Make sure this will not cause any concurrency issues (how)
-
-        const effectiveConfig = await ctx.m.getEffectiveConfig();
+        const effectiveConfig = await ctx.chatConfig.getEffectiveConfig();
 
         // Wait for configured delay before replying
-        setTimeout(async () => {
-            // If user is sent something after this message, drop current one
+        await new Promise((resolve) =>
+            setTimeout(resolve, effectiveConfig.responseDelay * 1000)
+        );
 
-            const history = await ctx.m.getHistory();
-
-            // Get last message from this user in chat
-            const lastUserMessage = history.filter((msg) =>
-                msg.info.from?.id === ctx.msg.from?.id
-            ).slice(-1)[0];
-            if (!lastUserMessage) {
-                logger.info(
-                    'Replying but could not find last message from user',
-                );
-                const typing = doTyping(ctx, logger);
-                try {
-                    await handleNext();
-                } finally {
-                    typing.abort();
-                }
-                return;
-            }
-
-            if (lastUserMessage.id !== ctx.msg.message_id) {
-                // Dropping message because user sent something new
-                return;
-            }
-
-            const lastMessage = await ctx.m.getLastMessage();
-            if (lastMessage?.id !== lastUserMessage.id) {
-                // If user's last message is followed by messages from other users
-                // then add info to which user to reply
-                ctx.info.userToReply = ctx.msg.from?.username ??
-                    ctx.chat.first_name;
-            }
-            const typing = doTyping(ctx, logger);
-            try {
-                await handleNext();
-            } finally {
-                typing.abort();
-            }
-        }, effectiveConfig.responseDelay * 1000);
+        const typing = doTyping(ctx, logger);
+        try {
+            await handleNext();
+        } finally {
+            typing.abort();
+        }
     });
 
     return bot;

@@ -43,7 +43,7 @@ bot.command('language', async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    const memLocale = (await ctx.m.getChat()).locale;
+    const memLocale = (await ctx.chats.getChat(ctx.chat)).locale;
     const current = memLocale ?? await ctx.i18n.getLocale();
     const keyboard = buildLanguageKeyboard(current, userId);
 
@@ -67,15 +67,18 @@ bot.callbackQuery(/set-lang .*/, async (ctx) => {
         if (!allowed.includes(locale)) {
             return ctx.answerCallbackQuery(ctx.t('language-invalid-locale'));
         }
+        const chat = ctx.chat;
+        if (!chat) {
+            return ctx.answerCallbackQuery(ctx.t('language-invalid-locale'));
+        }
 
-        const current = (await ctx.m.getChat()).locale ??
+        const current = (await ctx.chats.getChat(chat)).locale ??
             await ctx.i18n.getLocale();
         if (current === locale) {
             return ctx.answerCallbackQuery(ctx.t('language-already-set'));
         }
 
-        // Persist in chat memory and use for current update
-        await ctx.m.setLocale(locale);
+        await ctx.chats.patchChat(chat.id, { locale });
         await ctx.i18n.useLocale(locale);
 
         const keyboard = buildLanguageKeyboard(locale, ownerId);

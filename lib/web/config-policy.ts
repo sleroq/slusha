@@ -1,21 +1,24 @@
 import { ChatConfigOverride, UserConfig } from '../config.ts';
-import { chatOverrideContract } from '../config-contract.ts';
+import {
+    categoriesEditableByRole,
+    chatOverrideContract,
+} from '../config-contract.ts';
 import { ConfigRole } from './permissions.ts';
 import { normalizeReactionBlacklist } from '../telegram/reactions.ts';
 
 type ChatEditableAi = NonNullable<ChatConfigOverride['ai']>;
 type ChatOverrideKey = keyof Omit<
     ChatConfigOverride,
-    'ai' | 'requestWindowPerChat'
+    'ai'
 >;
 type ChatEditableAiKey = keyof ChatEditableAi;
 
 const regularDirectOverrideKeys = chatOverrideContract
-    .regularDirect satisfies readonly ChatOverrideKey[];
+    .regularDirect as readonly ChatOverrideKey[];
 const regularDeltaOverrideKeys = chatOverrideContract
-    .regularDelta satisfies readonly ChatOverrideKey[];
+    .regularDelta as readonly ChatOverrideKey[];
 const trustedAiKeys = chatOverrideContract
-    .trustedAi satisfies readonly ChatEditableAiKey[];
+    .trustedAi as readonly ChatEditableAiKey[];
 
 function uniqueModels(models: string[]): string[] {
     return Array.from(new Set(models.map((item) => item.trim()))).filter((
@@ -85,30 +88,9 @@ export function buildBootstrapCapabilities(role: ConfigRole): {
     role: ConfigRole;
     categories: string[];
 } {
-    if (role === 'admin') {
-        return {
-            role,
-            categories: ['general', 'model', 'prompts', 'advanced', 'admin'],
-        };
-    }
-
-    if (role === 'trusted') {
-        return {
-            role,
-            categories: ['general', 'model', 'prompts', 'advanced'],
-        };
-    }
-
-    if (role === 'regular') {
-        return {
-            role,
-            categories: ['general'],
-        };
-    }
-
     return {
         role,
-        categories: [],
+        categories: categoriesEditableByRole(role),
     };
 }
 
@@ -137,9 +119,7 @@ export function projectEffectiveConfigForRole(
         blacklistedReactions: config.blacklistedReactions,
         nepons: config.nepons,
         responseDelay: config.responseDelay,
-        ai: {
-            historyVersion: config.ai.historyVersion,
-        },
+        ai: {},
     };
 
     if (role === 'trusted' || role === 'admin') {
@@ -153,11 +133,7 @@ export function projectChatBaseConfigForRole(
     config: UserConfig,
     role: ConfigRole,
 ): Record<string, unknown> {
-    const payload = projectEffectiveConfigForRole(config, role);
-    if (role === 'admin') {
-        payload.requestWindow = config.requestWindow;
-    }
-    return payload;
+    return projectEffectiveConfigForRole(config, role);
 }
 
 export function sanitizeChatOverrideForRole(
@@ -179,27 +155,10 @@ export function sanitizeChatOverrideForRole(
         globalConfig,
         regularDeltaOverrideKeys,
     );
-    if (role === 'admin' && override.requestWindowPerChat !== undefined) {
-        next.requestWindowPerChat = override.requestWindowPerChat;
-    }
-
     if (next.blacklistedReactions) {
         next.blacklistedReactions = normalizeReactionBlacklist(
             next.blacklistedReactions,
         );
-    }
-
-    if (override.ai && role === 'regular') {
-        if (
-            hasDefinedPrimitiveDelta(
-                override.ai.historyVersion,
-                globalConfig.ai.historyVersion,
-            )
-        ) {
-            next.ai = {
-                historyVersion: override.ai.historyVersion,
-            };
-        }
     }
 
     if ((role === 'trusted' || role === 'admin') && override.ai) {

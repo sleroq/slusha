@@ -23,13 +23,11 @@ import {
   defaultGlobalConfig,
   fromUnknownCurrentCharacter,
   fromUnknownGlobal,
-  fromUnknownUsageWindowStatus,
   type GlobalFormText,
   globalTextFromConfig,
   parseChatIdFromStartParam,
   resolveChatOverridePayload,
   type ResolvedChatOverridePayload,
-  type UsageWindowStatus,
 } from "./model";
 
 function initialSearchParams(): URLSearchParams {
@@ -74,13 +72,12 @@ export class ConfigController {
   bootstrap = $state<BootstrapResponse | undefined>(undefined);
   status = $state("");
   userId = $state<number | undefined>(undefined);
-  role = $state<ConfigRole>("viewer");
+  role = $state<ConfigRole>("regular");
   categories = $state<string[]>([]);
   availableModels = $state<string[]>([]);
   availableReactions = $state<string[]>([]);
   availableChats = $state<AvailableChat[]>([]);
   currentCharacter = $state<CurrentCharacterPayload | undefined>(undefined);
-  usageWindowStatus = $state<UsageWindowStatus | undefined>(undefined);
 
   globalConfig = $state(defaultGlobalConfig());
   globalText = $state<GlobalFormText>({
@@ -209,10 +206,6 @@ export class ConfigController {
     this.currentCharacter = fromUnknownCurrentCharacter(
       data.currentCharacter,
     );
-    this.usageWindowStatus = fromUnknownUsageWindowStatus(
-      data.usageWindowStatus,
-    );
-
     if (!this.canViewGlobal && this.scope === "global") {
       this.scope = "chat";
     }

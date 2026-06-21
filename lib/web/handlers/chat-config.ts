@@ -1,5 +1,6 @@
 import { parseChatOverridePayload } from '../../config.ts';
-import { ChatMemory } from '../../memory.ts';
+import { ChatConfigRepository } from '../../persistence/chat-config.ts';
+import { ChatRepository } from '../../persistence/chats.ts';
 import { sanitizeChatOverrideForRole } from '../config-policy.ts';
 import { jsonResponse } from '../http.ts';
 import { canEditChatConfig } from '../permissions.ts';
@@ -36,11 +37,12 @@ export async function handlePutChatConfigRequest(
         role,
         globalConfig,
     );
-    const chatMemory = new ChatMemory(
-        options.memory,
-        await options.bot.api.getChat(chatId),
+    const chat = await options.bot.api.getChat(chatId);
+    await new ChatRepository(options.db).ensureChat(chat);
+    await new ChatConfigRepository(options.db, chatId).setChatConfigOverride(
+        sanitizedOverride,
+        userId,
     );
-    await chatMemory.setChatConfigOverride(sanitizedOverride, userId);
 
     return jsonResponse({ ok: true });
 }

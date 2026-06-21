@@ -7,7 +7,7 @@ import {
     removeFieldsWithSuffixes,
     sliceMessage,
 } from './helpers.ts';
-import { ChatMessage, ReplyTo } from './memory.ts';
+import type { ChatMessage, ReplyTo } from './persistence/types.ts';
 import { Message } from 'grammy_types';
 import { Logger } from '@deno-library/logger';
 import logger from './logger.ts';
@@ -19,7 +19,6 @@ interface HistoryOptions {
     attachments?: boolean;
     resolveReplyThread?: boolean;
     includeReactions?: boolean;
-    historyVersion?: 'v2' | 'v3';
     activeMessageId?: number;
 }
 
@@ -66,7 +65,7 @@ function collectReplyThread(
     return thread;
 }
 
-export function selectHistoryCandidates(
+export function selectHistoryCandidatesLegacy(
     history: ChatMessage[],
     options: {
         resolveReplyThread: boolean;
@@ -129,7 +128,7 @@ function hasThreadMetadata(history: ChatMessage[]): boolean {
     );
 }
 
-export function selectHistoryCandidatesV3(
+export function selectHistoryCandidates(
     history: ChatMessage[],
     options: {
         maxRootMessages?: number;
@@ -137,7 +136,7 @@ export function selectHistoryCandidatesV3(
     },
 ): HistoryCandidate[] {
     if (!hasThreadMetadata(history)) {
-        return selectHistoryCandidates(history, {
+        return selectHistoryCandidatesLegacy(history, {
             resolveReplyThread: true,
             maxRootMessages: options.maxRootMessages,
         });
@@ -620,7 +619,6 @@ interface BuildHistoryContextOptions {
     resolveReplyThread?: boolean;
     includeReactions?: boolean;
     characterName?: string;
-    historyVersion?: 'v2' | 'v3';
     activeMessageId?: number;
 }
 
@@ -641,12 +639,12 @@ export async function buildHistoryContext(
     const prompt: ModelMessage[] = [];
     let textPart = '';
 
-    const candidates = mode === 'chat' && options.historyVersion === 'v3'
-        ? selectHistoryCandidatesV3(history, {
+    const candidates = mode === 'chat'
+        ? selectHistoryCandidates(history, {
             maxRootMessages: undefined,
             activeMessageId: options.activeMessageId,
         })
-        : selectHistoryCandidates(history, {
+        : selectHistoryCandidatesLegacy(history, {
             resolveReplyThread: resolveReplies,
             maxRootMessages: undefined,
         });
@@ -744,7 +742,7 @@ export async function buildHistoryContext(
     return prompt;
 }
 
-export function makeHistoryV2(
+export function makeHistory(
     botInfo: { token: string; id: number },
     api: Api<RawApi>,
     logger: Logger,
@@ -764,33 +762,6 @@ export function makeHistoryV2(
             attachments: options.attachments,
             resolveReplyThread: options.resolveReplyThread,
             includeReactions: options.includeReactions,
-            historyVersion: 'v2',
-            activeMessageId: options.activeMessageId,
-        },
-    );
-}
-
-export function makeHistoryV3(
-    botInfo: { token: string; id: number },
-    api: Api<RawApi>,
-    logger: Logger,
-    history: ChatMessage[],
-    options: HistoryOptions,
-): Promise<ModelMessage[]> {
-    return buildHistoryContext(
-        botInfo,
-        api,
-        logger,
-        history,
-        {
-            mode: 'chat',
-            symbolLimit: options.symbolLimit,
-            messagesLimit: options.messagesLimit,
-            bytesLimit: options.bytesLimit,
-            attachments: options.attachments,
-            resolveReplyThread: options.resolveReplyThread,
-            includeReactions: options.includeReactions,
-            historyVersion: 'v3',
             activeMessageId: options.activeMessageId,
         },
     );

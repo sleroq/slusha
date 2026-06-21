@@ -1,6 +1,6 @@
 import { count, eq } from 'drizzle-orm';
 import { migrateDb } from '../lib/db/migrate.ts';
-import { createDb, DbClient } from '../lib/db/client.ts';
+import { DbClient, getDb } from '../lib/db/client.ts';
 import {
     chatCharacters,
     chatMembers,
@@ -10,7 +10,7 @@ import {
     messageReactions,
     messageReactionUsers,
 } from '../lib/db/schema.ts';
-import { Chat, MessageReactions } from '../lib/memory.ts';
+import type { Chat, MessageReactions } from '../lib/persistence/types.ts';
 
 interface LegacyMemory {
     chats: Record<string, Chat>;
@@ -162,7 +162,7 @@ async function upsertChat(db: DbClient, chatId: number, chat: Chat) {
 
 async function main() {
     await migrateDb();
-    const { db } = createDb();
+    const db = getDb();
 
     const raw = await Deno.readTextFile('memory.json');
     const legacy = JSON.parse(raw) as LegacyMemory;

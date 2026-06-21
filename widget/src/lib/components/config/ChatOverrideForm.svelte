@@ -27,7 +27,6 @@
         availableReactions: string[];
         currentCharacter?: CurrentCharacterPayload;
         canConfigureTrustedSettings: boolean;
-        canEditWindowOverrides: boolean;
         overriddenFieldPaths: ChatOverridePath[];
         searchQuery: string;
     }
@@ -40,7 +39,6 @@
         availableReactions = [],
         currentCharacter,
         canConfigureTrustedSettings,
-        canEditWindowOverrides,
         overriddenFieldPaths = [],
         searchQuery = '',
     }: Props = $props();
@@ -74,7 +72,6 @@
             'ignore tendency',
             'random reply chance',
             'response delay',
-            'history version',
             'bot names',
             'reply trigger patterns',
             'ignore trigger patterns',
@@ -93,10 +90,8 @@
     let showPrompts = $derived(
         matchesSection(
             'prompts',
-            'json-actions chat prompt',
-            'plain-text chat prompt',
+            'chat prompt',
             'primary chat prompt',
-            'low-context chat prompt',
             'private chat prompt addition',
             'group chat prompt addition',
             'comment prompt addition',
@@ -107,27 +102,16 @@
         matchesSection(
             'advanced',
             'messages passed to ai',
-            'reply method',
             'max reply length',
             'attachment byte limit',
             'include attachments in history',
-        ),
-    );
-    let showUsageLimits = $derived(
-        matchesSection(
-            'usage limits',
-            'request windows',
-            'free tier per-chat max requests',
-            'free tier per-chat window minutes',
-            'trusted tier per-chat max requests',
-            'trusted tier per-chat window minutes',
         ),
     );
     let hasMatches = $derived(
         showCurrentCharacter ||
             showGeneral ||
             (canConfigureTrustedSettings &&
-                (showModel || showPrompts || showAdvanced || showUsageLimits)),
+                (showModel || showPrompts || showAdvanced)),
     );
     let overriddenPathSet = $derived(new Set(overriddenFieldPaths));
 
@@ -269,15 +253,6 @@
                             hidden={!matchesBlockItem('general', 'response delay')}
                             bind:value={config.responseDelay}
                         />
-                        <SettingSelectField
-                            id="c-ai-history-version"
-                            label="History version"
-                            description="Selects conversation history builder for this chat."
-                            options={['v2', 'v3']}
-                            sourceState={sourceStateFor('ai.historyVersion')}
-                            hidden={!matchesBlockItem('general', 'history version', 'ai.historyVersion')}
-                            bind:value={config.ai.historyVersion}
-                        />
                     </div>
 
                     <div class="grid gap-3 md:grid-cols-2">
@@ -382,21 +357,11 @@
                             id="c-ai-prompt"
                             rows={4}
                             containerClass="md:col-span-2"
-                            label="JSON-actions chat prompt"
-                            description="Core behavior/persona prompt used only when reply method is json_actions."
+                            label="Chat prompt"
+                            description="Core behavior/persona prompt for this chat."
                             sourceState={sourceStateFor('ai.prompt')}
-                            hidden={!matchesBlockItem('prompts', 'json-actions chat prompt', 'primary chat prompt')}
+                            hidden={!matchesBlockItem('prompts', 'chat prompt', 'primary chat prompt')}
                             bind:value={config.ai.prompt}
-                        />
-                        <SettingTextareaField
-                            id="c-ai-dumb-prompt"
-                            rows={3}
-                            containerClass="md:col-span-2"
-                            label="Plain-text chat prompt"
-                            description="Core behavior/persona prompt used only when reply method is plain_text_reactions."
-                            sourceState={sourceStateFor('ai.dumbPrompt')}
-                            hidden={!matchesBlockItem('prompts', 'plain-text chat prompt', 'low-context chat prompt', 'dumb prompt')}
-                            bind:value={config.ai.dumbPrompt}
                         />
                         <SettingTextareaField
                             id="c-ai-private-addition"
@@ -473,15 +438,6 @@
                             hidden={!matchesBlockItem('advanced', 'attachment byte limit', 'bytes limit')}
                             bind:value={config.ai.bytesLimit}
                         />
-                        <SettingSelectField
-                            id="c-ai-reply-method"
-                            label="Reply method"
-                            description="Chooses how replies and reactions are generated in this chat."
-                            options={['json_actions', 'plain_text_reactions']}
-                            sourceState={sourceStateFor('ai.replyMethod')}
-                            hidden={!matchesBlockItem('advanced', 'reply method', 'ai.replyMethod')}
-                            bind:value={config.ai.replyMethod}
-                        />
                         <SettingToggleField
                             id="c-ai-attachments"
                             label="Include attachments in history"
@@ -494,49 +450,6 @@
                 </details>
             {/if}
 
-            {#if showUsageLimits && canEditWindowOverrides}
-                <details class="quick-details pt-4" open={hasSearch}>
-                    <summary class="cursor-pointer select-none font-medium">Usage Limits</summary>
-                    <div class="mt-4 grid gap-3 md:grid-cols-2">
-                        <SettingInputField
-                            id="c-req-free-chat-max"
-                            type="number"
-                            label="Free tier per-chat max requests"
-                            description="Chat-wide free-tier limit before cost mode."
-                            sourceState={sourceStateFor('requestWindowPerChat.free.maxRequests')}
-                            hidden={!matchesBlockItem('usage limits', 'free tier per-chat max requests')}
-                            bind:value={config.requestWindowPerChat.free.maxRequests}
-                        />
-                        <SettingInputField
-                            id="c-req-free-chat-window"
-                            type="number"
-                            label="Free tier per-chat window (minutes)"
-                            description="Rolling window for free-tier chat usage."
-                            sourceState={sourceStateFor('requestWindowPerChat.free.windowMinutes')}
-                            hidden={!matchesBlockItem('usage limits', 'free tier per-chat window minutes')}
-                            bind:value={config.requestWindowPerChat.free.windowMinutes}
-                        />
-                        <SettingInputField
-                            id="c-req-trusted-chat-max"
-                            type="number"
-                            label="Trusted tier per-chat max requests"
-                            description="Chat-wide trusted-tier limit before cost mode."
-                            sourceState={sourceStateFor('requestWindowPerChat.trusted.maxRequests')}
-                            hidden={!matchesBlockItem('usage limits', 'trusted tier per-chat max requests')}
-                            bind:value={config.requestWindowPerChat.trusted.maxRequests}
-                        />
-                        <SettingInputField
-                            id="c-req-trusted-chat-window"
-                            type="number"
-                            label="Trusted tier per-chat window (minutes)"
-                            description="Rolling window for trusted-tier chat usage."
-                            sourceState={sourceStateFor('requestWindowPerChat.trusted.windowMinutes')}
-                            hidden={!matchesBlockItem('usage limits', 'trusted tier per-chat window minutes')}
-                            bind:value={config.requestWindowPerChat.trusted.windowMinutes}
-                        />
-                    </div>
-                </details>
-            {/if}
         {/if}
 
     </div>

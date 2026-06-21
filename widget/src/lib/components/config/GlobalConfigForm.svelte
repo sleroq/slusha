@@ -65,59 +65,30 @@
     let showPrompts = $derived(
         matchesSection(
             'prompts',
-            'json-actions preface prompt',
-            'plain-text preface prompt',
-            'json-actions chat prompt',
-            'plain-text chat prompt',
+            'preface prompt',
+            'chat prompt',
             'system preface prompt',
             'primary chat prompt',
-            'low-context chat prompt',
-            'low-context preface prompt',
             'private chat prompt addition',
             'group chat prompt addition',
             'comment prompt addition',
             'hate mode prompt',
-            'json-actions final prompt wrapper',
-            'plain-text final prompt wrapper',
+            'final prompt wrapper',
             'final prompt wrapper',
             'chat actions tool description',
-            'chat reactions tool description',
-            'low-context final wrapper',
         ),
     );
     let showAdvanced = $derived(
         matchesSection(
             'advanced',
-            'history version',
             'max messages to store',
             'messages passed to ai',
-            'reply method',
             'max output tokens',
             'thinking level',
-            'thinking budget',
             'reasoning max tokens',
             'max reply length',
             'attachment byte limit',
             'include attachments in history',
-        ),
-    );
-    let showUsageLimits = $derived(
-        matchesSection(
-            'usage limits',
-            'request windows',
-            'free user per-user max requests',
-            'free user per-user window minutes',
-            'free user per-chat max requests',
-            'free user per-chat window minutes',
-            'trusted user per-user max requests',
-            'trusted user per-user window minutes',
-            'trusted user per-chat max requests',
-            'trusted user per-chat window minutes',
-            'downgrade model',
-            'downgraded messages to pass',
-            'downgraded bytes limit',
-            'disable long context',
-            'disable attachments',
         ),
     );
     let showAdmin = $derived(
@@ -132,7 +103,7 @@
         ),
     );
     let hasMatches = $derived(
-        showGeneral || showModel || showPrompts || showAdvanced || showUsageLimits || showAdmin,
+        showGeneral || showModel || showPrompts || showAdvanced || showAdmin,
     );
 </script>
 
@@ -280,37 +251,19 @@
                         id="g-ai-preprompt"
                         rows={4}
                         containerClass="md:col-span-2"
-                        label="JSON-actions preface prompt"
-                        description="Prepended context used only when reply method is json_actions."
-                        hidden={!matchesBlockItem('prompts', 'json-actions preface prompt', 'system preface prompt', 'preprompt')}
+                        label="Preface prompt"
+                        description="Prepended system context for chat responses."
+                        hidden={!matchesBlockItem('prompts', 'preface prompt', 'system preface prompt', 'preprompt')}
                         bind:value={config.ai.prePrompt}
-                    />
-                    <SettingTextareaField
-                        id="g-ai-dumb-preprompt"
-                        rows={3}
-                        containerClass="md:col-span-2"
-                        label="Plain-text preface prompt"
-                        description="Prepended context used only when reply method is plain_text_reactions."
-                        hidden={!matchesBlockItem('prompts', 'plain-text preface prompt', 'low-context preface prompt', 'dumb preprompt')}
-                        bind:value={config.ai.dumbPrePrompt}
                     />
                     <SettingTextareaField
                         id="g-ai-prompt"
                         rows={4}
                         containerClass="md:col-span-2"
-                        label="JSON-actions chat prompt"
-                        description="Core behavior/persona prompt used only in json_actions mode."
-                        hidden={!matchesBlockItem('prompts', 'json-actions chat prompt', 'primary chat prompt')}
+                        label="Chat prompt"
+                        description="Core behavior/persona prompt."
+                        hidden={!matchesBlockItem('prompts', 'chat prompt', 'primary chat prompt')}
                         bind:value={config.ai.prompt}
-                    />
-                    <SettingTextareaField
-                        id="g-ai-dumb-prompt"
-                        rows={3}
-                        containerClass="md:col-span-2"
-                        label="Plain-text chat prompt"
-                        description="Core behavior/persona prompt used only in plain_text_reactions mode."
-                        hidden={!matchesBlockItem('prompts', 'plain-text chat prompt', 'low-context chat prompt', 'dumb prompt')}
-                        bind:value={config.ai.dumbPrompt}
                     />
                     <SettingTextareaField
                         id="g-ai-private-addition"
@@ -352,19 +305,10 @@
                         id="g-ai-final-prompt"
                         rows={4}
                         containerClass="md:col-span-2"
-                        label="JSON-actions final prompt wrapper"
-                        description="Last instruction template used only in json_actions mode."
-                        hidden={!matchesBlockItem('prompts', 'json-actions final prompt wrapper', 'final prompt wrapper', 'final prompt')}
+                        label="Final prompt wrapper"
+                        description="Last instruction template before generation."
+                        hidden={!matchesBlockItem('prompts', 'final prompt wrapper', 'final prompt')}
                         bind:value={config.ai.finalPrompt}
-                    />
-                    <SettingTextareaField
-                        id="g-ai-dumb-final"
-                        rows={3}
-                        containerClass="md:col-span-2"
-                        label="Plain-text final prompt wrapper"
-                        description="Last instruction template used only in plain_text_reactions mode."
-                        hidden={!matchesBlockItem('prompts', 'plain-text final prompt wrapper', 'low-context final wrapper', 'dumb final prompt')}
-                        bind:value={config.ai.dumbFinalPrompt}
                     />
                     <SettingTextareaField
                         id="g-ai-tool-description"
@@ -374,15 +318,6 @@
                         description="Schema and guidance injected into send_chat_actions tool description."
                         hidden={!matchesBlockItem('prompts', 'chat actions tool description', 'tool description', 'chatActionsToolDescription')}
                         bind:value={config.ai.chatActionsToolDescription}
-                    />
-                    <SettingTextareaField
-                        id="g-ai-chat-reactions"
-                        rows={3}
-                        containerClass="md:col-span-2"
-                        label="Chat reactions tool description"
-                        description="Tool description for send_chat_reactions used in plain_text_reactions mode to add reactions after text replies."
-                        hidden={!matchesBlockItem('prompts', 'chat reactions tool description', 'reactions tool', 'chatReactionsToolDescription')}
-                        bind:value={config.ai.chatReactionsToolDescription}
                     />
                 </div>
             </details>
@@ -416,14 +351,6 @@
                         hidden={!matchesBlockItem('advanced', 'max output tokens')}
                         bind:value={config.ai.generation.chat.maxOutputTokens}
                     />
-                    <SettingInputField
-                        id="g-ai-thinking-budget"
-                        type="number"
-                        label="Thinking budget"
-                        description="Google thinking token budget for chat generation (used by Gemini 2.5 models)."
-                        hidden={!matchesBlockItem('advanced', 'thinking budget')}
-                        bind:value={config.ai.generation.chat.thinking.thinkingBudget}
-                    />
                     <SettingSelectField
                         id="g-ai-thinking-level"
                         label="Thinking level"
@@ -456,138 +383,12 @@
                         hidden={!matchesBlockItem('advanced', 'attachment byte limit', 'bytes limit')}
                         bind:value={config.ai.bytesLimit}
                     />
-                    <SettingSelectField
-                        id="g-ai-history-version"
-                        label="History version"
-                        description="Selects history builder strategy used in chat generation."
-                        options={['v2', 'v3']}
-                        hidden={!matchesBlockItem('advanced', 'history version', 'ai.historyVersion')}
-                        bind:value={config.ai.historyVersion}
-                    />
-                    <SettingSelectField
-                        id="g-ai-reply-method"
-                        label="Reply method"
-                        description="Chooses how replies and reactions are generated."
-                        options={['json_actions', 'plain_text_reactions']}
-                        hidden={!matchesBlockItem('advanced', 'reply method', 'ai.replyMethod')}
-                        bind:value={config.ai.replyMethod}
-                    />
                     <SettingToggleField
                         id="g-ai-attachments"
                         label="Include attachments in history"
                         description="Adds attachment text to model context when possible."
                         hidden={!matchesBlockItem('advanced', 'include attachments in history')}
                         bind:checked={config.ai.includeAttachmentsInHistory}
-                    />
-                </div>
-            </details>
-        {/if}
-
-        {#if showUsageLimits}
-            <details class="quick-details pt-4" open={hasSearch}>
-                <summary class="cursor-pointer select-none font-medium">Usage Limits</summary>
-                <div class="mt-4 grid gap-3 md:grid-cols-2">
-                    <SettingInputField
-                        id="g-req-free-user-max"
-                        type="number"
-                        label="Free user per-user max requests"
-                        description="Switches to downgrade mode when this limit is reached."
-                        hidden={!matchesBlockItem('usage limits', 'free user per-user max requests')}
-                        bind:value={config.requestWindow.free.perUser.maxRequests}
-                    />
-                    <SettingInputField
-                        id="g-req-free-user-window"
-                        type="number"
-                        label="Free user per-user window (minutes)"
-                        description="Rolling window for free user personal usage."
-                        hidden={!matchesBlockItem('usage limits', 'free user per-user window minutes')}
-                        bind:value={config.requestWindow.free.perUser.windowMinutes}
-                    />
-                    <SettingInputField
-                        id="g-req-free-chat-max"
-                        type="number"
-                        label="Free user per-chat max requests"
-                        description="Chat-wide limit for free tier before downgrade mode."
-                        hidden={!matchesBlockItem('usage limits', 'free user per-chat max requests')}
-                        bind:value={config.requestWindow.free.perChat.maxRequests}
-                    />
-                    <SettingInputField
-                        id="g-req-free-chat-window"
-                        type="number"
-                        label="Free user per-chat window (minutes)"
-                        description="Rolling window for free tier chat usage."
-                        hidden={!matchesBlockItem('usage limits', 'free user per-chat window minutes')}
-                        bind:value={config.requestWindow.free.perChat.windowMinutes}
-                    />
-                    <SettingInputField
-                        id="g-req-trusted-user-max"
-                        type="number"
-                        label="Trusted user per-user max requests"
-                        description="Personal limit for trusted tier before downgrade mode."
-                        hidden={!matchesBlockItem('usage limits', 'trusted user per-user max requests')}
-                        bind:value={config.requestWindow.trusted.perUser.maxRequests}
-                    />
-                    <SettingInputField
-                        id="g-req-trusted-user-window"
-                        type="number"
-                        label="Trusted user per-user window (minutes)"
-                        description="Rolling window for trusted user personal usage."
-                        hidden={!matchesBlockItem('usage limits', 'trusted user per-user window minutes')}
-                        bind:value={config.requestWindow.trusted.perUser.windowMinutes}
-                    />
-                    <SettingInputField
-                        id="g-req-trusted-chat-max"
-                        type="number"
-                        label="Trusted user per-chat max requests"
-                        description="Chat-wide limit for trusted tier before downgrade mode."
-                        hidden={!matchesBlockItem('usage limits', 'trusted user per-chat max requests')}
-                        bind:value={config.requestWindow.trusted.perChat.maxRequests}
-                    />
-                    <SettingInputField
-                        id="g-req-trusted-chat-window"
-                        type="number"
-                        label="Trusted user per-chat window (minutes)"
-                        description="Rolling window for trusted tier chat usage."
-                        hidden={!matchesBlockItem('usage limits', 'trusted user per-chat window minutes')}
-                        bind:value={config.requestWindow.trusted.perChat.windowMinutes}
-                    />
-                    <SettingSelectField
-                        id="g-req-downgrade-model"
-                        label="Downgrade model"
-                        description="Model used when either window limit is exhausted."
-                        options={availableModels}
-                        hidden={!matchesBlockItem('usage limits', 'downgrade model')}
-                        bind:value={config.requestWindow.downgradeModel}
-                    />
-                    <SettingInputField
-                        id="g-req-downgrade-messages"
-                        type="number"
-                        label="Downgraded messages to pass"
-                        description="Maximum messages included when long context is disabled."
-                        hidden={!matchesBlockItem('usage limits', 'downgraded messages to pass')}
-                        bind:value={config.requestWindow.downgradeMessagesToPass}
-                    />
-                    <SettingInputField
-                        id="g-req-downgrade-bytes"
-                        type="number"
-                        label="Downgraded bytes limit"
-                        description="Max bytes included when long context is disabled."
-                        hidden={!matchesBlockItem('usage limits', 'downgraded bytes limit')}
-                        bind:value={config.requestWindow.downgradeBytesLimit}
-                    />
-                    <SettingToggleField
-                        id="g-req-disable-long-context"
-                        label="Disable long context in cost mode"
-                        description="Reduces history size when windows are exhausted."
-                        hidden={!matchesBlockItem('usage limits', 'disable long context')}
-                        bind:checked={config.requestWindow.disableLongContext}
-                    />
-                    <SettingToggleField
-                        id="g-req-disable-attachments"
-                        label="Disable attachments in cost mode"
-                        description="Excludes attachments from history while downgraded."
-                        hidden={!matchesBlockItem('usage limits', 'disable attachments')}
-                        bind:checked={config.requestWindow.disableAttachments}
                     />
                 </div>
             </details>

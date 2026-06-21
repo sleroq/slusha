@@ -249,6 +249,11 @@
     onMount(() => {
         try {
             init();
+            if (!controller.ensureInitDataRaw()) {
+                launchError = t('app.launchContextMissing');
+                return;
+            }
+
             controller.initialize();
             setupTelegramTheme();
         } catch (error) {
@@ -300,7 +305,6 @@
             canViewGlobal={controller.canViewGlobal}
             role={controller.role}
             availableChats={controller.availableChats}
-            usageWindowStatus={controller.usageWindowStatus}
             onReload={reloadWithFeedback}
             isReloading={isReloading}
             isLoading={controller.isLoading}
@@ -353,7 +357,6 @@
                                 availableReactions={controller.availableReactions}
                                 currentCharacter={controller.currentCharacter}
                                 canConfigureTrustedSettings={controller.canConfigureTrustedSettings}
-                                canEditWindowOverrides={controller.role === 'admin'}
                                 overriddenFieldPaths={overriddenFieldPaths}
                                 searchQuery={settingsSearch}
                             />
@@ -367,7 +370,6 @@
                             availableReactions={controller.availableReactions}
                             currentCharacter={controller.currentCharacter}
                             canConfigureTrustedSettings={controller.canConfigureTrustedSettings}
-                            canEditWindowOverrides={controller.role === 'admin'}
                             overriddenFieldPaths={overriddenFieldPaths}
                             searchQuery={settingsSearch}
                         />

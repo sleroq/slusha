@@ -3,7 +3,7 @@ import { Composer } from 'grammy';
 
 export default function registerHateMode(composer: Composer<SlushaContext>) {
     composer.command('hatemode', async (ctx) => {
-        const chat = await ctx.m.getChat();
+        const chat = await ctx.chats.getChat(ctx.chat);
         if (ctx.chat.type !== 'private') {
             const admins = await ctx.getChatAdministrators();
             if (!admins.some((a) => a.user.id === ctx.from?.id)) {
@@ -18,7 +18,7 @@ export default function registerHateMode(composer: Composer<SlushaContext>) {
         }
 
         const nextMode = !chat.hateMode;
-        await ctx.m.setHateMode(nextMode);
+        await ctx.chats.patchChat(ctx.chat.id, { hateMode: nextMode });
 
         return ctx.reply(
             ctx.t('hate-mode-status', {

@@ -36,14 +36,11 @@ const widgetFieldMeta: Partial<
     textKind: "stringList",
   },
   nepons: { textKey: "nepons", textKind: "stringList" },
-  "ai.historyVersion": { fallback: "v2" },
   "ai.prompt": { fallback: "" },
-  "ai.dumbPrompt": { fallback: "" },
   "ai.privateChatPromptAddition": { fallback: "" },
   "ai.groupChatPromptAddition": { fallback: "" },
   "ai.commentsPromptAddition": { fallback: "" },
   "ai.hateModePrompt": { fallback: "" },
-  "ai.replyMethod": { fallback: "" },
 };
 
 function buildField(path: ChatOverridePath): ChatOverrideField {
@@ -55,7 +52,6 @@ export const CHAT_OVERRIDE_FIELDS: readonly ChatOverrideField[] = [
   ...chatOverrideContract.regularDirect.map(buildField),
   ...chatOverrideContract.trustedAi
     .map((key) => buildField(`ai.${key}` as ChatOverridePath)),
-  ...chatOverrideContract.adminWindow.map(buildField),
 ] as const;
 
 function getPath(source: unknown, path: ChatOverridePath): unknown {

@@ -40,7 +40,7 @@ export function registerConfig(
         }
 
         if (requestedScope === 'global') {
-            const globalConfig = await getGlobalUserConfig(ctx.memory.db);
+            const globalConfig = await getGlobalUserConfig(ctx.db);
             if (
                 !ctx.from ||
                 !(globalConfig.adminIds?.includes(ctx.from.id) ?? false)

@@ -3,8 +3,8 @@ import logger from './lib/logger.ts';
 import resolveConfig, { Config } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
 import { run } from '@grammyjs/runner';
-import { loadMemory } from './lib/memory.ts';
 import { migrateDb } from './lib/db/migrate.ts';
+import { getDb } from './lib/db/client.ts';
 
 // AI runtime details moved to handler module
 
@@ -28,12 +28,12 @@ let config: Config;
 
 await migrateDb();
 
-const memory = await loadMemory();
-logger.info('Memory loaded');
-logMemoryUsage('after memory load');
+const db = getDb();
+logger.info('Database ready');
+logMemoryUsage('after database init');
 
 try {
-    config = await resolveConfig(memory.db);
+    config = await resolveConfig(db);
 } catch (error) {
     logger.error('Config error: ', error);
     Deno.exit(1);
@@ -43,12 +43,12 @@ const runtimeConfig = {
     getBotToken: () => config.botToken,
 };
 
-const bot = await setupBot(config, memory);
+const bot = await setupBot(config, db);
 logMemoryUsage('after bot setup');
 
 startWebServer({
     bot,
-    memory,
+    db,
     runtimeConfig,
 });
 
@@ -92,7 +92,7 @@ logMemoryUsage('bot started');
 
 // TODO: Remind users about bot existence
 
-const _stopSchedulers = startSchedulers({ db: memory.db, logger });
+const _stopSchedulers = startSchedulers({ db, logger });
 
 // Save memory on exit
 wireShutdown(bot, sdk);

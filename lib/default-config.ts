@@ -31,9 +31,6 @@ const finalPrompt =
 const chatActionsToolDescription =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
 
-const chatReactionsToolDescription =
-    'Submit Telegram reactions once per turn. Return entries containing only {"type":"react","react":"❤","target_ref":"tN"}. Do not include reply text.';
-
 const commentsPromptAddition = `
 - You're in a comments section of telegram channel with multiple users discussing channel posts and topics
 `.trim() + '\n\n';
@@ -65,27 +62,14 @@ const defaultConfig = {
     startMessage: 'Привет! Я Слюша, бот-гений.',
     ai: {
         model: 'gemini-3.1-flash-lite-preview',
-        replyMethod: 'json_actions',
-        historyVersion: 'v2',
         prePrompt,
-        dumbPrePrompt: `
-Коротко отвечай простым текстом одним сообщением. Не используй JSON.
-Не ставь реакции и не описывай действия. Используй Telegram markdown без заголовков.
-Пиши на языке чата по умолчанию. Будь лаконичной и естественной.
-`.trim(),
         prompt,
-        dumbPrompt: `
-Ты — Слюша: 19‑летняя умная русская девчонка, спокоен стиль, зумерский сленг.
-Пиши коротко, по делу, без лишней вежливости. Можно сарказм.
-`.trim() + '\n\n',
         privateChatPromptAddition,
         groupChatPromptAddition,
         commentsPromptAddition,
         hateModePrompt,
         finalPrompt,
         chatActionsToolDescription,
-        chatReactionsToolDescription,
-        dumbFinalPrompt: 'Ответь одним коротким сообщением простым текстом.',
         temperature: 0.55,
         topK: 32,
         topP: 0.85,
@@ -193,33 +177,6 @@ const defaultConfig = {
     ],
     maxMessagesToStore: 200,
     responseDelay: 1,
-    requestWindow: {
-        free: {
-            perUser: {
-                maxRequests: 30,
-                windowMinutes: 180,
-            },
-            perChat: {
-                maxRequests: 120,
-                windowMinutes: 180,
-            },
-        },
-        trusted: {
-            perUser: {
-                maxRequests: 300,
-                windowMinutes: 180,
-            },
-            perChat: {
-                maxRequests: 1200,
-                windowMinutes: 180,
-            },
-        },
-        downgradeModel: 'gemini-3.1-flash-lite-preview',
-        disableLongContext: false,
-        downgradeMessagesToPass: 4,
-        downgradeBytesLimit: 20 * 1024 * 1024,
-        disableAttachments: false,
-    },
 };
 
 export default defaultConfig;

@@ -1,21 +1,15 @@
 import { Bot, Composer } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
 import logger from '../../logger.ts';
-import {
-    APICallError,
-    generateText,
-    hasToolCall,
-    ModelMessage,
-    tool,
-} from 'ai';
-import { makeHistoryV2, makeHistoryV3 } from '../../history.ts';
+import { APICallError, hasToolCall, ModelMessage, tool } from 'ai';
+import { makeHistory } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
-import { ReplyTo } from '../../memory.ts';
+import type { ChatMessage, ReplyTo } from '../../persistence/types.ts';
+import type { UserConfig } from '../../config.ts';
 import {
     chatActionsToolInputSchema,
     ChatEntry,
-    chatReactionsToolInputSchema,
     isReactEntry,
     isTextEntry,
 } from '../../ai/schema.ts';
@@ -28,8 +22,6 @@ import {
     type GenerationAttemptPlan,
     getGenerationFallbackPlans,
     resolveCustomPrompt,
-    resolveReplyMethod,
-    splitTextByTwoLines,
 } from '../../ai/chat-generation.ts';
 import {
     buildChatInfoBlock,
@@ -38,45 +30,21 @@ import {
 } from '../../ai/chat-context.ts';
 import { canonicalizeReaction, resolveEnabledReactions } from '../reactions.ts';
 import { isMissingSendTextRightsError } from '../reply-rights.ts';
-import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { parseModelRef } from '../../ai/model-ref.ts';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
 import { buildLanguageProtocol } from '../../ai/language-protocol.ts';
-import {
-    cleanupUsageEvents,
-    getUsageSnapshot,
-    recordUsageEvent,
-} from '../usage-window.ts';
+import { generateLlmText } from '../../ai/generation.ts';
+import type { ResolvedGenerationPolicy } from '../../ai/generation-policy.ts';
 
 const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
 
-const DEFAULT_CHAT_REACTIONS_TOOL_DESCRIPTION =
-    'Submit Telegram reactions once per turn. Return entries containing only {"type":"react","react":"❤","target_ref":"tN"}. Do not include reply text.';
-
-const PLAIN_TEXT_META_OPEN = '<slusha_meta>';
-const PLAIN_TEXT_META_CLOSE = '</slusha_meta>';
-
-const plainTextTargetRefLineRegex = /^@@target_ref=(t\d+)\s*\r?\n([\s\S]*)$/;
-const plainTextMetadataBlockRegex =
-    /^<slusha_meta>\s*\r?\n([\s\S]*?)\r?\n<\/slusha_meta>\s*/;
 const defaultReservedMessageTokens = [
     'slusha_meta',
     'target_ref',
 ];
 const RESERVED_MESSAGE_TOKEN_ERROR =
     'Generated output contains reserved metadata token';
-
-function parseJsonRecord(text: string): Record<string, unknown> | undefined {
-    try {
-        const parsed = JSON.parse(text);
-        return parsed && typeof parsed === 'object'
-            ? parsed as Record<string, unknown>
-            : undefined;
-    } catch {
-        return undefined;
-    }
-}
 
 function createSendChatActionsTool(description: string) {
     return tool({
@@ -152,31 +120,6 @@ function createSendChatActionsTool(description: string) {
     });
 }
 
-function createSendChatReactionsTool(description: string) {
-    return tool({
-        description,
-        inputSchema: chatReactionsToolInputSchema,
-        inputExamples: [
-            {
-                input: {
-                    entries: [
-                        {
-                            type: 'react',
-                            react: '❤',
-                            target_ref: 't1',
-                        },
-                    ],
-                },
-            },
-            {
-                input: {
-                    entries: [],
-                },
-            },
-        ],
-    });
-}
-
 function parseSendChatActionsEntries(
     toolCalls: Array<{ toolName: string; input: unknown }>,
 ): ChatEntry[] | undefined {
@@ -194,104 +137,6 @@ function parseSendChatActionsEntries(
     }
 
     return undefined;
-}
-
-function parseSendChatReactionsEntries(
-    toolCalls: Array<{ toolName: string; input: unknown }>,
-): ChatEntry[] | undefined {
-    const chatReactionsToolCall = toolCalls.find((call) =>
-        call.toolName === 'send_chat_reactions'
-    );
-    const parsedToolCallInput = chatReactionsToolCall
-        ? chatReactionsToolInputSchema.safeParse(
-            chatReactionsToolCall.input,
-        )
-        : undefined;
-
-    if (parsedToolCallInput?.success) {
-        return parsedToolCallInput.data.entries;
-    }
-
-    return undefined;
-}
-
-function parsePlainTextRepliesWithTargets(rawText: string): ChatEntry[] {
-    const chunks = splitTextByTwoLines(rawText.trim());
-    const entries: ChatEntry[] = [];
-    let pendingTargetRef: string | undefined;
-
-    for (const chunk of chunks) {
-        const trimmed = chunk.trim();
-        if (!trimmed) {
-            continue;
-        }
-
-        let candidateText = trimmed;
-        let targetRef: string | undefined;
-
-        while (true) {
-            const metadataMatch = candidateText.match(
-                plainTextMetadataBlockRegex,
-            );
-            if (!metadataMatch) {
-                break;
-            }
-
-            const metadataPayload = metadataMatch[1].trim();
-            const metadata = parseJsonRecord(metadataPayload);
-            if (
-                !targetRef &&
-                metadata &&
-                typeof metadata.target_ref === 'string'
-            ) {
-                const parsedTargetRef = metadata.target_ref;
-                if (/^t\d+$/.test(parsedTargetRef)) {
-                    targetRef = parsedTargetRef;
-                }
-            }
-
-            candidateText = candidateText.slice(metadataMatch[0].length)
-                .trimStart();
-        }
-
-        const targetMatch = candidateText.match(plainTextTargetRefLineRegex);
-        if (targetMatch) {
-            targetRef = targetMatch[1] ?? targetRef ?? pendingTargetRef;
-            pendingTargetRef = undefined;
-            const text = targetMatch[2].trim();
-            if (!text) {
-                continue;
-            }
-
-            entries.push({
-                type: 'reply',
-                text,
-                target_ref: targetRef,
-            });
-            continue;
-        }
-
-        const visibleText = candidateText
-            .replace(/<slusha_meta>[\s\S]*?<\/slusha_meta>/g, '')
-            .trim();
-        if (!visibleText) {
-            if (targetRef) {
-                pendingTargetRef = targetRef;
-            }
-            continue;
-        }
-
-        const resolvedTargetRef = targetRef ?? pendingTargetRef;
-        pendingTargetRef = undefined;
-
-        entries.push({
-            type: 'reply',
-            text: visibleText,
-            target_ref: resolvedTargetRef,
-        });
-    }
-
-    return entries;
 }
 
 function normalizeReservedMessageTokens(rawTokens: string[]): string[] {
@@ -328,10 +173,8 @@ function buildTelemetryMetadata(
     ctx: SlushaContext,
     chatName: string,
     tags: string[],
-    effectiveConfig: Awaited<
-        ReturnType<SlushaContext['m']['getEffectiveConfig']>
-    >,
-    policy: ReturnType<typeof resolveGenerationPolicy>,
+    effectiveConfig: UserConfig,
+    policy: ResolvedGenerationPolicy,
 ) {
     return buildGenerationTelemetryMetadata({
         sessionId: ctx.chat?.id.toString() ?? '',
@@ -345,9 +188,7 @@ function buildTelemetryMetadata(
     });
 }
 
-type EffectiveConfig = Awaited<
-    ReturnType<SlushaContext['m']['getEffectiveConfig']>
->;
+type EffectiveConfig = UserConfig;
 
 async function sendGeneratedOutput(params: {
     bot: Bot<SlushaContext>;
@@ -356,10 +197,7 @@ async function sendGeneratedOutput(params: {
     targetRefMap: Map<string, number>;
     enabledReactions: string[];
     effectiveConfig: EffectiveConfig;
-    historyById: Map<
-        number,
-        Awaited<ReturnType<SlushaContext['m']['getHistory']>>[number]
-    >;
+    historyById: Map<number, ChatMessage>;
 }): Promise<boolean> {
     const {
         bot,
@@ -416,11 +254,20 @@ async function sendGeneratedOutput(params: {
                             targetId,
                             [{ type: 'emoji', emoji: canon }],
                         );
-                        await ctx.m.addEmojiReaction(targetId, canon, {
-                            id: bot.botInfo.id,
-                            username: bot.botInfo.username,
-                            first_name: bot.botInfo.first_name ?? 'Slusha',
-                        });
+                        await ctx.messages.applyReactionDelta(
+                            targetId,
+                            {
+                                emojiAdded: [canon],
+                                emojiRemoved: [],
+                                customAdded: [],
+                                customRemoved: [],
+                            },
+                            {
+                                id: bot.botInfo.id,
+                                username: bot.botInfo.username,
+                                first_name: bot.botInfo.first_name ?? 'Slusha',
+                            },
+                        );
                     } catch (error) {
                         logger.warn('Could not set reaction: ', error);
                     }
@@ -500,8 +347,10 @@ async function sendGeneratedOutput(params: {
                 ctx.chat?.type !== 'private' &&
                 isMissingSendTextRightsError(error)
             ) {
-                await ctx.m.setDisableRepliesDueToRights(true);
-                await ctx.m.setDisabledReplyRightsLastProbeAt(Date.now());
+                await ctx.chatConfig.disableRepliesDueToRights();
+                await ctx.chatConfig.setDisabledReplyRightsLastProbeAt(
+                    Date.now(),
+                );
                 logger.warn(
                     'Disabled replies in chat due to missing send rights',
                 );
@@ -561,7 +410,7 @@ async function sendGeneratedOutput(params: {
             threadParentMessageId,
             threadSource,
         };
-        await ctx.m.addMessage(messageRecord);
+        await ctx.messages.addMessage(messageRecord);
         historyById.set(messageRecord.id, messageRecord);
 
         if (i === output.length - 1) {
@@ -588,38 +437,13 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
     const composer = new Composer<SlushaContext>();
 
     composer.on('message', async (ctx) => {
-        const chatState = await ctx.m.getChat();
-        const effectiveConfig = await ctx.m.getEffectiveConfig();
-        const chatOverride = await ctx.m.getChatConfigOverride();
-        await recordUsageEvent(ctx.memory.db, {
-            chatId: ctx.chat.id,
-            userId: ctx.from?.id,
-        });
-        await cleanupUsageEvents(ctx.memory.db, effectiveConfig);
-        const usageSnapshot = await getUsageSnapshot(ctx.memory.db, {
-            config: effectiveConfig,
-            chatId: ctx.chat.id,
-            userId: ctx.from?.id,
-            chatOverride,
-        });
-        const isDowngraded = usageSnapshot.downgraded;
-        const usageConfig = effectiveConfig.requestWindow;
-        const includeAttachments = !isDowngraded ||
-            !usageConfig.disableAttachments;
+        const chatState = await ctx.chats.getChat(ctx.chat);
+        const effectiveConfig = await ctx.chatConfig.getEffectiveConfig();
         const sendChatActionsTool = createSendChatActionsTool(
             resolveCustomPrompt(
                 effectiveConfig.ai.chatActionsToolDescription,
                 DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION,
             ),
-        );
-        const sendChatReactionsTool = createSendChatReactionsTool(
-            resolveCustomPrompt(
-                effectiveConfig.ai.chatReactionsToolDescription,
-                DEFAULT_CHAT_REACTIONS_TOOL_DESCRIPTION,
-            ),
-        );
-        const replyMethod = resolveReplyMethod(
-            effectiveConfig.ai.replyMethod,
         );
         const enabledReactions = resolveEnabledReactions(
             effectiveConfig.blacklistedReactions,
@@ -630,15 +454,8 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
 
         const baseMessagesToPass = chatState.messagesToPass ??
             effectiveConfig.ai.messagesToPass;
-        const messagesToPass = isDowngraded && usageConfig.disableLongContext
-            ? Math.min(baseMessagesToPass, usageConfig.downgradeMessagesToPass)
-            : baseMessagesToPass;
-        const bytesLimit = isDowngraded && usageConfig.disableLongContext
-            ? Math.min(
-                effectiveConfig.ai.bytesLimit,
-                usageConfig.downgradeBytesLimit,
-            )
-            : effectiveConfig.ai.bytesLimit;
+        const messagesToPass = baseMessagesToPass;
+        const bytesLimit = effectiveConfig.ai.bytesLimit;
         const maxTargetCount = Math.min(
             Math.max(messagesToPass * 2, 12),
             40,
@@ -648,7 +465,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             (maxLimit, attempt) => Math.max(maxLimit, attempt.historyLimit),
             0,
         );
-        const savedHistory = await ctx.m.getRecentHistory(
+        const savedHistory = await ctx.messages.getRecentHistory(
             Math.max(maxTargetCount, maxAttemptHistoryLimit),
         );
 
@@ -669,9 +486,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             await ctx.i18n.getLocale();
         const character = chatState.character;
 
-        const modelRef = isDowngraded
-            ? usageConfig.downgradeModel
-            : (chatState.chatModel ?? effectiveConfig.ai.model);
+        const modelRef = chatState.chatModel ?? effectiveConfig.ai.model;
         const parsedModel = parseModelRef(modelRef);
 
         const time = new Date().getTime();
@@ -684,31 +499,18 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
         if (ctx.info.isRandom) {
             tags.push('random');
         }
-        if (isDowngraded) {
-            tags.push('downgraded');
-        }
         const chatName = ctx.chat.first_name ?? ctx.chat.title;
 
         const activeMembers = ctx.chat.type === 'private'
             ? []
-            : await ctx.m.getActiveMembers();
+            : await ctx.members.getActiveMembers();
 
         const buildMessagesForAttempt = async (
             plan: GenerationAttemptPlan,
         ): Promise<ModelMessage[]> => {
             const messages: ModelMessage[] = [];
 
-            let prompt = '';
-            if (replyMethod === 'json_actions') {
-                prompt = (effectiveConfig.ai.prePrompt ?? '') + '\n\n';
-            } else {
-                const fallbackDumbPre =
-                    'Отвечай простым текстом без какого-либо JSON.' +
-                    '\nНе описывай действия и не пиши служебные команды.' +
-                    '\nИспользуй Telegram markdown, но без заголовков.';
-                prompt = (effectiveConfig.ai.dumbPrePrompt ?? fallbackDumbPre) +
-                    '\n\n';
-            }
+            let prompt = (effectiveConfig.ai.prePrompt ?? '') + '\n\n';
 
             prompt += buildChatPromptAddition({
                 chatType: ctx.chat.type,
@@ -731,10 +533,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             if (character) {
                 prompt += '### Character ###\n' + character.description;
             } else {
-                prompt += replyMethod === 'json_actions'
-                    ? effectiveConfig.ai.prompt
-                    : (effectiveConfig.ai.dumbPrompt ??
-                        effectiveConfig.ai.prompt);
+                prompt += effectiveConfig.ai.prompt;
             }
 
             const chatInfoMsg = buildChatInfoBlock({
@@ -763,11 +562,11 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 content: prompt,
             });
 
-            const historyBuilder = effectiveConfig.ai.historyVersion === 'v3'
-                ? makeHistoryV3
-                : makeHistoryV2;
+            const includeBinaryAttachments =
+                effectiveConfig.ai.includeAttachmentsInHistory &&
+                parsedModel.provider === 'google';
 
-            const history = await historyBuilder(
+            const history = await makeHistory(
                 { token: bot.token, id: bot.botInfo.id },
                 bot.api,
                 logger,
@@ -778,10 +577,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                     symbolLimit: effectiveConfig.ai.messageMaxLength,
                     includeReactions: true,
                     activeMessageId: ctx.msg.message_id,
-                    attachments:
-                        effectiveConfig.ai.includeAttachmentsInHistory &&
-                        includeAttachments &&
-                        parsedModel.provider === 'google',
+                    attachments: includeBinaryAttachments,
                 },
             );
 
@@ -791,28 +587,8 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             );
             messages.push(...annotatedHistory);
 
-            let finalPrompt = replyMethod === 'json_actions'
-                ? effectiveConfig.ai.finalPrompt
-                : (effectiveConfig.ai.dumbFinalPrompt ??
-                    'Ответь простым текстом.');
-            if (replyMethod === 'json_actions') {
-                finalPrompt +=
-                    ' Return only actions array using typed entries and target_ref values from Reply Target Map.';
-            }
-            if (replyMethod !== 'json_actions' && ctx.info.userToReply) {
-                finalPrompt +=
-                    ` Ответь на сообщение от ${ctx.info.userToReply}.`;
-            }
-            if (replyMethod !== 'json_actions') {
-                finalPrompt +=
-                    ` If you need to reply to a specific message from Reply Target Map, start that reply block with ${PLAIN_TEXT_META_OPEN} on a separate line, then a one-line JSON object like {"target_ref":"tN"}, then ${PLAIN_TEXT_META_CLOSE}, then put reply text on the next line.`;
-                finalPrompt +=
-                    ` Never include ${PLAIN_TEXT_META_OPEN}...${PLAIN_TEXT_META_CLOSE} in user-facing text body. It is machine-only metadata.`;
-                if (enabledReactions.length > 0) {
-                    finalPrompt +=
-                        ' Reply as plain text in assistant content. Optionally call send_chat_reactions only for react entries. Do not put reply text inside tool calls.';
-                }
-            }
+            const finalPrompt = effectiveConfig.ai.finalPrompt +
+                ' Return only actions array using typed entries and target_ref values from Reply Target Map.';
 
             messages.push({
                 role: 'user',
@@ -822,85 +598,14 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             return messages;
         };
 
-        const generatePlainTextAndReactionsOutput = async (
-            messages: ModelMessage[],
-        ): Promise<ChatEntry[]> => {
-            const generationPolicy = resolveGenerationPolicy({
-                modelRef,
-                config: effectiveConfig.ai,
-                task: 'chat',
-                expectsStructuredOutput: false,
-            });
-            const providerOptions = generationPolicy
-                .providerOptions as Parameters<
-                    typeof generateText
-                >[0]['providerOptions'];
-            const response = await generateText({
-                model: generationPolicy.model,
-                providerOptions,
-                maxRetries: maxGenerationRetries,
-                tools: enabledReactions.length > 0
-                    ? {
-                        send_chat_reactions: sendChatReactionsTool,
-                    }
-                    : undefined,
-                messages,
-                temperature: effectiveConfig.ai.temperature,
-                topK: effectiveConfig.ai.topK,
-                topP: effectiveConfig.ai.topP,
-                maxOutputTokens: generationPolicy.maxOutputTokens,
-                experimental_telemetry: {
-                    isEnabled: true,
-                    functionId: 'user-message-dumb',
-                    metadata: buildTelemetryMetadata(
-                        ctx,
-                        chatName,
-                        tags,
-                        effectiveConfig,
-                        generationPolicy,
-                    ),
-                },
-            });
-
-            const plainTextResponse = response.text.trim();
-            const replyEntries = parsePlainTextRepliesWithTargets(
-                plainTextResponse,
-            );
-
-            if (enabledReactions.length === 0) {
-                return replyEntries;
-            }
-
-            const reactionEntries = parseSendChatReactionsEntries(
-                response.toolCalls,
-            );
-            if (!reactionEntries) {
-                return replyEntries;
-            }
-
-            const filteredReactionEntries = reactionEntries.filter((entry) =>
-                isReactEntry(entry)
-            );
-
-            return [...replyEntries, ...filteredReactionEntries];
-        };
-
         const generateStructuredActionsOutput = async (
             messages: ModelMessage[],
         ): Promise<ChatEntry[]> => {
-            const generationPolicy = resolveGenerationPolicy({
+            const result = await generateLlmText({
                 modelRef,
                 config: effectiveConfig.ai,
                 task: 'chat',
                 expectsStructuredOutput: true,
-            });
-            const providerOptions = generationPolicy
-                .providerOptions as Parameters<
-                    typeof generateText
-                >[0]['providerOptions'];
-            const result = await generateText({
-                model: generationPolicy.model,
-                providerOptions,
                 maxRetries: maxGenerationRetries,
                 tools: {
                     send_chat_actions: sendChatActionsTool,
@@ -910,22 +615,18 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                     toolName: 'send_chat_actions',
                 },
                 stopWhen: hasToolCall('send_chat_actions'),
-                temperature: effectiveConfig.ai.temperature,
-                topK: effectiveConfig.ai.topK,
-                topP: effectiveConfig.ai.topP,
-                maxOutputTokens: generationPolicy.maxOutputTokens,
                 messages,
                 experimental_telemetry: {
-                    isEnabled: true,
                     functionId: 'user-message',
-                    metadata: buildTelemetryMetadata(
+                },
+                buildTelemetryMetadata: (generationPolicy) =>
+                    buildTelemetryMetadata(
                         ctx,
                         chatName,
                         tags,
                         effectiveConfig,
                         generationPolicy,
                     ),
-                },
             });
 
             const entries = parseSendChatActionsEntries(result.toolCalls);
@@ -968,11 +669,9 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             }
 
             try {
-                const generatedOutput = replyMethod === 'json_actions'
-                    ? await generateStructuredActionsOutput(attemptMessages)
-                    : await generatePlainTextAndReactionsOutput(
-                        attemptMessages,
-                    );
+                const generatedOutput = await generateStructuredActionsOutput(
+                    attemptMessages,
+                );
                 if (
                     hasReservedMessageToken(
                         generatedOutput,
@@ -988,7 +687,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 logger.warn('Generation attempt failed', {
                     level: attempt.level,
                     historyLimit: attempt.historyLimit,
-                    replyMethod,
                     reservedMessageToken: isReservedMessageTokenError(error),
                     error,
                 });

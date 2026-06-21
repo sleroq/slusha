@@ -9,6 +9,15 @@ export interface RequestContext {
     globalConfig: Awaited<ReturnType<typeof getGlobalUserConfig>>;
 }
 
+export class UnauthorizedRequestError extends Error {
+    status = 401;
+
+    constructor(message: string) {
+        super(message);
+        this.name = 'UnauthorizedRequestError';
+    }
+}
+
 function pickInitData(req: Request): string {
     const custom = req.headers.get('x-telegram-init-data');
     if (custom) return custom;
@@ -26,12 +35,20 @@ export async function resolveRequestContext(
     options: StartWebServerOptions,
 ): Promise<RequestContext> {
     const initData = pickInitData(req);
+    if (!initData.trim()) {
+        throw new UnauthorizedRequestError('Missing Telegram initData');
+    }
+
     const verified = await verifyTelegramInitData(
         initData,
         options.runtimeConfig.getBotToken(),
     );
     const userId = verified.user?.id;
-    const globalConfig = await getGlobalUserConfig(options.memory.db);
+    if (!userId) {
+        throw new UnauthorizedRequestError('Missing Telegram user');
+    }
+
+    const globalConfig = await getGlobalUserConfig(options.db);
     const role = resolveConfigRole(globalConfig, userId);
 
     return {
