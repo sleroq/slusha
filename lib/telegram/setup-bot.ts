@@ -382,12 +382,10 @@ export default async function setupBot(
             if (!update) return next();
 
             if (canMemberSendTextMessages(update.new_chat_member)) {
-                await ctx.chatConfig.setDisableRepliesDueToRights(false);
-                await ctx.chatConfig.setDisabledReplyRightsLastProbeAt(
-                    undefined,
-                );
+                await ctx.chatConfig.clearDisableRepliesDueToRights();
+                await ctx.chatConfig.clearDisabledReplyRightsLastProbeAt();
             } else {
-                await ctx.chatConfig.setDisableRepliesDueToRights(true);
+                await ctx.chatConfig.disableRepliesDueToRights();
                 await ctx.chatConfig.setDisabledReplyRightsLastProbeAt(
                     Date.now(),
                 );

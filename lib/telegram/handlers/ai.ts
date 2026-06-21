@@ -352,7 +352,7 @@ async function sendGeneratedOutput(params: {
                 ctx.chat?.type !== 'private' &&
                 isMissingSendTextRightsError(error)
             ) {
-                await ctx.chatConfig.setDisableRepliesDueToRights(true);
+                await ctx.chatConfig.disableRepliesDueToRights();
                 await ctx.chatConfig.setDisabledReplyRightsLastProbeAt(
                     Date.now(),
                 );

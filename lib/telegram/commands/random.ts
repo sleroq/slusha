@@ -32,7 +32,7 @@ export function registerRandom(
 
         const newValue = args[1];
         if (newValue === 'default') {
-            await ctx.chatConfig.setRandomReplyProbability(undefined);
+            await ctx.chatConfig.clearRandomReplyProbability();
             return ctx.reply(ctx.t('random-updated'));
         }
 

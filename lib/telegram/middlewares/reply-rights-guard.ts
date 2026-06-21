@@ -34,8 +34,8 @@ export async function checkAndMaybeRecoverReplyRights(
             return false;
         }
 
-        await ctx.chatConfig.setDisableRepliesDueToRights(false);
-        await ctx.chatConfig.setDisabledReplyRightsLastProbeAt(undefined);
+        await ctx.chatConfig.clearDisableRepliesDueToRights();
+        await ctx.chatConfig.clearDisabledReplyRightsLastProbeAt();
         logger.info('Replies re-enabled after weekly rights probe');
         return true;
     } catch (error) {

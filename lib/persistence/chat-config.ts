@@ -21,10 +21,9 @@ export class ChatConfigRepository {
     }
 
     async setChatConfigOverride(
-        value: ChatConfigOverride | undefined,
+        value: ChatConfigOverride,
         updatedBy?: number,
     ) {
-        if (value === undefined) return await this.setRaw(undefined, updatedBy);
         const parsed = chatConfigOverrideSchema.safeParse(value);
         if (!parsed.success) {
             throw new Error(
@@ -34,63 +33,98 @@ export class ChatConfigRepository {
         await this.setRaw(parsed.data, updatedBy);
     }
 
+    async clearChatConfigOverride() {
+        await this.db.delete(chatConfigOverrides).where(
+            eq(chatConfigOverrides.chatId, this.chatId),
+        );
+    }
+
     async getEffectiveConfig() {
         const base = await getGlobalUserConfig(this.db);
         return mergeWithChatOverride(base, await this.getChatConfigOverride());
     }
 
-    setChatModel(value?: string) {
-        return this.updateAi((ai) => {
-            if (value === undefined) delete ai.model;
-            else ai.model = value;
+    setChatModel(value: string) {
+        return this.updateOverride((override) => {
+            const ai = { ...(override.ai ?? {}) };
+            ai.model = value;
+            override.ai = ai;
         });
     }
 
-    setMessagesToPass(value?: number) {
-        return this.updateAi((ai) => {
-            if (value === undefined) delete ai.messagesToPass;
-            else ai.messagesToPass = value;
+    clearChatModel() {
+        return this.updateOverride((override) => {
+            if (!override.ai) return;
+            delete override.ai.model;
+            if (Object.keys(override.ai).length === 0) delete override.ai;
         });
     }
 
-    async setRandomReplyProbability(value?: number) {
-        const next = { ...((await this.getChatConfigOverride()) ?? {}) };
-        if (value === undefined) delete next.randomReplyProbability;
-        else next.randomReplyProbability = value;
-        await this.setRaw(next);
+    setMessagesToPass(value: number) {
+        return this.updateOverride((override) => {
+            const ai = { ...(override.ai ?? {}) };
+            ai.messagesToPass = value;
+            override.ai = ai;
+        });
     }
 
-    async setDisableRepliesDueToRights(value: boolean) {
-        const next = { ...((await this.getChatConfigOverride()) ?? {}) };
-        if (value) next.disableRepliesDueToRights = true;
-        else delete next.disableRepliesDueToRights;
-        await this.setRaw(next);
+    clearMessagesToPass() {
+        return this.updateOverride((override) => {
+            if (!override.ai) return;
+            delete override.ai.messagesToPass;
+            if (Object.keys(override.ai).length === 0) delete override.ai;
+        });
     }
 
-    async setDisabledReplyRightsLastProbeAt(value?: number) {
-        const next = { ...((await this.getChatConfigOverride()) ?? {}) };
-        if (value === undefined) delete next.disabledReplyRightsLastProbeAt;
-        else next.disabledReplyRightsLastProbeAt = value;
-        await this.setRaw(next);
+    setRandomReplyProbability(value: number) {
+        return this.updateOverride((override) => {
+            override.randomReplyProbability = value;
+        });
     }
 
-    private async updateAi(
-        mutate: (ai: NonNullable<ChatConfigOverride['ai']>) => void,
+    clearRandomReplyProbability() {
+        return this.updateOverride((override) => {
+            delete override.randomReplyProbability;
+        });
+    }
+
+    disableRepliesDueToRights() {
+        return this.updateOverride((override) => {
+            override.disableRepliesDueToRights = true;
+        });
+    }
+
+    clearDisableRepliesDueToRights() {
+        return this.updateOverride((override) => {
+            delete override.disableRepliesDueToRights;
+        });
+    }
+
+    setDisabledReplyRightsLastProbeAt(value: number) {
+        return this.updateOverride((override) => {
+            override.disabledReplyRightsLastProbeAt = value;
+        });
+    }
+
+    clearDisabledReplyRightsLastProbeAt() {
+        return this.updateOverride((override) => {
+            delete override.disabledReplyRightsLastProbeAt;
+        });
+    }
+
+    private async updateOverride(
+        mutate: (override: ChatConfigOverride) => void,
     ) {
-        const current = (await this.getChatConfigOverride()) ?? {};
-        const ai = { ...(current.ai ?? {}) };
-        mutate(ai);
-        const next: ChatConfigOverride = { ...current };
-        if (Object.keys(ai).length === 0) delete next.ai;
-        else next.ai = ai;
+        const next = { ...((await this.getChatConfigOverride()) ?? {}) };
+        mutate(next);
         await this.setRaw(next);
     }
 
     private async setRaw(
-        value: ChatConfigOverride | undefined,
+        value: ChatConfigOverride,
         updatedBy?: number,
     ) {
-        if (!value || this.isEmpty(value)) {
+        if (this.isEmpty(value)) {
             await this.db.delete(chatConfigOverrides).where(
                 eq(chatConfigOverrides.chatId, this.chatId),
             );

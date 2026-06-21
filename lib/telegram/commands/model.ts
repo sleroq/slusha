@@ -30,7 +30,7 @@ export function registerModel(
 
         const newModel = args[1];
         if (newModel === 'default') {
-            await ctx.chatConfig.setChatModel(undefined);
+            await ctx.chatConfig.clearChatModel();
             return ctx.reply(ctx.t('model-reset'));
         }
 
