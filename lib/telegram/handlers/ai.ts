@@ -583,6 +583,10 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 content: prompt,
             });
 
+            const includeBinaryAttachments =
+                effectiveConfig.ai.includeAttachmentsInHistory &&
+                parsedModel.provider === 'google';
+
             const history = await makeHistoryV3(
                 { token: bot.token, id: bot.botInfo.id },
                 bot.api,
@@ -594,9 +598,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                     symbolLimit: effectiveConfig.ai.messageMaxLength,
                     includeReactions: true,
                     activeMessageId: ctx.msg.message_id,
-                    attachments:
-                        effectiveConfig.ai.includeAttachmentsInHistory &&
-                        parsedModel.provider === 'google',
+                    attachments: includeBinaryAttachments,
                 },
             );
 
