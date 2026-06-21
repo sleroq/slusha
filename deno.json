@@ -54,5 +54,6 @@
         "remark-parse": "npm:remark-parse@^11.0.0",
         "unified": "npm:unified@^11.0.5",
         "zod": "npm:zod@^4.4.3"
-    }
+    },
+    "allowScripts": ["npm:@google/genai@2.8.0", "npm:esbuild@0.18.20", "npm:esbuild@0.25.12", "npm:esbuild@0.28.1", "npm:fsevents@2.3.3", "npm:protobufjs@7.6.4"]
 }
