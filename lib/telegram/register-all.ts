@@ -7,6 +7,10 @@ import language from './bot/language.ts';
 import msgDelay from './bot/msg-delay.ts';
 import { shouldReply } from './middlewares/should-reply.ts';
 import { rollingLimiter, shortBurstLimiter } from './middlewares/rate-limit.ts';
+import start from './commands/start.ts';
+import forget from './commands/forget.ts';
+import lobotomy from './commands/lobotomy.ts';
+import changelog from './commands/changelog.ts';
 
 type SlushaMiddleware = Parameters<Composer<SlushaContext>['use']>[0];
 
@@ -48,33 +52,28 @@ function shouldLoadCharacter(ctx: SlushaContext): boolean {
     return ctx.msg?.text?.startsWith('/character') ?? false;
 }
 
-function shouldLoadCommandHandlers(ctx: SlushaContext): boolean {
-    return ctx.msg?.text?.startsWith('/') ?? false;
+function shouldLoadCommand(...commands: string[]) {
+    return (ctx: SlushaContext): boolean => {
+        const command = ctx.msg?.text?.trimStart().split(/\s+/, 1)[0];
+        if (!command?.startsWith('/')) {
+            return false;
+        }
+
+        const commandName = command.slice(1).split('@', 1)[0];
+        return commands.includes(commandName);
+    };
 }
 
 export default function registerAll(bot: Bot<SlushaContext>, _config: Config) {
     const i18n = createI18n();
-    let commandHandlersPromise:
-        | Promise<typeof import('./register-commands.ts')>
-        | undefined;
-
-    const loadCommandHandlers = () => {
-        if (!commandHandlersPromise) {
-            commandHandlersPromise = import('./register-commands.ts');
-        }
-
-        return commandHandlersPromise;
-    };
 
     bot.use(i18n);
     bot.use(applyLocaleFromPersistence());
 
-    bot.use(createLazyMiddleware(async () => {
-        const { registerEarlyCommands } = await loadCommandHandlers();
-        const composer = new Composer<SlushaContext>();
-        registerEarlyCommands(composer);
-        return composer.middleware();
-    }, shouldLoadCommandHandlers));
+    bot.use(start);
+    bot.use(forget);
+    bot.use(lobotomy);
+    bot.use(changelog);
 
     bot.use(optOut);
     bot.use(language);
@@ -87,11 +86,48 @@ export default function registerAll(bot: Bot<SlushaContext>, _config: Config) {
     ));
 
     bot.use(createLazyMiddleware(async () => {
-        const { registerLateCommands } = await loadCommandHandlers();
+        const { registerModel } = await import('./commands/model.ts');
         const composer = new Composer<SlushaContext>();
-        registerLateCommands(composer);
+        registerModel(composer);
         return composer.middleware();
-    }, shouldLoadCommandHandlers));
+    }, shouldLoadCommand('model')));
+
+    bot.use(createLazyMiddleware(async () => {
+        const { registerRandom } = await import('./commands/random.ts');
+        const composer = new Composer<SlushaContext>();
+        registerRandom(composer);
+        return composer.middleware();
+    }, shouldLoadCommand('random')));
+
+    bot.use(createLazyMiddleware(async () => {
+        const { registerSummary } = await import('./commands/summary.ts');
+        const composer = new Composer<SlushaContext>();
+        registerSummary(composer);
+        return composer.middleware();
+    }, shouldLoadCommand('summary')));
+
+    bot.use(createLazyMiddleware(async () => {
+        const { default: registerHateMode } = await import(
+            './commands/hatemode.ts'
+        );
+        const composer = new Composer<SlushaContext>();
+        registerHateMode(composer);
+        return composer.middleware();
+    }, shouldLoadCommand('hatemode')));
+
+    bot.use(createLazyMiddleware(async () => {
+        const { registerConfig } = await import('./commands/config.ts');
+        const composer = new Composer<SlushaContext>();
+        registerConfig(composer);
+        return composer.middleware();
+    }, shouldLoadCommand('config', 'settings')));
+
+    bot.use(createLazyMiddleware(async () => {
+        const { registerUsage } = await import('./commands/usage.ts');
+        const composer = new Composer<SlushaContext>();
+        registerUsage(composer);
+        return composer.middleware();
+    }, shouldLoadCommand('usage')));
 
     bot.on(
         'message',
