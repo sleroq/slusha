@@ -4,7 +4,7 @@ import type { LanguageModel } from 'ai';
 import { UserConfig } from '../config.ts';
 import { ModelProvider, parseModelRef } from './model-ref.ts';
 
-export type GenerationTask = 'chat' | 'notes' | 'memory' | 'character';
+export type GenerationTask = 'chat' | 'character';
 
 export interface GenerationPolicyTelemetry {
     provider: ModelProvider;

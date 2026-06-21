@@ -611,7 +611,7 @@ async function constructMsg(
 }
 
 interface BuildHistoryContextOptions {
-    mode: 'chat' | 'notes';
+    mode: 'chat';
     symbolLimit: number;
     messagesLimit: number;
     bytesLimit: number;
@@ -646,7 +646,7 @@ export async function buildHistoryContext(
         })
         : selectHistoryCandidates(history, {
             resolveReplyThread: resolveReplies,
-            maxRootMessages: mode === 'notes' ? messagesLimit : undefined,
+            maxRootMessages: undefined,
         });
 
     for (const candidate of candidates) {
@@ -737,13 +737,6 @@ export async function buildHistoryContext(
         totalBytes += size;
     }
 
-    if (mode === 'notes') {
-        return [{
-            role: 'user',
-            content: textPart,
-        }];
-    }
-
     prompt.reverse();
     prompt.splice(0, prompt.length - messagesLimit);
     return prompt;
@@ -770,35 +763,6 @@ export function makeHistoryV3(
             resolveReplyThread: options.resolveReplyThread,
             includeReactions: options.includeReactions,
             activeMessageId: options.activeMessageId,
-        },
-    );
-}
-
-interface NotesHistoryOptions {
-    symbolLimit: number;
-    messagesLimit: number;
-    bytesLimit: number;
-    characterName?: string;
-}
-
-export function makeNotesHistory(
-    botInfo: { token: string; id: number },
-    api: Api<RawApi>,
-    logger: Logger,
-    history: ChatMessage[],
-    options: NotesHistoryOptions,
-): Promise<ModelMessage[]> {
-    return buildHistoryContext(
-        botInfo,
-        api,
-        logger,
-        history,
-        {
-            mode: 'notes',
-            symbolLimit: options.symbolLimit,
-            messagesLimit: options.messagesLimit,
-            bytesLimit: options.bytesLimit,
-            characterName: options.characterName,
         },
     );
 }

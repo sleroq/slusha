@@ -31,11 +31,6 @@ export interface CurrentCharacterPayload {
     messageExample: string;
 }
 
-export interface ChatInternalsPayload {
-    summary: string;
-    personalNotes: string;
-}
-
 export interface UsageWindowStatusPayload {
     tier: 'free' | 'trusted';
     downgraded: boolean;

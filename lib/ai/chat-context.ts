@@ -15,10 +15,6 @@ interface BuildChatInfoBlockParams {
     userFirstName?: string;
     userUsername?: string;
     activeMembers?: Member[];
-    notes?: string[];
-    memory?: string;
-    includeNotes?: boolean;
-    includeMemory?: boolean;
 }
 
 export function isTelegramCommentsHistory(history: ChatMessage[]): boolean {
@@ -58,10 +54,6 @@ export function buildChatInfoBlock(params: BuildChatInfoBlockParams): string {
         userFirstName,
         userUsername,
         activeMembers = [],
-        notes = [],
-        memory,
-        includeNotes = false,
-        includeMemory = false,
     } = params;
 
     let text = `Date and time right now: ${nowText}`;
@@ -82,14 +74,6 @@ export function buildChatInfoBlock(params: BuildChatInfoBlockParams): string {
         text += `\nChat: ${
             chatTitle ?? 'Unknown chat'
         }, Active members:\n${prettyMembersList}`;
-    }
-
-    if (includeNotes && notes.length > 0) {
-        text += `\n\nChat notes:\n${notes.join('\n')}`;
-    }
-
-    if (includeMemory && memory) {
-        text += `\n\nMY OWN PERSONAL NOTES AND MEMORY:\n${memory}`;
     }
 
     return text;

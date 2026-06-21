@@ -57,8 +57,6 @@
         matchesSection(
             'model',
             'primary model',
-            'notes model',
-            'memory model',
             'temperature',
             'top-k',
             'top-p',
@@ -78,28 +76,16 @@
             'final prompt wrapper',
             'final prompt wrapper',
             'chat actions tool description',
-            'notes extraction prompt',
-            'memory prompt',
-            'memory repeat prompt',
         ),
     );
     let showAdvanced = $derived(
         matchesSection(
             'advanced',
-            'max notes to store',
             'max messages to store',
-            'recent messages for notes',
-            'recent messages for memory',
             'messages passed to ai',
             'max output tokens',
-            'notes max output tokens',
-            'notes thinking level',
-            'memory max output tokens',
-            'memory thinking level',
             'thinking level',
             'reasoning max tokens',
-            'notes update frequency',
-            'memory update frequency',
             'max reply length',
             'attachment byte limit',
             'include attachments in history',
@@ -243,22 +229,6 @@
                         hidden={!matchesBlockItem('model', 'primary model', 'ai model')}
                         bind:value={config.ai.model}
                     />
-                    <SettingSelectField
-                        id="g-ai-notes-model"
-                        label="Notes model"
-                        description="Model used for note extraction and updates."
-                        options={availableModels}
-                        hidden={!matchesBlockItem('model', 'notes model')}
-                        bind:value={config.ai.notesModel}
-                    />
-                    <SettingSelectField
-                        id="g-ai-memory-model"
-                        label="Memory model"
-                        description="Model used for memory summarization tasks."
-                        options={availableModels}
-                        hidden={!matchesBlockItem('model', 'memory model')}
-                        bind:value={config.ai.memoryModel}
-                    />
                     <SettingInputField
                         id="g-ai-temp"
                         type="number"
@@ -363,33 +333,6 @@
                         hidden={!matchesBlockItem('prompts', 'chat actions tool description', 'tool description', 'chatActionsToolDescription')}
                         bind:value={config.ai.chatActionsToolDescription}
                     />
-                    <SettingTextareaField
-                        id="g-ai-notes-prompt"
-                        rows={4}
-                        containerClass="md:col-span-2"
-                        label="Notes extraction prompt"
-                        description="Template for generating structured notes."
-                        hidden={!matchesBlockItem('prompts', 'notes extraction prompt', 'notes prompt')}
-                        bind:value={config.ai.notesPrompt}
-                    />
-                    <SettingTextareaField
-                        id="g-ai-memory-prompt"
-                        rows={4}
-                        containerClass="md:col-span-2"
-                        label="Memory prompt"
-                        description="Template for creating memory summaries."
-                        hidden={!matchesBlockItem('prompts', 'memory prompt')}
-                        bind:value={config.ai.memoryPrompt}
-                    />
-                    <SettingTextareaField
-                        id="g-ai-memory-repeat"
-                        rows={4}
-                        containerClass="md:col-span-2"
-                        label="Memory repeat prompt"
-                        description="Template used when refreshing existing memory."
-                        hidden={!matchesBlockItem('prompts', 'memory repeat prompt')}
-                        bind:value={config.ai.memoryPromptRepeat}
-                    />
                 </div>
             </details>
         {/if}
@@ -399,36 +342,12 @@
                 <summary class="cursor-pointer select-none font-medium">Advanced</summary>
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
                     <SettingInputField
-                        id="g-max-notes"
-                        type="number"
-                        label="Max notes to store"
-                        description="Upper limit for saved notes per chat."
-                        hidden={!matchesBlockItem('advanced', 'max notes to store')}
-                        bind:value={config.maxNotesToStore}
-                    />
-                    <SettingInputField
                         id="g-max-messages"
                         type="number"
                         label="Max messages to store"
                         description="Conversation history cap kept in storage (up to 10000)."
                         hidden={!matchesBlockItem('advanced', 'max messages to store')}
                         bind:value={config.maxMessagesToStore}
-                    />
-                    <SettingInputField
-                        id="g-chat-last-notes"
-                        type="number"
-                        label="Recent messages for notes"
-                        description="How many latest messages feed note updates."
-                        hidden={!matchesBlockItem('advanced', 'recent messages for notes', 'chat last use notes')}
-                        bind:value={config.chatLastUseNotes}
-                    />
-                    <SettingInputField
-                        id="g-chat-last-memory"
-                        type="number"
-                        label="Recent messages for memory"
-                        description="How many latest messages feed memory updates."
-                        hidden={!matchesBlockItem('advanced', 'recent messages for memory', 'chat last use memory')}
-                        bind:value={config.chatLastUseMemory}
                     />
                     <SettingInputField
                         id="g-ai-msgs"
@@ -446,22 +365,6 @@
                         hidden={!matchesBlockItem('advanced', 'max output tokens')}
                         bind:value={config.ai.generation.chat.maxOutputTokens}
                     />
-                    <SettingInputField
-                        id="g-ai-notes-max-output-tokens"
-                        type="number"
-                        label="Notes max output tokens"
-                        description="Hard cap for generated tokens in notes updates."
-                        hidden={!matchesBlockItem('advanced', 'notes max output tokens')}
-                        bind:value={config.ai.generation.notes.maxOutputTokens}
-                    />
-                    <SettingSelectField
-                        id="g-ai-notes-thinking-level"
-                        label="Notes thinking level"
-                        description="Google thinking level for notes generation (used by Gemini 3 models)."
-                        options={['minimal', 'low', 'medium', 'high']}
-                        hidden={!matchesBlockItem('advanced', 'notes thinking level', 'thinking level')}
-                        bind:value={config.ai.generation.notes.thinking.thinkingLevel}
-                    />
                     <SettingSelectField
                         id="g-ai-thinking-level"
                         label="Thinking level"
@@ -477,38 +380,6 @@
                         description="OpenRouter reasoning token budget for chat generation."
                         hidden={!matchesBlockItem('advanced', 'reasoning max tokens', 'openrouter reasoning max tokens')}
                         bind:value={config.ai.generation.chat.openrouterReasoning.maxTokens}
-                    />
-                    <SettingInputField
-                        id="g-ai-notes-freq"
-                        type="number"
-                        label="Notes update frequency"
-                        description="Message interval between notes updates."
-                        hidden={!matchesBlockItem('advanced', 'notes update frequency')}
-                        bind:value={config.ai.notesFrequency}
-                    />
-                    <SettingInputField
-                        id="g-ai-memory-freq"
-                        type="number"
-                        label="Memory update frequency"
-                        description="Message interval between memory updates."
-                        hidden={!matchesBlockItem('advanced', 'memory update frequency')}
-                        bind:value={config.ai.memoryFrequency}
-                    />
-                    <SettingInputField
-                        id="g-ai-memory-max-output-tokens"
-                        type="number"
-                        label="Memory max output tokens"
-                        description="Hard cap for generated tokens in memory updates."
-                        hidden={!matchesBlockItem('advanced', 'memory max output tokens')}
-                        bind:value={config.ai.generation.memory.maxOutputTokens}
-                    />
-                    <SettingSelectField
-                        id="g-ai-memory-thinking-level"
-                        label="Memory thinking level"
-                        description="Google thinking level for memory generation (used by Gemini 3 models)."
-                        options={['minimal', 'low', 'medium', 'high']}
-                        hidden={!matchesBlockItem('advanced', 'memory thinking level', 'thinking level')}
-                        bind:value={config.ai.generation.memory.thinking.thinkingLevel}
                     />
                     <SettingInputField
                         id="g-ai-max-len"

@@ -564,10 +564,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 userFirstName: ctx.from.first_name,
                 userUsername: ctx.from.username,
                 activeMembers,
-                notes: chatState.notes,
-                memory: chatState.memory,
-                includeNotes: plan.includeBotNotes,
-                includeMemory: plan.includeBotNotes,
             });
 
             prompt += `\n\n### Chat Info ###\n${chatInfoMsg}`;
@@ -698,7 +694,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 logger.warn('Could not get history for generation attempt', {
                     level: attempt.level,
                     historyLimit: attempt.historyLimit,
-                    includeBotNotes: attempt.includeBotNotes,
                     error,
                 });
                 continue;
@@ -723,7 +718,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 logger.warn('Generation attempt failed', {
                     level: attempt.level,
                     historyLimit: attempt.historyLimit,
-                    includeBotNotes: attempt.includeBotNotes,
                     reservedMessageToken: isReservedMessageTokenError(error),
                     error,
                 });

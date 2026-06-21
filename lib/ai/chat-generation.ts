@@ -1,12 +1,11 @@
 export type GenerationFallbackLevel =
     | 'full'
     | 'short_history'
-    | 'short_history_no_notes';
+    | 'short_history_final';
 
 export type GenerationAttemptPlan = {
     level: GenerationFallbackLevel;
     historyLimit: number;
-    includeBotNotes: boolean;
 };
 
 export function getGenerationFallbackPlans(
@@ -18,17 +17,14 @@ export function getGenerationFallbackPlans(
         {
             level: 'full',
             historyLimit: messagesToPass,
-            includeBotNotes: true,
         },
         {
             level: 'short_history',
             historyLimit: shortHistoryLimit,
-            includeBotNotes: true,
         },
         {
-            level: 'short_history_no_notes',
+            level: 'short_history_final',
             historyLimit: shortHistoryLimit,
-            includeBotNotes: false,
         },
     ];
 }

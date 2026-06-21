@@ -12,8 +12,6 @@ bot.command('lobotomy', async (ctx) => {
     }
 
     await ctx.m.clear();
-    await ctx.m.clearNotes();
-    await ctx.m.setMemory(undefined);
     await ctx.reply(ctx.t('history-cleared'));
 });
 

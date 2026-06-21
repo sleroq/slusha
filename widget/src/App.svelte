@@ -27,7 +27,6 @@
     let launchError = $state<string | null>(null);
     let savedGlobalSignature = $state<string | null>(null);
     let savedChatSignature = $state<string | null>(null);
-    let savedChatInternalsSignature = $state<string | null>(null);
     let isSavingGlobal = $state(false);
     let isSavingChat = $state(false);
     let isReloading = $state(false);
@@ -178,9 +177,6 @@
         let ok: boolean;
         try {
             ok = await controller.saveChat();
-            if (ok && controller.canEditChatInternals) {
-                ok = await controller.saveInternals();
-            }
         } finally {
             isSavingChat = false;
         }
@@ -189,7 +185,6 @@
 
         if (ok) {
             savedChatSignature = computeChatPayloadSignature();
-            savedChatInternalsSignature = computeChatInternalsSignature();
         }
     };
 
@@ -215,8 +210,6 @@
             ),
         );
 
-    const computeChatInternalsSignature = (): string => JSON.stringify(controller.chatInternals);
-
     const computeGlobalPayloadSignature = (): string =>
         JSON.stringify(buildGlobalPayload(controller.globalConfig, controller.globalText));
 
@@ -232,11 +225,7 @@
         savedGlobalSignature !== null && computeGlobalPayloadSignature() !== savedGlobalSignature,
     );
     let hasUnsavedChat = $derived(
-        savedChatSignature !== null &&
-            (computeChatPayloadSignature() !== savedChatSignature ||
-                (controller.canEditChatInternals &&
-                    savedChatInternalsSignature !== null &&
-                    computeChatInternalsSignature() !== savedChatInternalsSignature)),
+        savedChatSignature !== null && computeChatPayloadSignature() !== savedChatSignature,
     );
     let activeHasUnsavedChanges = $derived(controller.scope === 'global' ? hasUnsavedGlobal : hasUnsavedChat);
     let activeCanSave = $derived(
@@ -254,7 +243,6 @@
         untrack(() => {
             savedGlobalSignature = computeGlobalPayloadSignature();
             savedChatSignature = computeChatPayloadSignature();
-            savedChatInternalsSignature = computeChatInternalsSignature();
         });
     });
 
@@ -368,9 +356,7 @@
                                 baseConfig={controller.chatBaseConfig}
                                 availableModels={controller.availableModels}
                                 availableReactions={controller.availableReactions}
-                                chatInternals={controller.chatInternals}
                                 currentCharacter={controller.currentCharacter}
-                                canEditChatInternals={controller.canEditChatInternals}
                                 canConfigureTrustedSettings={controller.canConfigureTrustedSettings}
                                 canEditWindowOverrides={controller.role === 'admin'}
                                 overriddenFieldPaths={overriddenFieldPaths}
@@ -384,9 +370,7 @@
                             baseConfig={controller.chatBaseConfig}
                             availableModels={controller.availableModels}
                             availableReactions={controller.availableReactions}
-                            chatInternals={controller.chatInternals}
                             currentCharacter={controller.currentCharacter}
-                            canEditChatInternals={controller.canEditChatInternals}
                             canConfigureTrustedSettings={controller.canConfigureTrustedSettings}
                             canEditWindowOverrides={controller.role === 'admin'}
                             overriddenFieldPaths={overriddenFieldPaths}

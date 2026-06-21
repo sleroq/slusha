@@ -7,7 +7,6 @@ import {
     chatConfigOverrides,
     chatMembers,
     chatMessages,
-    chatNotes,
     chatOptOutUsers,
     chats,
     messageReactions,
@@ -101,11 +100,7 @@ export interface BotCharacter extends Character {
 }
 
 export interface Chat {
-    notes: string[];
-    lastNotes: number;
-    lastMemory: number;
     history: ChatMessage[];
-    memory?: string;
     lastUse: number;
     info: TgChat;
     chatModel?: string;
@@ -231,8 +226,6 @@ export class Memory {
                 id: tgChat.id,
                 info: JSON.stringify(tgChat),
                 lastUse: Date.now(),
-                lastMemory: 0,
-                lastNotes: 0,
             })
             .onConflictDoNothing();
     }
@@ -247,17 +240,11 @@ export class Memory {
         }
 
         const [
-            notesRows,
             membersRows,
             optOutRows,
             characterRow,
             configOverrideRow,
         ] = await Promise.all([
-            this.db
-                .select()
-                .from(chatNotes)
-                .where(eq(chatNotes.chatId, chatId))
-                .orderBy(asc(chatNotes.noteIndex)),
             this.db
                 .select()
                 .from(chatMembers)
@@ -280,11 +267,7 @@ export class Memory {
             : undefined;
 
         return {
-            notes: notesRows.map((n: typeof chatNotes.$inferSelect) => n.text),
-            lastNotes: chatRow.lastNotes,
-            lastMemory: chatRow.lastMemory,
             history: [],
-            memory: chatRow.memory ?? undefined,
             lastUse: chatRow.lastUse,
             info: parseJson<TgChat>(chatRow.info),
             chatModel: configOverride?.ai?.model,
@@ -343,8 +326,6 @@ export class Memory {
                         id: to,
                         info: JSON.stringify(toInfo),
                         lastUse: Date.now(),
-                        lastMemory: 0,
-                        lastNotes: 0,
                     })
                     .onConflictDoNothing();
                 return;
@@ -359,16 +340,10 @@ export class Memory {
                 id: to,
                 info: JSON.stringify(toInfo),
                 lastUse: fromChat.lastUse,
-                lastNotes: fromChat.lastNotes,
-                lastMemory: fromChat.lastMemory,
-                memory: fromChat.memory,
                 hateMode: fromChat.hateMode,
                 locale: fromChat.locale,
             });
 
-            await tx.update(chatNotes).set({ chatId: to }).where(
-                eq(chatNotes.chatId, from),
-            );
             await tx.update(chatMembers).set({ chatId: to }).where(
                 eq(chatMembers.chatId, from),
             );
@@ -415,9 +390,6 @@ export class ChatMemory {
     private async patchChat(
         patch: Partial<{
             lastUse: number;
-            lastNotes: number;
-            lastMemory: number;
-            memory: string | null;
             hateMode: boolean | null;
             locale: string | null;
         }>,
@@ -582,9 +554,6 @@ export class ChatMemory {
             await tx.delete(chatMessages).where(
                 eq(chatMessages.chatId, this.chatInfo.id),
             );
-            await tx.update(chats).set({ lastNotes: 0 }).where(
-                eq(chats.id, this.chatInfo.id),
-            );
         });
     }
 
@@ -676,62 +645,8 @@ export class ChatMemory {
         });
     }
 
-    async removeOldNotes(maxLength: number) {
-        const chat = await this.getChat();
-        if (chat.notes.length <= maxLength) return;
-
-        const nextNotes = chat.notes.slice(chat.notes.length - maxLength);
-        await this.replaceNotes(nextNotes);
-    }
-
-    private async replaceNotes(notes: string[]) {
-        await this.memory.db.transaction(async (tx: Tx) => {
-            await tx.delete(chatNotes).where(
-                eq(chatNotes.chatId, this.chatInfo.id),
-            );
-            if (notes.length > 0) {
-                await tx.insert(chatNotes).values(notes.map((note, index) => ({
-                    chatId: this.chatInfo.id,
-                    noteIndex: index,
-                    text: note,
-                })));
-            }
-        });
-    }
-
-    async addNote(note: string) {
-        const chat = await this.getChat();
-        const notes = [...chat.notes, note];
-        await this.replaceNotes(notes);
-    }
-
-    async setNotes(notes: string[]) {
-        const normalized = notes
-            .map((note) => note.trim())
-            .filter((note) => note.length > 0);
-        await this.replaceNotes(normalized);
-    }
-
     async setLastUse(value = Date.now()) {
         await this.patchChat({ lastUse: value });
-    }
-
-    async setLastNotesMessageId(value: number) {
-        await this.patchChat({ lastNotes: value });
-    }
-
-    async setLastMemoryMessageId(value: number) {
-        await this.patchChat({ lastMemory: value });
-    }
-
-    async setMemory(value?: string) {
-        await this.patchChat({ memory: value ?? null });
-    }
-
-    async clearNotes() {
-        await this.memory.db.delete(chatNotes).where(
-            eq(chatNotes.chatId, this.chatInfo.id),
-        );
     }
 
     async setChatModel(value?: string) {

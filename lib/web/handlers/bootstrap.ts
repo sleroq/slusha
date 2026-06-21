@@ -26,7 +26,6 @@ import { canEditChatConfig, canEditGlobalConfig } from '../permissions.ts';
 import { RequestContext } from '../request-context.ts';
 import {
     AvailableChat,
-    ChatInternalsPayload,
     CurrentCharacterPayload,
     StartWebServerOptions,
     UsageWindowStatusPayload,
@@ -75,10 +74,6 @@ function readChatSummary(chatId: number, infoRaw: string): AvailableChat {
             type: 'group',
         };
     }
-}
-
-function notesToSummary(notes: string[]): string {
-    return notes.join('\n\n');
 }
 
 async function resolveAvailableChats(
@@ -193,8 +188,6 @@ export async function handleBootstrapRequest(
     let effectiveConfigPayload: unknown = undefined;
     let currentCharacter: unknown = undefined;
     let canEditChat = false;
-    let canEditChatInternals = false;
-    let chatInternalsPayload: ChatInternalsPayload | undefined;
     let usageWindowStatus: UsageWindowStatusPayload | undefined;
 
     if (chatId !== undefined && Number.isFinite(chatId)) {
@@ -208,14 +201,7 @@ export async function handleBootstrapRequest(
             const chat = await options.bot.api.getChat(chatId);
             const chatMemory = new ChatMemory(options.memory, chat);
             const currentChat = await chatMemory.getChat();
-            canEditChatInternals = role === 'admin';
             currentCharacter = projectCurrentCharacter(currentChat.character);
-            if (canEditChatInternals) {
-                chatInternalsPayload = {
-                    summary: notesToSummary(currentChat.notes),
-                    personalNotes: currentChat.memory ?? '',
-                };
-            }
             const chatOverride = await chatMemory.getChatConfigOverride();
             chatOverridePayload = chatOverride
                 ? JSON.parse(
@@ -286,14 +272,12 @@ export async function handleBootstrapRequest(
         canViewGlobal,
         canEditGlobal,
         canEditChat,
-        canEditChatInternals,
         availableChats,
         globalPayload,
         chatBasePayload,
         chatOverridePayload,
         effectiveConfigPayload,
         currentCharacter,
-        chatInternalsPayload,
         usageWindowStatus,
     });
 }

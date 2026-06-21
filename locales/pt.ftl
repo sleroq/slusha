@@ -30,8 +30,7 @@ random-parse-error = Não consegui analisar o número. Tente novamente
 random-set = Nova probabilidade de resposta: { $probability }%
 
 # Notes command
-notes-too-few-messages = Ainda não passaram mensagens suficientes, leia você mesmo
-notes-output = { $notes }
+summary-disabled = Resumo e memória de longo prazo estão temporariamente desativados.
 
 # Hate mode
 hate-mode-status = ódio está agora { $status }

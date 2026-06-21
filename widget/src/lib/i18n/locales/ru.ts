@@ -30,18 +30,11 @@ const ru = {
   "status.savingChat": "Сохранение чат-оверрайда...",
   "status.savedChat": "Чат-оверрайд сохранен",
   "status.failedSaveChat": "Не удалось сохранить чат-оверрайд",
-  "status.readOnlyInternals":
-    "Внутренние параметры чата только для чтения для вашей роли",
-  "status.savingInternals": "Сохранение внутренних параметров чата...",
-  "status.savedInternals": "Внутренние параметры чата сохранены",
-  "status.failedSaveInternals":
-    "Не удалось сохранить внутренние параметры чата",
 
   "api.networkFailed": "Сетевой запрос не выполнен",
   "api.failedLoad": "Не удалось загрузить",
   "api.failedSaveGlobal": "Не удалось сохранить глобальный конфиг",
   "api.failedSaveChat": "Не удалось сохранить чат-оверрайд",
-  "api.failedSaveInternals": "Не удалось сохранить внутренние параметры чата",
 
   "toolbar.role": "Роль: {role}",
   "toolbar.usage": "Лимиты ({tier})",
