@@ -4,7 +4,7 @@ import { Config } from '../config.ts';
 import { applyLocaleFromPersistence, createI18n } from '../i18n/index.ts';
 import optOut from './bot/opt-out.ts';
 import language from './bot/language.ts';
-import msgDelay from './bot/msg-delay.ts';
+import _msgDelay from './bot/msg-delay.ts';
 import { shouldReply } from './middlewares/should-reply.ts';
 import { rollingLimiter, shortBurstLimiter } from './middlewares/rate-limit.ts';
 import start from './commands/start.ts';
