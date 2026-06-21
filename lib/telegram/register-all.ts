@@ -127,7 +127,7 @@ export default function registerAll(bot: Bot<SlushaContext>, _config: Config) {
         shouldReply(),
     );
 
-    bot.use(msgDelay());
+    // bot.use(msgDelay());
 
     bot.use(shortBurstLimiter());
     bot.use(rollingLimiter());
