@@ -1,13 +1,7 @@
 import { Bot, Composer } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
 import logger from '../../logger.ts';
-import {
-    APICallError,
-    generateText,
-    hasToolCall,
-    ModelMessage,
-    tool,
-} from 'ai';
+import { APICallError, hasToolCall, ModelMessage, tool } from 'ai';
 import { makeHistoryV3 } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
@@ -35,10 +29,11 @@ import {
 } from '../../ai/chat-context.ts';
 import { canonicalizeReaction, resolveEnabledReactions } from '../reactions.ts';
 import { isMissingSendTextRightsError } from '../reply-rights.ts';
-import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { parseModelRef } from '../../ai/model-ref.ts';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
 import { buildLanguageProtocol } from '../../ai/language-protocol.ts';
+import { generateLlmText } from '../../ai/generation.ts';
+import type { ResolvedGenerationPolicy } from '../../ai/generation-policy.ts';
 import {
     cleanupUsageEvents,
     getUsageSnapshot,
@@ -185,7 +180,7 @@ function buildTelemetryMetadata(
     effectiveConfig: Awaited<
         ReturnType<SlushaContext['m']['getEffectiveConfig']>
     >,
-    policy: ReturnType<typeof resolveGenerationPolicy>,
+    policy: ResolvedGenerationPolicy,
 ) {
     return buildGenerationTelemetryMetadata({
         sessionId: ctx.chat?.id.toString() ?? '',
@@ -620,19 +615,11 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
         const generateStructuredActionsOutput = async (
             messages: ModelMessage[],
         ): Promise<ChatEntry[]> => {
-            const generationPolicy = resolveGenerationPolicy({
+            const result = await generateLlmText({
                 modelRef,
                 config: effectiveConfig.ai,
                 task: 'chat',
                 expectsStructuredOutput: true,
-            });
-            const providerOptions = generationPolicy
-                .providerOptions as Parameters<
-                    typeof generateText
-                >[0]['providerOptions'];
-            const result = await generateText({
-                model: generationPolicy.model,
-                providerOptions,
                 maxRetries: maxGenerationRetries,
                 tools: {
                     send_chat_actions: sendChatActionsTool,
@@ -642,22 +629,18 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                     toolName: 'send_chat_actions',
                 },
                 stopWhen: hasToolCall('send_chat_actions'),
-                temperature: effectiveConfig.ai.temperature,
-                topK: effectiveConfig.ai.topK,
-                topP: effectiveConfig.ai.topP,
-                maxOutputTokens: generationPolicy.maxOutputTokens,
                 messages,
                 experimental_telemetry: {
-                    isEnabled: true,
                     functionId: 'user-message',
-                    metadata: buildTelemetryMetadata(
+                },
+                buildTelemetryMetadata: (generationPolicy) =>
+                    buildTelemetryMetadata(
                         ctx,
                         chatName,
                         tags,
                         effectiveConfig,
                         generationPolicy,
                     ),
-                },
             });
 
             const entries = parseSendChatActionsEntries(result.toolCalls);

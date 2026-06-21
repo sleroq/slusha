@@ -10,15 +10,22 @@ import { sliceMessage } from '../../helpers.ts';
 import { ChatMemory } from '../../memory.ts';
 import logger from '../../logger.ts';
 import { InlineQueryResultArticle } from 'grammy_types';
-import { generateObject } from 'ai';
+import { hasToolCall, tool } from 'ai';
 import z from 'zod';
 import { limit } from 'grammy_ratelimiter';
 import DOMPurify from 'isomorphic-dompurify';
 import remarkHtml from 'remark-html';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
-import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
+import { generateLlmText } from '../../ai/generation.ts';
+
+const characterNamesTool = tool({
+    description: 'Submit generated character name variants.',
+    inputSchema: z.object({
+        names: z.array(z.string()),
+    }),
+});
 
 const bot = new Composer<SlushaContext>();
 
@@ -416,31 +423,27 @@ bot.callbackQuery(/set.*/, async (ctx) => {
 
     let names: string[] = [];
     try {
-        const generationPolicy = resolveGenerationPolicy({
+        const result = await generateLlmText({
             modelRef: model,
             config,
             task: 'character',
             expectsStructuredOutput: true,
-        });
-        const providerOptions = generationPolicy
-            .providerOptions as Parameters<
-                typeof generateObject
-            >[0]['providerOptions'];
-        const result = await generateObject({
-            model: generationPolicy.model,
-            providerOptions,
-            schema: z.array(z.string()),
-            temperature: config.temperature,
-            topK: config.topK,
-            topP: config.topP,
-            maxOutputTokens: generationPolicy.maxOutputTokens,
+            tools: {
+                submit_character_names: characterNamesTool,
+            },
+            toolChoice: {
+                type: 'tool',
+                toolName: 'submit_character_names',
+            },
+            stopWhen: hasToolCall('submit_character_names'),
             prompt:
                 `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
                 'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.',
             experimental_telemetry: {
-                isEnabled: true,
                 functionId: 'character-names',
-                metadata: buildGenerationTelemetryMetadata({
+            },
+            buildTelemetryMetadata: (generationPolicy) =>
+                buildGenerationTelemetryMetadata({
                     sessionId: chatId.toString(),
                     userId: '',
                     tags: ['character'],
@@ -449,9 +452,14 @@ bot.callbackQuery(/set.*/, async (ctx) => {
                     topP: config.topP,
                     policy: generationPolicy,
                 }),
-            },
         });
-        names = result.object;
+        const toolCall = result.toolCalls.find((call) =>
+            call.toolName === 'submit_character_names'
+        );
+        if (!toolCall) {
+            throw new Error('Character names tool call missing');
+        }
+        names = toolCall.input.names;
     } catch (error) {
         logger.error(error, 'Error getting names for character');
         return await ctx.reply(ctx.t('character-names-error'));
