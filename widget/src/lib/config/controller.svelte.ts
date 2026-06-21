@@ -77,7 +77,7 @@ export class ConfigController {
   bootstrap = $state<BootstrapResponse | undefined>(undefined);
   status = $state("");
   userId = $state<number | undefined>(undefined);
-  role = $state<ConfigRole>("viewer");
+  role = $state<ConfigRole>("regular");
   categories = $state<string[]>([]);
   availableModels = $state<string[]>([]);
   availableReactions = $state<string[]>([]);

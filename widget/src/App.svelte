@@ -261,6 +261,11 @@
     onMount(() => {
         try {
             init();
+            if (!controller.ensureInitDataRaw()) {
+                launchError = t('app.launchContextMissing');
+                return;
+            }
+
             controller.initialize();
             setupTelegramTheme();
         } catch (error) {

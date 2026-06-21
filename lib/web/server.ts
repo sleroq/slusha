@@ -9,7 +9,10 @@ import { handleBootstrapRequest } from './handlers/bootstrap.ts';
 import { handlePutChatConfigRequest } from './handlers/chat-config.ts';
 import { handlePutChatInternalsRequest } from './handlers/chat-internals.ts';
 import { handlePutGlobalConfigRequest } from './handlers/global-config.ts';
-import { resolveRequestContext } from './request-context.ts';
+import {
+    resolveRequestContext,
+    UnauthorizedRequestError,
+} from './request-context.ts';
 import { parseChatConfigChatId, parseChatInternalsChatId } from './routes.ts';
 import { StartWebServerOptions } from './types.ts';
 
@@ -139,6 +142,10 @@ export function startWebServer(options: StartWebServerOptions) {
                 try {
                     return await dispatchApiConfigRoute(req, url, options);
                 } catch (error) {
+                    if (error instanceof UnauthorizedRequestError) {
+                        return jsonResponse({ error: error.message }, error.status);
+                    }
+
                     logger.error('Web API error: ', error);
                     const message = error instanceof Error
                         ? error.message

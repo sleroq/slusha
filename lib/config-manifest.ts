@@ -1,4 +1,4 @@
-export type ConfigRole = 'viewer' | 'regular' | 'trusted' | 'admin';
+export type ConfigRole = 'regular' | 'trusted' | 'admin';
 
 export type ConfigScope = 'global' | 'chat';
 

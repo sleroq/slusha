@@ -1,5 +1,5 @@
 export type ConfigScope = "global" | "chat";
-export type ConfigRole = "viewer" | "regular" | "trusted" | "admin";
+export type ConfigRole = "regular" | "trusted" | "admin";
 
 export interface AvailableChat {
   id: number;
