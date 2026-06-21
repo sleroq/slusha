@@ -27,7 +27,6 @@
         availableReactions: string[];
         currentCharacter?: CurrentCharacterPayload;
         canConfigureTrustedSettings: boolean;
-        canEditWindowOverrides: boolean;
         overriddenFieldPaths: ChatOverridePath[];
         searchQuery: string;
     }
@@ -40,7 +39,6 @@
         availableReactions = [],
         currentCharacter,
         canConfigureTrustedSettings,
-        canEditWindowOverrides,
         overriddenFieldPaths = [],
         searchQuery = '',
     }: Props = $props();
@@ -109,21 +107,11 @@
             'include attachments in history',
         ),
     );
-    let showUsageLimits = $derived(
-        matchesSection(
-            'usage limits',
-            'request windows',
-            'free tier per-chat max requests',
-            'free tier per-chat window minutes',
-            'trusted tier per-chat max requests',
-            'trusted tier per-chat window minutes',
-        ),
-    );
     let hasMatches = $derived(
         showCurrentCharacter ||
             showGeneral ||
             (canConfigureTrustedSettings &&
-                (showModel || showPrompts || showAdvanced || showUsageLimits)),
+                (showModel || showPrompts || showAdvanced)),
     );
     let overriddenPathSet = $derived(new Set(overriddenFieldPaths));
 
@@ -462,49 +450,6 @@
                 </details>
             {/if}
 
-            {#if showUsageLimits && canEditWindowOverrides}
-                <details class="quick-details pt-4" open={hasSearch}>
-                    <summary class="cursor-pointer select-none font-medium">Usage Limits</summary>
-                    <div class="mt-4 grid gap-3 md:grid-cols-2">
-                        <SettingInputField
-                            id="c-req-free-chat-max"
-                            type="number"
-                            label="Free tier per-chat max requests"
-                            description="Chat-wide free-tier usage limit."
-                            sourceState={sourceStateFor('requestWindowPerChat.free.maxRequests')}
-                            hidden={!matchesBlockItem('usage limits', 'free tier per-chat max requests')}
-                            bind:value={config.requestWindowPerChat.free.maxRequests}
-                        />
-                        <SettingInputField
-                            id="c-req-free-chat-window"
-                            type="number"
-                            label="Free tier per-chat window (minutes)"
-                            description="Rolling window for free-tier chat usage."
-                            sourceState={sourceStateFor('requestWindowPerChat.free.windowMinutes')}
-                            hidden={!matchesBlockItem('usage limits', 'free tier per-chat window minutes')}
-                            bind:value={config.requestWindowPerChat.free.windowMinutes}
-                        />
-                        <SettingInputField
-                            id="c-req-trusted-chat-max"
-                            type="number"
-                            label="Trusted tier per-chat max requests"
-                            description="Chat-wide trusted-tier usage limit."
-                            sourceState={sourceStateFor('requestWindowPerChat.trusted.maxRequests')}
-                            hidden={!matchesBlockItem('usage limits', 'trusted tier per-chat max requests')}
-                            bind:value={config.requestWindowPerChat.trusted.maxRequests}
-                        />
-                        <SettingInputField
-                            id="c-req-trusted-chat-window"
-                            type="number"
-                            label="Trusted tier per-chat window (minutes)"
-                            description="Rolling window for trusted-tier chat usage."
-                            sourceState={sourceStateFor('requestWindowPerChat.trusted.windowMinutes')}
-                            hidden={!matchesBlockItem('usage limits', 'trusted tier per-chat window minutes')}
-                            bind:value={config.requestWindowPerChat.trusted.windowMinutes}
-                        />
-                    </div>
-                </details>
-            {/if}
         {/if}
 
     </div>

@@ -37,10 +37,6 @@ const ru = {
   "api.failedSaveChat": "Не удалось сохранить чат-оверрайд",
 
   "toolbar.role": "Роль: {role}",
-  "toolbar.usage": "Лимиты ({tier})",
-  "toolbar.limited": "лимит",
-  "toolbar.perUser": "На пользователя",
-  "toolbar.perChat": "На чат",
   "toolbar.scope": "Область",
   "toolbar.scopeChat": "чат",
   "toolbar.scopeGlobal": "глобальный",

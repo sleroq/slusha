@@ -301,50 +301,6 @@ export const configFieldManifest = [
         chatRoles: trustedAndAdmin,
     },
     {
-        path: 'requestWindow.free.perChat.maxRequests',
-        overridePath: 'requestWindowPerChat.free.maxRequests',
-        scope: 'global-chat',
-        storage: 'delta',
-        category: 'admin',
-        label: 'Free tier per-chat max requests',
-        description: 'Chat-wide free-tier usage limit.',
-        globalRoles: adminOnly,
-        chatRoles: adminOnly,
-    },
-    {
-        path: 'requestWindow.free.perChat.windowMinutes',
-        overridePath: 'requestWindowPerChat.free.windowMinutes',
-        scope: 'global-chat',
-        storage: 'delta',
-        category: 'admin',
-        label: 'Free tier per-chat window',
-        description: 'Rolling window for free-tier chat usage.',
-        globalRoles: adminOnly,
-        chatRoles: adminOnly,
-    },
-    {
-        path: 'requestWindow.trusted.perChat.maxRequests',
-        overridePath: 'requestWindowPerChat.trusted.maxRequests',
-        scope: 'global-chat',
-        storage: 'delta',
-        category: 'admin',
-        label: 'Trusted tier per-chat max requests',
-        description: 'Chat-wide trusted-tier usage limit.',
-        globalRoles: adminOnly,
-        chatRoles: adminOnly,
-    },
-    {
-        path: 'requestWindow.trusted.perChat.windowMinutes',
-        overridePath: 'requestWindowPerChat.trusted.windowMinutes',
-        scope: 'global-chat',
-        storage: 'delta',
-        category: 'admin',
-        label: 'Trusted tier per-chat window',
-        description: 'Rolling window for trusted-tier chat usage.',
-        globalRoles: adminOnly,
-        chatRoles: adminOnly,
-    },
-    {
         path: 'adminIds',
         scope: 'global',
         category: 'admin',
@@ -394,11 +350,6 @@ export const chatOverrideContract = {
             field.chatRoles.includes('trusted')
         )
         .map((field) => field.overridePath.slice('ai.'.length)),
-    adminWindow: chatOverrideFields
-        .filter((field) =>
-            field.overridePath.startsWith('requestWindowPerChat.')
-        )
-        .map((field) => field.overridePath),
 } as const;
 
 export type RegularDirectChatOverridePath =
@@ -407,14 +358,10 @@ export type RegularDeltaChatOverridePath =
     typeof chatOverrideContract.regularDelta[number];
 export type TrustedAiChatOverrideKey =
     typeof chatOverrideContract.trustedAi[number];
-export type AdminWindowChatOverridePath =
-    typeof chatOverrideContract.adminWindow[number];
-
 export type ChatOverridePath =
     | RegularDirectChatOverridePath
     | RegularDeltaChatOverridePath
-    | `ai.${TrustedAiChatOverrideKey}`
-    | AdminWindowChatOverridePath;
+    | `ai.${TrustedAiChatOverrideKey}`;
 
 export function categoriesEditableByRole(role: ConfigRole): ConfigCategory[] {
     const categories = new Set<ConfigCategory>();

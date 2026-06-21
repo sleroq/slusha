@@ -91,20 +91,6 @@
             'include attachments in history',
         ),
     );
-    let showUsageLimits = $derived(
-        matchesSection(
-            'usage limits',
-            'request windows',
-            'free user per-user max requests',
-            'free user per-user window minutes',
-            'free user per-chat max requests',
-            'free user per-chat window minutes',
-            'trusted user per-user max requests',
-            'trusted user per-user window minutes',
-            'trusted user per-chat max requests',
-            'trusted user per-chat window minutes',
-        ),
-    );
     let showAdmin = $derived(
         matchesSection(
             'admin',
@@ -117,7 +103,7 @@
         ),
     );
     let hasMatches = $derived(
-        showGeneral || showModel || showPrompts || showAdvanced || showUsageLimits || showAdmin,
+        showGeneral || showModel || showPrompts || showAdvanced || showAdmin,
     );
 </script>
 
@@ -403,78 +389,6 @@
                         description="Adds attachment text to model context when possible."
                         hidden={!matchesBlockItem('advanced', 'include attachments in history')}
                         bind:checked={config.ai.includeAttachmentsInHistory}
-                    />
-                </div>
-            </details>
-        {/if}
-
-        {#if showUsageLimits}
-            <details class="quick-details pt-4" open={hasSearch}>
-                <summary class="cursor-pointer select-none font-medium">Usage Limits</summary>
-                <div class="mt-4 grid gap-3 md:grid-cols-2">
-                    <SettingInputField
-                        id="g-req-free-user-max"
-                        type="number"
-                        label="Free user per-user max requests"
-                        description="Switches to downgrade mode when this limit is reached."
-                        hidden={!matchesBlockItem('usage limits', 'free user per-user max requests')}
-                        bind:value={config.requestWindow.free.perUser.maxRequests}
-                    />
-                    <SettingInputField
-                        id="g-req-free-user-window"
-                        type="number"
-                        label="Free user per-user window (minutes)"
-                        description="Rolling window for free user personal usage."
-                        hidden={!matchesBlockItem('usage limits', 'free user per-user window minutes')}
-                        bind:value={config.requestWindow.free.perUser.windowMinutes}
-                    />
-                    <SettingInputField
-                        id="g-req-free-chat-max"
-                        type="number"
-                        label="Free user per-chat max requests"
-                        description="Chat-wide limit for free tier before downgrade mode."
-                        hidden={!matchesBlockItem('usage limits', 'free user per-chat max requests')}
-                        bind:value={config.requestWindow.free.perChat.maxRequests}
-                    />
-                    <SettingInputField
-                        id="g-req-free-chat-window"
-                        type="number"
-                        label="Free user per-chat window (minutes)"
-                        description="Rolling window for free tier chat usage."
-                        hidden={!matchesBlockItem('usage limits', 'free user per-chat window minutes')}
-                        bind:value={config.requestWindow.free.perChat.windowMinutes}
-                    />
-                    <SettingInputField
-                        id="g-req-trusted-user-max"
-                        type="number"
-                        label="Trusted user per-user max requests"
-                        description="Personal limit for trusted tier before downgrade mode."
-                        hidden={!matchesBlockItem('usage limits', 'trusted user per-user max requests')}
-                        bind:value={config.requestWindow.trusted.perUser.maxRequests}
-                    />
-                    <SettingInputField
-                        id="g-req-trusted-user-window"
-                        type="number"
-                        label="Trusted user per-user window (minutes)"
-                        description="Rolling window for trusted user personal usage."
-                        hidden={!matchesBlockItem('usage limits', 'trusted user per-user window minutes')}
-                        bind:value={config.requestWindow.trusted.perUser.windowMinutes}
-                    />
-                    <SettingInputField
-                        id="g-req-trusted-chat-max"
-                        type="number"
-                        label="Trusted user per-chat max requests"
-                        description="Chat-wide limit for trusted tier."
-                        hidden={!matchesBlockItem('usage limits', 'trusted user per-chat max requests')}
-                        bind:value={config.requestWindow.trusted.perChat.maxRequests}
-                    />
-                    <SettingInputField
-                        id="g-req-trusted-chat-window"
-                        type="number"
-                        label="Trusted user per-chat window (minutes)"
-                        description="Rolling window for trusted tier chat usage."
-                        hidden={!matchesBlockItem('usage limits', 'trusted user per-chat window minutes')}
-                        bind:value={config.requestWindow.trusted.perChat.windowMinutes}
                     />
                 </div>
             </details>

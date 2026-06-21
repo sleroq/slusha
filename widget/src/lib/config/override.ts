@@ -52,7 +52,6 @@ export const CHAT_OVERRIDE_FIELDS: readonly ChatOverrideField[] = [
   ...chatOverrideContract.regularDirect.map(buildField),
   ...chatOverrideContract.trustedAi
     .map((key) => buildField(`ai.${key}` as ChatOverridePath)),
-  ...chatOverrideContract.adminWindow.map(buildField),
 ] as const;
 
 function getPath(source: unknown, path: ChatOverridePath): unknown {

@@ -205,7 +205,6 @@ const commands = [
     '/summary',
     '/language',
     '/config',
-    '/usage',
 ];
 
 const startDate = new Date();

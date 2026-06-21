@@ -122,13 +122,6 @@ export default function registerAll(bot: Bot<SlushaContext>, _config: Config) {
         return composer.middleware();
     }, shouldLoadCommand('config', 'settings')));
 
-    bot.use(createLazyMiddleware(async () => {
-        const { registerUsage } = await import('./commands/usage.ts');
-        const composer = new Composer<SlushaContext>();
-        registerUsage(composer);
-        return composer.middleware();
-    }, shouldLoadCommand('usage')));
-
     bot.on(
         'message',
         shouldReply(),

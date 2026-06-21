@@ -30,16 +30,3 @@ export interface CurrentCharacterPayload {
     firstMessage: string;
     messageExample: string;
 }
-
-export interface UsageWindowStatusPayload {
-    tier: 'free' | 'trusted';
-    downgraded: boolean;
-    userUsed: number;
-    userMax: number;
-    userWindowMinutes: number;
-    userBar: string;
-    chatUsed: number;
-    chatMax: number;
-    chatWindowMinutes: number;
-    chatBar: string;
-}

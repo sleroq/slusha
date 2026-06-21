@@ -10,10 +10,6 @@ import { ChatConfigRepository } from '../../persistence/chat-config.ts';
 import { ChatRepository } from '../../persistence/chats.ts';
 import { ALLOWED_REACTIONS } from '../../telegram/reactions.ts';
 import {
-    getUsageSnapshot,
-    renderProgressBar,
-} from '../../telegram/usage-window.ts';
-import {
     buildBootstrapCapabilities,
     getModelOptionsForRole,
     projectChatBaseConfigForRole,
@@ -28,7 +24,6 @@ import {
     AvailableChat,
     CurrentCharacterPayload,
     StartWebServerOptions,
-    UsageWindowStatusPayload,
 } from '../types.ts';
 
 function projectCurrentCharacter(
@@ -157,7 +152,6 @@ export async function handleBootstrapRequest(
     let effectiveConfigPayload: unknown = undefined;
     let currentCharacter: unknown = undefined;
     let canEditChat = false;
-    let usageWindowStatus: UsageWindowStatusPayload | undefined;
 
     if (chatId !== undefined && Number.isFinite(chatId)) {
         canEditChat = await canEditChatConfig(
@@ -198,38 +192,6 @@ export async function handleBootstrapRequest(
                 serializedEffectiveConfig,
                 role,
             );
-
-            if (userId) {
-                const usageSnapshot = await getUsageSnapshot(
-                    options.db,
-                    {
-                        config: globalConfig,
-                        chatId,
-                        userId,
-                        chatOverride,
-                    },
-                );
-                usageWindowStatus = {
-                    tier: usageSnapshot.tier,
-                    downgraded: usageSnapshot.downgraded,
-                    userUsed: usageSnapshot.user.used,
-                    userMax: usageSnapshot.user.maxRequests,
-                    userWindowMinutes: usageSnapshot.user.windowMinutes,
-                    userBar: renderProgressBar(
-                        usageSnapshot.user.used,
-                        usageSnapshot.user.maxRequests,
-                        16,
-                    ),
-                    chatUsed: usageSnapshot.chat.used,
-                    chatMax: usageSnapshot.chat.maxRequests,
-                    chatWindowMinutes: usageSnapshot.chat.windowMinutes,
-                    chatBar: renderProgressBar(
-                        usageSnapshot.chat.used,
-                        usageSnapshot.chat.maxRequests,
-                        16,
-                    ),
-                };
-            }
         }
     }
 
@@ -249,6 +211,5 @@ export async function handleBootstrapRequest(
         chatOverridePayload,
         effectiveConfigPayload,
         currentCharacter,
-        usageWindowStatus,
     });
 }

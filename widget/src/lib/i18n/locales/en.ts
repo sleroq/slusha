@@ -36,10 +36,6 @@ const en = {
   "api.failedSaveChat": "Failed to save chat override",
 
   "toolbar.role": "Role: {role}",
-  "toolbar.usage": "Usage ({tier})",
-  "toolbar.limited": "limited",
-  "toolbar.perUser": "Per-user",
-  "toolbar.perChat": "Per-chat",
   "toolbar.scope": "Scope",
   "toolbar.scopeChat": "chat",
   "toolbar.scopeGlobal": "global",

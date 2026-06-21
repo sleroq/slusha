@@ -150,8 +150,3 @@ config-open-chat = Відкрити конфігурацію поточного 
 config-widget-unavailable = Віджет конфігурації зараз недоступний
 
 # Usage window
-usage-title = Usage window ({ $tier } tier)
-usage-user-window = Per-user
-usage-chat-window = Per-chat
-usage-limited = Usage limits are exhausted. Requests continue with the normal configuration.
-usage-normal = Normal mode is active.

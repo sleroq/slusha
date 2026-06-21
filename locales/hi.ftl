@@ -150,8 +150,3 @@ config-open-chat = इस चैट का कॉन्फिग खोलो
 config-widget-unavailable = कॉन्फिग विजेट अभी उपलब्ध नहीं है
 
 # Usage window
-usage-title = Usage window ({ $tier } tier)
-usage-user-window = Per-user
-usage-chat-window = Per-chat
-usage-limited = Usage limits are exhausted. Requests continue with the normal configuration.
-usage-normal = Normal mode is active.

@@ -37,23 +37,6 @@ const generationTaskSchema = z.object({
     openrouterReasoning: openrouterReasoningSchema.optional(),
     maxOutputTokens: z.number().int().min(1).max(65536).optional(),
 });
-const requestWindowLimitSchema = z.object({
-    maxRequests: boundedPositiveInt(1, 100000),
-    windowMinutes: boundedPositiveInt(1, 7 * 24 * 60),
-});
-const requestWindowLimitOverrideSchema = z.object({
-    maxRequests: boundedPositiveInt(1, 100000).optional(),
-    windowMinutes: boundedPositiveInt(1, 7 * 24 * 60).optional(),
-});
-const requestWindowTierSchema = z.object({
-    perUser: requestWindowLimitSchema,
-    perChat: requestWindowLimitSchema,
-});
-const requestWindowPerChatOverrideSchema = z.object({
-    free: requestWindowLimitOverrideSchema.optional(),
-    trusted: requestWindowLimitOverrideSchema.optional(),
-});
-
 const defaultGoogleSafetySettings: Array<
     { category: string; threshold: string }
 > = [
@@ -155,10 +138,6 @@ export const configSchema = z.object({
         ]),
     maxMessagesToStore: boundedPositiveInt(1, 10000).default(100),
     responseDelay: z.number().min(0).max(120).default(1),
-    requestWindow: z.object({
-        free: requestWindowTierSchema,
-        trusted: requestWindowTierSchema,
-    }).default(defaultConfig.requestWindow),
 });
 
 const chatOverrideAiSchema = z.object({
@@ -192,7 +171,6 @@ export const chatConfigOverrideSchema = z.object({
     responseDelay: z.number().min(0).max(120).optional(),
     disableRepliesDueToRights: z.boolean().optional(),
     disabledReplyRightsLastProbeAt: z.number().int().min(0).optional(),
-    requestWindowPerChat: requestWindowPerChatOverrideSchema.optional(),
 });
 
 export const safetySettings: Array<{ category: string; threshold: string }> = [
@@ -410,12 +388,10 @@ export function mergeWithChatOverride(
     };
 
     const entries = Object.entries(override).filter(([k]) =>
-        k !== 'ai' && k !== 'requestWindowPerChat'
+        k !== 'ai'
     ) as Array<[
-        keyof Omit<ChatConfigOverride, 'ai' | 'requestWindowPerChat'>,
-        ChatConfigOverride[
-            keyof Omit<ChatConfigOverride, 'ai' | 'requestWindowPerChat'>
-        ],
+        keyof Omit<ChatConfigOverride, 'ai'>,
+        ChatConfigOverride[keyof Omit<ChatConfigOverride, 'ai'>],
     ]>;
 
     for (const [key, value] of entries) {

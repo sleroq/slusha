@@ -177,28 +177,6 @@ const defaultConfig = {
     ],
     maxMessagesToStore: 200,
     responseDelay: 1,
-    requestWindow: {
-        free: {
-            perUser: {
-                maxRequests: 30,
-                windowMinutes: 180,
-            },
-            perChat: {
-                maxRequests: 120,
-                windowMinutes: 180,
-            },
-        },
-        trusted: {
-            perUser: {
-                maxRequests: 300,
-                windowMinutes: 180,
-            },
-            perChat: {
-                maxRequests: 1200,
-                windowMinutes: 180,
-            },
-        },
-    },
 };
 
 export default defaultConfig;

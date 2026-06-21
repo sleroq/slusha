@@ -35,11 +35,6 @@ import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts
 import { buildLanguageProtocol } from '../../ai/language-protocol.ts';
 import { generateLlmText } from '../../ai/generation.ts';
 import type { ResolvedGenerationPolicy } from '../../ai/generation-policy.ts';
-import {
-    cleanupUsageEvents,
-    getUsageSnapshot,
-    recordUsageEvent,
-} from '../usage-window.ts';
 
 const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
@@ -444,19 +439,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
     composer.on('message', async (ctx) => {
         const chatState = await ctx.chats.getChat(ctx.chat);
         const effectiveConfig = await ctx.chatConfig.getEffectiveConfig();
-        const chatOverride = await ctx.chatConfig.getChatConfigOverride();
-        await recordUsageEvent(ctx.db, {
-            chatId: ctx.chat.id,
-            userId: ctx.from?.id,
-        });
-        await cleanupUsageEvents(ctx.db, effectiveConfig);
-        const usageSnapshot = await getUsageSnapshot(ctx.db, {
-            config: effectiveConfig,
-            chatId: ctx.chat.id,
-            userId: ctx.from?.id,
-            chatOverride,
-        });
-        const isDowngraded = usageSnapshot.downgraded;
         const sendChatActionsTool = createSendChatActionsTool(
             resolveCustomPrompt(
                 effectiveConfig.ai.chatActionsToolDescription,
@@ -516,9 +498,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
         }
         if (ctx.info.isRandom) {
             tags.push('random');
-        }
-        if (isDowngraded) {
-            tags.push('downgraded');
         }
         const chatName = ctx.chat.first_name ?? ctx.chat.title;
 

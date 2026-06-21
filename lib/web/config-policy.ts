@@ -9,7 +9,7 @@ import { normalizeReactionBlacklist } from '../telegram/reactions.ts';
 type ChatEditableAi = NonNullable<ChatConfigOverride['ai']>;
 type ChatOverrideKey = keyof Omit<
     ChatConfigOverride,
-    'ai' | 'requestWindowPerChat'
+    'ai'
 >;
 type ChatEditableAiKey = keyof ChatEditableAi;
 
@@ -133,11 +133,7 @@ export function projectChatBaseConfigForRole(
     config: UserConfig,
     role: ConfigRole,
 ): Record<string, unknown> {
-    const payload = projectEffectiveConfigForRole(config, role);
-    if (role === 'admin') {
-        payload.requestWindow = config.requestWindow;
-    }
-    return payload;
+    return projectEffectiveConfigForRole(config, role);
 }
 
 export function sanitizeChatOverrideForRole(
@@ -159,10 +155,6 @@ export function sanitizeChatOverrideForRole(
         globalConfig,
         regularDeltaOverrideKeys,
     );
-    if (role === 'admin' && override.requestWindowPerChat !== undefined) {
-        next.requestWindowPerChat = override.requestWindowPerChat;
-    }
-
     if (next.blacklistedReactions) {
         next.blacklistedReactions = normalizeReactionBlacklist(
             next.blacklistedReactions,

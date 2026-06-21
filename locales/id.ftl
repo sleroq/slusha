@@ -150,8 +150,3 @@ config-open-chat = Buka konfigurasi chat saat ini
 config-widget-unavailable = Widget konfigurasi sedang tidak tersedia
 
 # Usage window
-usage-title = Usage window ({ $tier } tier)
-usage-user-window = Per-user
-usage-chat-window = Per-chat
-usage-limited = Usage limits are exhausted. Requests continue with the normal configuration.
-usage-normal = Normal mode is active.
