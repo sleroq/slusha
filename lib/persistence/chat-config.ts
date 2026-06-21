@@ -7,7 +7,7 @@ import {
     getGlobalUserConfig,
     mergeWithChatOverride,
     parseChatOverridePayload,
-    serializeChatOverride,
+    toStoredChatOverride,
 } from '../config.ts';
 
 export class ChatConfigRepository {
@@ -130,7 +130,7 @@ export class ChatConfigRepository {
             );
             return;
         }
-        const payload = serializeChatOverride(value);
+        const payload = JSON.stringify(toStoredChatOverride(value));
         await this.db.insert(chatConfigOverrides).values({
             chatId: this.chatId,
             payload,
@@ -143,8 +143,6 @@ export class ChatConfigRepository {
     }
 
     private isEmpty(value: ChatConfigOverride) {
-        // Matches serializeChatOverride: undefined values and empty nested
-        // objects collapse, so an "all undefined" override serializes to "{}".
-        return JSON.stringify(value) === '{}';
+        return JSON.stringify(toStoredChatOverride(value)) === '{}';
     }
 }

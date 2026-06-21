@@ -241,7 +241,7 @@ function deserializeMatcher(item: SerializedMatcher): string | RegExp {
     return new RegExp(item.__regex, item.flags ?? '');
 }
 
-function toStoredUserConfig(input: UserConfig): StoredUserConfig {
+export function toStoredUserConfig(input: UserConfig): StoredUserConfig {
     return {
         ...input,
         names: input.names.map(serializeMatcher),
@@ -259,7 +259,7 @@ function fromStoredUserConfig(input: StoredUserConfig): UserConfig {
     };
 }
 
-function toStoredChatOverride(
+export function toStoredChatOverride(
     input: ChatConfigOverride,
 ): StoredChatConfigOverride {
     return {
@@ -281,10 +281,6 @@ function fromStoredChatOverride(
     };
 }
 
-export function serializeUserConfig(config: UserConfig): string {
-    return JSON.stringify(toStoredUserConfig(config));
-}
-
 export function parseUserConfigPayload(payload: string): UserConfig {
     const raw = JSON.parse(payload) as StoredUserConfig;
     const parsed = configSchema.safeParse(fromStoredUserConfig(raw));
@@ -292,10 +288,6 @@ export function parseUserConfigPayload(payload: string): UserConfig {
         throw new Error('Invalid global config in DB: ' + parsed.error.message);
     }
     return parsed.data;
-}
-
-export function serializeChatOverride(override: ChatConfigOverride): string {
-    return JSON.stringify(toStoredChatOverride(override));
 }
 
 export function parseChatOverridePayload(payload: string): ChatConfigOverride {
@@ -330,7 +322,7 @@ export async function getGlobalUserConfig(
         const now = Date.now();
         await db.insert(globalConfig).values({
             id: 1,
-            payload: serializeUserConfig(parsedDefaults.data),
+            payload: JSON.stringify(toStoredUserConfig(parsedDefaults.data)),
             updatedAt: now,
         });
 
@@ -387,14 +379,14 @@ export async function setGlobalUserConfig(
         .insert(globalConfig)
         .values({
             id: 1,
-            payload: serializeUserConfig(nextValue),
+            payload: JSON.stringify(toStoredUserConfig(nextValue)),
             updatedBy,
             updatedAt: now,
         })
         .onConflictDoUpdate({
             target: [globalConfig.id],
             set: {
-                payload: serializeUserConfig(nextValue),
+                payload: JSON.stringify(toStoredUserConfig(nextValue)),
                 updatedBy,
                 updatedAt: now,
             },

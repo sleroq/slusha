@@ -1,8 +1,8 @@
 import type { Chat as TgChat } from 'grammy_types';
 import {
     mergeWithChatOverride,
-    serializeChatOverride,
-    serializeUserConfig,
+    toStoredChatOverride,
+    toStoredUserConfig,
     UserConfig,
 } from '../../config.ts';
 import type { BotCharacter } from '../../persistence/types.ts';
@@ -142,7 +142,7 @@ export async function handleBootstrapRequest(
         ? await resolveAvailableChats(options, userId, canEditGlobal)
         : [];
     const serializedGlobalConfig = JSON.parse(
-        serializeUserConfig(globalConfig),
+        JSON.stringify(toStoredUserConfig(globalConfig)),
     ) as UserConfig;
     const globalPayload = projectGlobalConfigForRole(
         serializedGlobalConfig,
@@ -176,14 +176,14 @@ export async function handleBootstrapRequest(
             const chatOverride = await chatConfig.getChatConfigOverride();
             chatOverridePayload = chatOverride
                 ? JSON.parse(
-                    serializeChatOverride(
+                    JSON.stringify(toStoredChatOverride(
                         sanitizeChatOverrideForRole(
                             chatOverride,
                             role,
                             globalConfig,
                             false,
                         ),
-                    ),
+                    )),
                 )
                 : {};
 
@@ -192,7 +192,7 @@ export async function handleBootstrapRequest(
                 chatOverride,
             );
             const serializedEffectiveConfig = JSON.parse(
-                serializeUserConfig(effectiveConfig),
+                JSON.stringify(toStoredUserConfig(effectiveConfig)),
             ) as UserConfig;
             effectiveConfigPayload = projectEffectiveConfigForRole(
                 serializedEffectiveConfig,
