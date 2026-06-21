@@ -20,7 +20,7 @@ export async function handlePutGlobalConfigRequest(
     }
 
     const parsed = parseUserConfigPayload(JSON.stringify(body.payload));
-    await setGlobalUserConfig(parsed, userId, options.memory.db);
+    await setGlobalUserConfig(parsed, userId, options.db);
 
     return jsonResponse({ ok: true });
 }

@@ -5,7 +5,8 @@ import { APICallError, hasToolCall, ModelMessage, tool } from 'ai';
 import { makeHistoryV3 } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
-import { ReplyTo } from '../../memory.ts';
+import type { ChatMessage, ReplyTo } from '../../persistence/types.ts';
+import type { UserConfig } from '../../config.ts';
 import {
     chatActionsToolInputSchema,
     ChatEntry,
@@ -177,9 +178,7 @@ function buildTelemetryMetadata(
     ctx: SlushaContext,
     chatName: string,
     tags: string[],
-    effectiveConfig: Awaited<
-        ReturnType<SlushaContext['m']['getEffectiveConfig']>
-    >,
+    effectiveConfig: UserConfig,
     policy: ResolvedGenerationPolicy,
 ) {
     return buildGenerationTelemetryMetadata({
@@ -194,9 +193,7 @@ function buildTelemetryMetadata(
     });
 }
 
-type EffectiveConfig = Awaited<
-    ReturnType<SlushaContext['m']['getEffectiveConfig']>
->;
+type EffectiveConfig = UserConfig;
 
 async function sendGeneratedOutput(params: {
     bot: Bot<SlushaContext>;
@@ -205,10 +202,7 @@ async function sendGeneratedOutput(params: {
     targetRefMap: Map<string, number>;
     enabledReactions: string[];
     effectiveConfig: EffectiveConfig;
-    historyById: Map<
-        number,
-        Awaited<ReturnType<SlushaContext['m']['getHistory']>>[number]
-    >;
+    historyById: Map<number, ChatMessage>;
 }): Promise<boolean> {
     const {
         bot,
@@ -265,11 +259,20 @@ async function sendGeneratedOutput(params: {
                             targetId,
                             [{ type: 'emoji', emoji: canon }],
                         );
-                        await ctx.m.addEmojiReaction(targetId, canon, {
-                            id: bot.botInfo.id,
-                            username: bot.botInfo.username,
-                            first_name: bot.botInfo.first_name ?? 'Slusha',
-                        });
+                        await ctx.messages.applyReactionDelta(
+                            targetId,
+                            {
+                                emojiAdded: [canon],
+                                emojiRemoved: [],
+                                customAdded: [],
+                                customRemoved: [],
+                            },
+                            {
+                                id: bot.botInfo.id,
+                                username: bot.botInfo.username,
+                                first_name: bot.botInfo.first_name ?? 'Slusha',
+                            },
+                        );
                     } catch (error) {
                         logger.warn('Could not set reaction: ', error);
                     }
@@ -349,8 +352,10 @@ async function sendGeneratedOutput(params: {
                 ctx.chat?.type !== 'private' &&
                 isMissingSendTextRightsError(error)
             ) {
-                await ctx.m.setDisableRepliesDueToRights(true);
-                await ctx.m.setDisabledReplyRightsLastProbeAt(Date.now());
+                await ctx.chatConfig.setDisableRepliesDueToRights(true);
+                await ctx.chatConfig.setDisabledReplyRightsLastProbeAt(
+                    Date.now(),
+                );
                 logger.warn(
                     'Disabled replies in chat due to missing send rights',
                 );
@@ -410,7 +415,7 @@ async function sendGeneratedOutput(params: {
             threadParentMessageId,
             threadSource,
         };
-        await ctx.m.addMessage(messageRecord);
+        await ctx.messages.addMessage(messageRecord);
         historyById.set(messageRecord.id, messageRecord);
 
         if (i === output.length - 1) {
@@ -437,15 +442,15 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
     const composer = new Composer<SlushaContext>();
 
     composer.on('message', async (ctx) => {
-        const chatState = await ctx.m.getChat();
-        const effectiveConfig = await ctx.m.getEffectiveConfig();
-        const chatOverride = await ctx.m.getChatConfigOverride();
-        await recordUsageEvent(ctx.memory.db, {
+        const chatState = await ctx.chats.getChat(ctx.chat);
+        const effectiveConfig = await ctx.chatConfig.getEffectiveConfig();
+        const chatOverride = await ctx.chatConfig.getChatConfigOverride();
+        await recordUsageEvent(ctx.db, {
             chatId: ctx.chat.id,
             userId: ctx.from?.id,
         });
-        await cleanupUsageEvents(ctx.memory.db, effectiveConfig);
-        const usageSnapshot = await getUsageSnapshot(ctx.memory.db, {
+        await cleanupUsageEvents(ctx.db, effectiveConfig);
+        const usageSnapshot = await getUsageSnapshot(ctx.db, {
             config: effectiveConfig,
             chatId: ctx.chat.id,
             userId: ctx.from?.id,
@@ -478,7 +483,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             (maxLimit, attempt) => Math.max(maxLimit, attempt.historyLimit),
             0,
         );
-        const savedHistory = await ctx.m.getRecentHistory(
+        const savedHistory = await ctx.messages.getRecentHistory(
             Math.max(maxTargetCount, maxAttemptHistoryLimit),
         );
 
@@ -519,7 +524,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
 
         const activeMembers = ctx.chat.type === 'private'
             ? []
-            : await ctx.m.getActiveMembers();
+            : await ctx.members.getActiveMembers();
 
         const buildMessagesForAttempt = async (
             plan: GenerationAttemptPlan,

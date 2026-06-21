@@ -6,7 +6,7 @@ export function registerModel(
     composer: Composer<SlushaContext>,
 ) {
     composer.command('model', async (ctx) => {
-        const globalConfig = await getGlobalUserConfig(ctx.memory.db);
+        const globalConfig = await getGlobalUserConfig(ctx.db);
         if (
             !globalConfig.adminIds || !ctx.msg.from ||
             !globalConfig.adminIds.includes(ctx.msg.from.id)
@@ -22,7 +22,7 @@ export function registerModel(
         if (args.length === 1) {
             return ctx.reply(
                 ctx.t('model-current', {
-                    model: (await ctx.m.getChat()).chatModel ??
+                    model: (await ctx.chats.getChat(ctx.chat)).chatModel ??
                         globalConfig.ai.model,
                 }),
             );
@@ -30,11 +30,11 @@ export function registerModel(
 
         const newModel = args[1];
         if (newModel === 'default') {
-            await ctx.m.setChatModel(undefined);
+            await ctx.chatConfig.setChatModel(undefined);
             return ctx.reply(ctx.t('model-reset'));
         }
 
-        await ctx.m.setChatModel(newModel);
+        await ctx.chatConfig.setChatModel(newModel);
         return ctx.reply(ctx.t('model-set', { model: newModel }));
     });
 }

@@ -7,7 +7,6 @@ import {
 import { SlushaContext } from '../setup-bot.ts';
 import { getCharacter, getCharacters, pageSize } from '../../charhub/api.ts';
 import { sliceMessage } from '../../helpers.ts';
-import { ChatMemory } from '../../memory.ts';
 import logger from '../../logger.ts';
 import { InlineQueryResultArticle } from 'grammy_types';
 import { hasToolCall, tool } from 'ai';
@@ -19,6 +18,8 @@ import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
 import { generateLlmText } from '../../ai/generation.ts';
+import { CharacterRepository } from '../../persistence/characters.ts';
+import { MessageRepository } from '../../persistence/messages.ts';
 
 const characterNamesTool = tool({
     description: 'Submit generated character name variants.',
@@ -41,7 +42,7 @@ bot.command('character', async (ctx) => {
     let keyboard = new InlineKeyboard()
         .switchInlineCurrent(ctx.t('search'), `@${ctx.chat.id} `);
 
-    const character = (await ctx.m.getChat()).character;
+    const character = (await ctx.chats.getChat(ctx.chat)).character;
 
     const name = character?.name ?? ctx.t('slusha-name');
 
@@ -320,7 +321,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     }
 
     const chatId = parseInt(args[1]);
-    const chat = await ctx.memory.getChatById(chatId);
+    const chat = await ctx.chats.getChatById(chatId);
     if (isNaN(chatId) || chat === undefined) {
         return ctx.answerCallbackQuery(ctx.t('character-invalid-chat-id'));
     }
@@ -330,8 +331,8 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         return ctx.answerCallbackQuery(ctx.t('character-not-member'));
     }
 
-    // Manually set chat by query id cause it's not available in ctx
-    ctx.m = new ChatMemory(ctx.memory, chat.info);
+    const characters = new CharacterRepository(ctx.db, chatId);
+    const messages = new MessageRepository(ctx.db, chatId);
 
     if (!chat) {
         return ctx.answerCallbackQuery('Chat not found');
@@ -354,7 +355,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
                 );
         }
 
-        await ctx.m.setCharacter(undefined);
+        await characters.unsetCharacter();
 
         try {
             await Promise.all([
@@ -373,7 +374,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
             logger.error('Could not notify character change: ', error);
         }
 
-        await ctx.m.clear();
+        await messages.clear();
         return;
     }
 
@@ -465,7 +466,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         return await ctx.reply(ctx.t('character-names-error'));
     }
 
-    await ctx.m.setCharacter({ ...character, names });
+    await characters.setCharacter({ ...character, names });
 
     const keyboard = new InlineKeyboard()
         .text(ctx.t('character-return-slusha'), `set ${chatId} default`)
@@ -508,7 +509,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         logger.error('Could not send message: ', error);
     }
 
-    await ctx.m.clear();
+    await messages.clear();
 
     return ctx.answerCallbackQuery(
         ctx.t('character-set-to', { name: character.name }),

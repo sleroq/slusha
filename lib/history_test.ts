@@ -1,7 +1,7 @@
 import { assertEquals } from '@std/assert';
 import { Message } from 'grammy_types';
 import { ReplyMessage } from './telegram/helpers.ts';
-import { ChatMessage, ReplyTo } from './memory.ts';
+import type { ChatMessage, ReplyTo } from './persistence/types.ts';
 import {
     selectHistoryCandidates,
     selectHistoryCandidatesV3,

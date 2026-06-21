@@ -132,7 +132,10 @@ export function startWebServer(options: StartWebServerOptions) {
                     return await dispatchApiConfigRoute(req, url, options);
                 } catch (error) {
                     if (error instanceof UnauthorizedRequestError) {
-                        return jsonResponse({ error: error.message }, error.status);
+                        return jsonResponse(
+                            { error: error.message },
+                            error.status,
+                        );
                     }
 
                     logger.error('Web API error: ', error);

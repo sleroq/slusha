@@ -14,9 +14,9 @@ function formatWindowLine(
 
 export function registerUsage(composer: Composer<SlushaContext>) {
     composer.command('usage', async (ctx) => {
-        const effectiveConfig = await ctx.m.getEffectiveConfig();
-        const chatOverride = await ctx.m.getChatConfigOverride();
-        const snapshot = await getUsageSnapshot(ctx.memory.db, {
+        const effectiveConfig = await ctx.chatConfig.getEffectiveConfig();
+        const chatOverride = await ctx.chatConfig.getChatConfigOverride();
+        const snapshot = await getUsageSnapshot(ctx.db, {
             config: effectiveConfig,
             chatId: ctx.chat.id,
             userId: ctx.from?.id,

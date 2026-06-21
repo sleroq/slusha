@@ -7,14 +7,14 @@ export function registerRandom(
     composer: Composer<SlushaContext>,
 ) {
     composer.command('random', async (ctx) => {
-        const globalConfig = await getGlobalUserConfig(ctx.memory.db);
+        const globalConfig = await getGlobalUserConfig(ctx.db);
         const args = ctx.msg.text
             .split(' ')
             .map((arg) => arg.trim())
             .filter((arg) => arg !== '');
 
-        const currentValue = (await ctx.m.getChat()).randomReplyProbability ??
-            globalConfig.randomReplyProbability;
+        const currentValue = (await ctx.chats.getChat(ctx.chat))
+            .randomReplyProbability ?? globalConfig.randomReplyProbability;
 
         if (args.length === 1) {
             return replyWithMarkdown(
@@ -32,7 +32,7 @@ export function registerRandom(
 
         const newValue = args[1];
         if (newValue === 'default') {
-            await ctx.m.setRandomReplyProbability(undefined);
+            await ctx.chatConfig.setRandomReplyProbability(undefined);
             return ctx.reply(ctx.t('random-updated'));
         }
 
@@ -41,7 +41,7 @@ export function registerRandom(
             return ctx.reply(ctx.t('random-parse-error'));
         }
 
-        await ctx.m.setRandomReplyProbability(probability);
+        await ctx.chatConfig.setRandomReplyProbability(probability);
         return ctx.reply(ctx.t('random-set', { probability }));
     });
 }

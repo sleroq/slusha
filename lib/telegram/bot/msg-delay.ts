@@ -17,13 +17,13 @@ export default function msgDelay() {
 
         // TODO: Make sure this will not cause any concurrency issues (how)
 
-        const effectiveConfig = await ctx.m.getEffectiveConfig();
+        const effectiveConfig = await ctx.chatConfig.getEffectiveConfig();
 
         // Wait for configured delay before replying
         setTimeout(async () => {
             // If user is sent something after this message, drop current one
 
-            const history = await ctx.m.getHistory();
+            const history = await ctx.messages.getHistory();
 
             // Get last message from this user in chat
             const lastUserMessage = history.filter((msg) =>
@@ -47,7 +47,7 @@ export default function msgDelay() {
                 return;
             }
 
-            const lastMessage = await ctx.m.getLastMessage();
+            const lastMessage = await ctx.messages.getLastMessage();
             if (lastMessage?.id !== lastUserMessage.id) {
                 // If user's last message is followed by messages from other users
                 // then add info to which user to reply

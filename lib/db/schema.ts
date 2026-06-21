@@ -45,9 +45,9 @@ export const chatMembers = sqliteTable('chat_members', {
     description: text('description').notNull().default(''),
     info: text('info').notNull(),
     lastUse: integer('last_use', { mode: 'number' }).notNull().default(0),
-}, (table) => ({
-    pk: primaryKey({ columns: [table.chatId, table.userId] }),
-}));
+}, (table) => [
+    primaryKey({ columns: [table.chatId, table.userId] }),
+]);
 
 export const chatOptOutUsers = sqliteTable('chat_opt_out_users', {
     chatId: integer('chat_id', { mode: 'number' }).notNull().references(
@@ -57,9 +57,9 @@ export const chatOptOutUsers = sqliteTable('chat_opt_out_users', {
     userId: integer('user_id', { mode: 'number' }).notNull(),
     username: text('username'),
     firstName: text('first_name').notNull(),
-}, (table) => ({
-    pk: primaryKey({ columns: [table.chatId, table.userId] }),
-}));
+}, (table) => [
+    primaryKey({ columns: [table.chatId, table.userId] }),
+]);
 
 export const chatMessages = sqliteTable('chat_messages', {
     chatId: integer('chat_id', { mode: 'number' }).notNull().references(
@@ -80,9 +80,9 @@ export const chatMessages = sqliteTable('chat_messages', {
     }),
     threadSource: text('thread_source'),
     info: text('info').notNull(),
-}, (table) => ({
-    pk: primaryKey({ columns: [table.chatId, table.messageId] }),
-}));
+}, (table) => [
+    primaryKey({ columns: [table.chatId, table.messageId] }),
+]);
 
 export const messageReactions = sqliteTable('message_reactions', {
     chatId: integer('chat_id', { mode: 'number' }).notNull().references(
@@ -95,11 +95,11 @@ export const messageReactions = sqliteTable('message_reactions', {
     emoji: text('emoji'),
     customEmojiId: text('custom_emoji_id'),
     count: integer('count', { mode: 'number' }).notNull().default(0),
-}, (table) => ({
-    pk: primaryKey({
+}, (table) => [
+    primaryKey({
         columns: [table.chatId, table.messageId, table.reactionKey],
     }),
-}));
+]);
 
 export const messageReactionUsers = sqliteTable('message_reaction_users', {
     chatId: integer('chat_id', { mode: 'number' }).notNull(),
@@ -108,8 +108,8 @@ export const messageReactionUsers = sqliteTable('message_reaction_users', {
     userId: integer('user_id', { mode: 'number' }).notNull(),
     username: text('username'),
     name: text('name').notNull(),
-}, (table) => ({
-    pk: primaryKey({
+}, (table) => [
+    primaryKey({
         columns: [
             table.chatId,
             table.messageId,
@@ -117,7 +117,7 @@ export const messageReactionUsers = sqliteTable('message_reaction_users', {
             table.userId,
         ],
     }),
-}));
+]);
 
 export const chatCharacters = sqliteTable('chat_characters', {
     chatId: integer('chat_id', { mode: 'number' }).primaryKey().references(

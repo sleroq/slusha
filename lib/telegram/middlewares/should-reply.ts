@@ -10,9 +10,9 @@ import { checkAndMaybeRecoverReplyRights } from './reply-rights-guard.ts';
 
 export function shouldReply() {
     return async (ctx: SlushaContext, next: () => Promise<void>) => {
-        const msg = await ctx.m.getLastMessage();
+        const msg = await ctx.messages.getLastMessage();
         const currentMessage = ctx.msg;
-        const effectiveConfig = await ctx.m.getEffectiveConfig();
+        const effectiveConfig = await ctx.chatConfig.getEffectiveConfig();
         const isIgnoreCandidate = Boolean(msg?.text) &&
             msg.text.length < 20 &&
             testMessage(effectiveConfig.tendToIgnore, msg.text);
@@ -34,8 +34,10 @@ export function shouldReply() {
             return;
         }
 
-        if (currentMessage.chat.type === 'private') {
-            await ctx.m.setLastUse(Date.now());
+        const chat = currentMessage.chat;
+
+        if (chat.type === 'private') {
+            await ctx.chats.patchChat(chat.id, { lastUse: Date.now() });
             return next();
         }
 
@@ -54,7 +56,7 @@ export function shouldReply() {
         }
 
         if (isDirectReplyToBot) {
-            await ctx.m.setLastUse(Date.now());
+            await ctx.chats.patchChat(chat.id, { lastUse: Date.now() });
             return next();
         }
 
@@ -62,7 +64,7 @@ export function shouldReply() {
             return next();
         }
 
-        const characterNames = (await ctx.m.getChat()).character?.names;
+        const characterNames = (await ctx.characters.get())?.names;
         const names = effectiveConfig.names.concat(characterNames ?? []);
         const nameRegex = createNameMatcher(names);
 
@@ -71,7 +73,7 @@ export function shouldReply() {
             !(msg.info.forward_origin?.type === 'user' &&
                 msg.info.forward_origin.sender_user.id === ctx.me.id)
         ) {
-            await ctx.m.setLastUse(Date.now());
+            await ctx.chats.patchChat(chat.id, { lastUse: Date.now() });
             logger.info("Replying because of mentioned bot's name");
             return next();
         }
@@ -92,7 +94,7 @@ export function shouldReply() {
         }
 
         const randomReplyProbability =
-            (await ctx.m.getChat()).randomReplyProbability ??
+            (await ctx.chats.getChat(chat)).randomReplyProbability ??
                 effectiveConfig.randomReplyProbability;
 
         if (probability(randomReplyProbability)) {

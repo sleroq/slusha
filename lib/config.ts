@@ -366,16 +366,11 @@ export async function setGlobalUserConfig(
         throw new Error('availableModels must contain at least one model');
     }
 
-    const modelsToCheck = [parsed.data.ai.model].filter((item): item is string =>
-        typeof item === 'string' && item.length > 0
-    );
-
-    for (const model of modelsToCheck) {
-        if (!normalizedModels.includes(model)) {
-            throw new Error(
-                `Model "${model}" is not listed in availableModels`,
-            );
-        }
+    const model = parsed.data.ai.model;
+    if (!normalizedModels.includes(model)) {
+        throw new Error(
+            `Model "${model}" is not listed in availableModels`,
+        );
     }
 
     const nextValue: UserConfig = {

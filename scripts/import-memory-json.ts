@@ -10,7 +10,7 @@ import {
     messageReactions,
     messageReactionUsers,
 } from '../lib/db/schema.ts';
-import { Chat, MessageReactions } from '../lib/memory.ts';
+import type { Chat, MessageReactions } from '../lib/persistence/types.ts';
 
 interface LegacyMemory {
     chats: Record<string, Chat>;

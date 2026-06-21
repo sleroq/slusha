@@ -48,7 +48,7 @@ export async function resolveRequestContext(
         throw new UnauthorizedRequestError('Missing Telegram user');
     }
 
-    const globalConfig = await getGlobalUserConfig(options.memory.db);
+    const globalConfig = await getGlobalUserConfig(options.db);
     const role = resolveConfigRole(globalConfig, userId);
 
     return {

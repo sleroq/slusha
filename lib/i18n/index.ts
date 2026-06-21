@@ -8,14 +8,14 @@ export function createI18n() {
     });
 }
 
-export function applyLocaleFromMemory() {
+export function applyLocaleFromPersistence() {
     return async (ctx: SlushaContext, next: () => Promise<void>) => {
         try {
-            const memLocale = ctx.m
-                ? (await ctx.m.getChat()).locale
+            const locale = ctx.chat
+                ? (await ctx.chats.getChat(ctx.chat)).locale
                 : undefined;
-            if (memLocale) {
-                await ctx.i18n.useLocale(memLocale);
+            if (locale) {
+                await ctx.i18n.useLocale(locale);
             }
         } catch (_) {
             // ignore

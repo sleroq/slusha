@@ -1,4 +1,4 @@
-import { ChatMessage, Member } from '../memory.ts';
+import type { ChatMessage, Member } from '../persistence/types.ts';
 
 interface ChatPromptAdditionParams {
     chatType: string;

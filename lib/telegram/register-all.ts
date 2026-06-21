@@ -1,7 +1,7 @@
 import { Bot, Composer } from 'grammy';
 import { SlushaContext } from './setup-bot.ts';
 import { Config } from '../config.ts';
-import { applyLocaleFromMemory, createI18n } from '../i18n/index.ts';
+import { applyLocaleFromPersistence, createI18n } from '../i18n/index.ts';
 import optOut from './bot/opt-out.ts';
 import language from './bot/language.ts';
 import msgDelay from './bot/msg-delay.ts';
@@ -67,7 +67,7 @@ export default function registerAll(bot: Bot<SlushaContext>, _config: Config) {
     };
 
     bot.use(i18n);
-    bot.use(applyLocaleFromMemory());
+    bot.use(applyLocaleFromPersistence());
 
     bot.use(createLazyMiddleware(async () => {
         const { registerEarlyCommands } = await loadCommandHandlers();

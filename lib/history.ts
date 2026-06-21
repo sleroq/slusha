@@ -7,7 +7,7 @@ import {
     removeFieldsWithSuffixes,
     sliceMessage,
 } from './helpers.ts';
-import { ChatMessage, ReplyTo } from './memory.ts';
+import type { ChatMessage, ReplyTo } from './persistence/types.ts';
 import { Message } from 'grammy_types';
 import { Logger } from '@deno-library/logger';
 import logger from './logger.ts';
