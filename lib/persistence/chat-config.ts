@@ -109,30 +109,8 @@ export class ChatConfigRepository {
     }
 
     private isEmpty(value: ChatConfigOverride) {
-        const noAi = !value.ai ||
-            Object.values(value.ai).every((item) => item === undefined);
-        const rest = Object.entries(value).filter(([key]) => key !== 'ai').map((
-            [, item],
-        ) => item).every((item) => {
-            if (item === undefined) return true;
-            if (item && typeof item === 'object' && !Array.isArray(item)) {
-                return Object.values(item as Record<string, unknown>).every(
-                    (nested) => {
-                        if (nested === undefined) return true;
-                        if (
-                            nested && typeof nested === 'object' &&
-                            !Array.isArray(nested)
-                        ) {
-                            return Object.values(
-                                nested as Record<string, unknown>,
-                            ).every((deep) => deep === undefined);
-                        }
-                        return false;
-                    },
-                );
-            }
-            return false;
-        });
-        return noAi && rest;
+        // Matches serializeChatOverride: undefined values and empty nested
+        // objects collapse, so an "all undefined" override serializes to "{}".
+        return JSON.stringify(value) === '{}';
     }
 }

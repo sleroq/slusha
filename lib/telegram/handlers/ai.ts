@@ -2,7 +2,7 @@ import { Bot, Composer } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
 import logger from '../../logger.ts';
 import { APICallError, hasToolCall, ModelMessage, tool } from 'ai';
-import { makeHistoryV3 } from '../../history.ts';
+import { makeHistory } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
 import type { ChatMessage, ReplyTo } from '../../persistence/types.ts';
@@ -587,7 +587,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 effectiveConfig.ai.includeAttachmentsInHistory &&
                 parsedModel.provider === 'google';
 
-            const history = await makeHistoryV3(
+            const history = await makeHistory(
                 { token: bot.token, id: bot.botInfo.id },
                 bot.api,
                 logger,

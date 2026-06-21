@@ -65,7 +65,7 @@ function collectReplyThread(
     return thread;
 }
 
-export function selectHistoryCandidates(
+export function selectHistoryCandidatesLegacy(
     history: ChatMessage[],
     options: {
         resolveReplyThread: boolean;
@@ -128,7 +128,7 @@ function hasThreadMetadata(history: ChatMessage[]): boolean {
     );
 }
 
-export function selectHistoryCandidatesV3(
+export function selectHistoryCandidates(
     history: ChatMessage[],
     options: {
         maxRootMessages?: number;
@@ -136,7 +136,7 @@ export function selectHistoryCandidatesV3(
     },
 ): HistoryCandidate[] {
     if (!hasThreadMetadata(history)) {
-        return selectHistoryCandidates(history, {
+        return selectHistoryCandidatesLegacy(history, {
             resolveReplyThread: true,
             maxRootMessages: options.maxRootMessages,
         });
@@ -640,11 +640,11 @@ export async function buildHistoryContext(
     let textPart = '';
 
     const candidates = mode === 'chat'
-        ? selectHistoryCandidatesV3(history, {
+        ? selectHistoryCandidates(history, {
             maxRootMessages: undefined,
             activeMessageId: options.activeMessageId,
         })
-        : selectHistoryCandidates(history, {
+        : selectHistoryCandidatesLegacy(history, {
             resolveReplyThread: resolveReplies,
             maxRootMessages: undefined,
         });
@@ -742,7 +742,7 @@ export async function buildHistoryContext(
     return prompt;
 }
 
-export function makeHistoryV3(
+export function makeHistory(
     botInfo: { token: string; id: number },
     api: Api<RawApi>,
     logger: Logger,
