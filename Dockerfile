@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY widget ./widget
 COPY lib/config-contract.ts ./lib/config-contract.ts
+COPY lib/config-manifest.ts ./lib/config-manifest.ts
 
 RUN deno task --config ./widget/deno.json build
 
