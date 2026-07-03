@@ -1,6 +1,6 @@
 import { Bot, Composer } from 'grammy';
-import { SlushaContext } from './setup-bot.ts';
-import { Config } from '../config.ts';
+import type { SlushaContext } from './setup-bot.ts';
+import type { Config } from '../config.ts';
 import { applyLocaleFromPersistence, createI18n } from '../i18n/index.ts';
 import optOut from './bot/opt-out.ts';
 import language from './bot/language.ts';
@@ -13,6 +13,96 @@ import lobotomy from './commands/lobotomy.ts';
 import changelog from './commands/changelog.ts';
 
 type SlushaMiddleware = Parameters<Composer<SlushaContext>['use']>[0];
+
+type LazyCommandDescriptor = {
+    names: readonly string[];
+    load: () => Promise<SlushaMiddleware>;
+};
+
+const eagerCommandNames = [
+    'start',
+    'forget',
+    'lobotomy',
+    'changelog',
+    'optout',
+    'optin',
+    'language',
+] as const;
+
+function createCommandMiddleware(
+    register: (composer: Composer<SlushaContext>) => void,
+): SlushaMiddleware {
+    const composer = new Composer<SlushaContext>();
+    register(composer);
+    return composer.middleware();
+}
+
+const lazyCommands = [
+    {
+        names: ['character'],
+        load: async () => {
+            const { default: character } = await import('./bot/character.ts');
+            return character.middleware();
+        },
+    },
+    {
+        names: ['model'],
+        load: async () => {
+            const { registerModel } = await import('./commands/model.ts');
+            return createCommandMiddleware(registerModel);
+        },
+    },
+    {
+        names: ['random'],
+        load: async () => {
+            const { registerRandom } = await import('./commands/random.ts');
+            return createCommandMiddleware(registerRandom);
+        },
+    },
+    {
+        names: ['summary'],
+        load: async () => {
+            const { registerSummary } = await import('./commands/summary.ts');
+            return createCommandMiddleware(registerSummary);
+        },
+    },
+    {
+        names: ['hatemode'],
+        load: async () => {
+            const { default: registerHateMode } = await import(
+                './commands/hatemode.ts'
+            );
+            return createCommandMiddleware(registerHateMode);
+        },
+    },
+    {
+        names: ['config', 'settings'],
+        load: async () => {
+            const { registerConfig } = await import('./commands/config.ts');
+            return createCommandMiddleware(registerConfig);
+        },
+    },
+] as const satisfies readonly LazyCommandDescriptor[];
+
+export const registeredCommandNames = [
+    ...eagerCommandNames,
+    ...lazyCommands.flatMap((command) => command.names),
+] as readonly string[];
+
+export function getMessageCommand(text: string): string | undefined {
+    const command = text.split(/\s+/, 1)[0];
+    if (!command?.startsWith('/')) {
+        return undefined;
+    }
+
+    return command.slice(1).split('@', 1)[0];
+}
+
+export function isRegisteredCommand(text: string | undefined): boolean {
+    if (text === undefined) return false;
+    const command = getMessageCommand(text);
+    return command !== undefined && registeredCommandNames.includes(command);
+}
 
 function toMiddlewareFn(middleware: SlushaMiddleware) {
     return typeof middleware === 'function'
@@ -54,13 +144,12 @@ function shouldLoadCharacter(ctx: SlushaContext): boolean {
 
 function shouldLoadCommand(...commands: string[]) {
     return (ctx: SlushaContext): boolean => {
-        const command = ctx.msg?.text?.trimStart().split(/\s+/, 1)[0];
-        if (!command?.startsWith('/')) {
+        if (!ctx.msg?.text) {
             return false;
         }
 
-        const commandName = command.slice(1).split('@', 1)[0];
-        return commands.includes(commandName);
+        const commandName = getMessageCommand(ctx.msg.text);
+        return commandName !== undefined && commands.includes(commandName);
     };
 }
 
@@ -77,50 +166,12 @@ export default function registerAll(bot: Bot<SlushaContext>, _config: Config) {
 
     bot.use(optOut);
     bot.use(language);
-    bot.use(createLazyMiddleware(
-        async () => {
-            const { default: character } = await import('./bot/character.ts');
-            return character.middleware();
-        },
-        shouldLoadCharacter,
-    ));
-
-    bot.use(createLazyMiddleware(async () => {
-        const { registerModel } = await import('./commands/model.ts');
-        const composer = new Composer<SlushaContext>();
-        registerModel(composer);
-        return composer.middleware();
-    }, shouldLoadCommand('model')));
-
-    bot.use(createLazyMiddleware(async () => {
-        const { registerRandom } = await import('./commands/random.ts');
-        const composer = new Composer<SlushaContext>();
-        registerRandom(composer);
-        return composer.middleware();
-    }, shouldLoadCommand('random')));
-
-    bot.use(createLazyMiddleware(async () => {
-        const { registerSummary } = await import('./commands/summary.ts');
-        const composer = new Composer<SlushaContext>();
-        registerSummary(composer);
-        return composer.middleware();
-    }, shouldLoadCommand('summary')));
-
-    bot.use(createLazyMiddleware(async () => {
-        const { default: registerHateMode } = await import(
-            './commands/hatemode.ts'
-        );
-        const composer = new Composer<SlushaContext>();
-        registerHateMode(composer);
-        return composer.middleware();
-    }, shouldLoadCommand('hatemode')));
-
-    bot.use(createLazyMiddleware(async () => {
-        const { registerConfig } = await import('./commands/config.ts');
-        const composer = new Composer<SlushaContext>();
-        registerConfig(composer);
-        return composer.middleware();
-    }, shouldLoadCommand('config', 'settings')));
+    for (const command of lazyCommands) {
+        const shouldLoad = command.names.some((name) => name === 'character')
+            ? shouldLoadCharacter
+            : shouldLoadCommand(...command.names);
+        bot.use(createLazyMiddleware(command.load, shouldLoad));
+    }
 
     bot.on(
         'message',

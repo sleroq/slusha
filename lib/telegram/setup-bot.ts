@@ -17,6 +17,7 @@ import type {
 import { sequentialize } from '@grammyjs/runner';
 import { canMemberSendTextMessages } from './reply-rights.ts';
 import { Message } from 'grammy_types';
+import { isRegisteredCommand } from './register-all.ts';
 
 interface RequestInfo {
     isRandom: boolean;
@@ -196,17 +197,6 @@ async function resolveThreadForIncomingMessage(
     };
 }
 
-// TODO: Maybe derive from bot info somehow?
-const commands = [
-    '/optout',
-    '/model',
-    '/lobotomy',
-    '/random',
-    '/summary',
-    '/language',
-    '/config',
-];
-
 const startDate = new Date();
 
 export default async function setupBot(
@@ -324,9 +314,7 @@ export default async function setupBot(
             return;
         }
 
-        if (
-            commands.some((c) => ctx.msg.text?.startsWith(c))
-        ) {
+        if (isRegisteredCommand(ctx.msg.text)) {
             return next();
         }
 
