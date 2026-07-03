@@ -1,4 +1,3 @@
-import type { Chat as TgChat } from 'grammy_types';
 import {
     mergeWithChatOverride,
     toStoredChatOverride,
@@ -45,76 +44,9 @@ function projectCurrentCharacter(
     };
 }
 
-function readChatSummary(chatId: number, infoRaw: string): AvailableChat {
-    try {
-        const info = JSON.parse(infoRaw) as TgChat;
-        const title = info.type === 'private'
-            ? [info.first_name, info.last_name].filter(Boolean).join(' ').trim()
-            : info.title;
-        const normalizedTitle =
-            typeof title === 'string' && title.trim().length > 0
-                ? title.trim()
-                : String(chatId);
-
-        return {
-            id: chatId,
-            title: normalizedTitle,
-            username: info.username ?? undefined,
-            type: info.type,
-        };
-    } catch {
-        return {
-            id: chatId,
-            title: String(chatId),
-            type: 'group',
-        };
-    }
-}
-
-async function resolveAvailableChats(
-    options: StartWebServerOptions,
-    userId: number,
-    includeAllChats: boolean,
-): Promise<AvailableChat[]> {
-    const chats = new ChatRepository(options.db);
-    if (includeAllChats) {
-        const chatRows = await chats.listAvailableChats();
-        return chatRows.map((chat) => readChatSummary(chat.id, chat.info));
-    }
-
-    const chatRows = await chats.listChatsForMember(userId);
-
-    if (chatRows.length === 0) {
-        return [];
-    }
-
-    const seen = new Set<number>();
-    const filtered = await Promise.all(chatRows.map(async (chat) => {
-        const chatId = chat.id;
-        if (seen.has(chatId)) {
-            return undefined;
-        }
-        seen.add(chatId);
-
-        if (chatId === userId) {
-            return readChatSummary(chatId, chat.info);
-        }
-
-        try {
-            const member = await options.bot.api.getChatMember(chatId, userId);
-            const isAdmin = member.status === 'creator' ||
-                member.status === 'administrator';
-            if (!isAdmin) {
-                return undefined;
-            }
-        } catch {
-            // Unknown membership/admin state: keep chat in list.
-        }
-
-        return readChatSummary(chatId, chat.info);
-    }));
-
-    return filtered.filter((chat): chat is AvailableChat => Boolean(chat));
+function resolveAvailableChats(): AvailableChat[] {
+    // TODO: Add the new available chats implementation soon.
+    return [];
 }
 
 export async function handleBootstrapRequest(
@@ -133,9 +65,7 @@ export async function handleBootstrapRequest(
 
     const canEditGlobal = canEditGlobalConfig(globalConfig, userId);
     const canViewGlobal = canEditGlobal;
-    const availableChats = userId
-        ? await resolveAvailableChats(options, userId, canEditGlobal)
-        : [];
+    const availableChats = userId ? resolveAvailableChats() : [];
     const serializedGlobalConfig = JSON.parse(
         JSON.stringify(toStoredUserConfig(globalConfig)),
     ) as UserConfig;
