@@ -190,7 +190,6 @@ export class MessageRepository {
         await this.reactions.applyDelta(
             messageId,
             delta,
-            () => this.exists(messageId),
             by,
         );
     }
@@ -202,21 +201,7 @@ export class MessageRepository {
         await this.reactions.replaceCounts(
             messageId,
             counts,
-            () => this.exists(messageId),
         );
-    }
-
-    private async exists(messageId: number) {
-        const row = await this.db.select({ messageId: chatMessages.messageId })
-            .from(chatMessages)
-            .where(
-                and(
-                    eq(chatMessages.chatId, this.chatId),
-                    eq(chatMessages.messageId, messageId),
-                ),
-            )
-            .limit(1);
-        return row.length > 0;
     }
 
     private async withReactions(rows: (typeof chatMessages.$inferSelect)[]) {

@@ -81,14 +81,12 @@ export class ReactionRepository {
     async applyDelta(
         messageId: number,
         delta: ReactionDelta,
-        messageExists: () => Promise<boolean>,
         by?: Pick<User, 'id' | 'username' | 'first_name'>,
     ) {
         for (const emoji of delta.emojiAdded) {
             await this.upsert(
                 messageId,
                 { type: 'emoji', emoji },
-                messageExists,
                 by,
             );
         }
@@ -99,7 +97,6 @@ export class ReactionRepository {
             await this.upsert(
                 messageId,
                 { type: 'custom', customEmojiId },
-                messageExists,
                 by,
             );
         }
@@ -111,10 +108,7 @@ export class ReactionRepository {
     async replaceCounts(
         messageId: number,
         counts: ReactionCountEntry[],
-        messageExists: () => Promise<boolean>,
     ) {
-        if (!await messageExists()) return;
-
         const nextKeys = new Set(counts.map((c) =>
             reactionKey(
                 c.type === 'emoji'
@@ -176,10 +170,8 @@ export class ReactionRepository {
             type: 'custom';
             customEmojiId: string;
         },
-        messageExists: () => Promise<boolean>,
         by?: Pick<User, 'id' | 'username' | 'first_name'>,
     ) {
-        if (!await messageExists()) return;
         const key = reactionKey(reaction);
         const existing = await this.db.query.messageReactions.findFirst({
             where: and(
