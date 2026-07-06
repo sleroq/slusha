@@ -79,7 +79,6 @@ const reactions = new Composer<SlushaContext>();
 // Reaction updates (added/removed/changed by users)
 reactions.on('message_reaction', async (ctx, next) => {
     const mr = ctx.update.message_reaction;
-    const messageId = mr.message_id;
     const delta = parseReactionDelta(mr);
 
     const by = ctx.from
@@ -89,7 +88,8 @@ reactions.on('message_reaction', async (ctx, next) => {
             first_name: ctx.from.first_name,
         }
         : undefined;
-    await ctx.messages.applyReactionDelta(messageId, delta, by);
+
+    await ctx.messages.applyReactionDelta(mr.message_id, delta, by);
 
     return next();
 });
@@ -98,10 +98,9 @@ reactions.on('message_reaction', async (ctx, next) => {
 reactions.on('message_reaction_count', async (ctx, next) => {
     try {
         const mrc = ctx.update.message_reaction_count;
-        if (!mrc) return next();
-        const messageId = mrc.message_id;
+
         const counts = parseReactionCounts(mrc);
-        await ctx.messages.replaceReactionCounts(messageId, counts);
+        await ctx.messages.replaceReactionCounts(mrc.message_id, counts);
     } catch (error) {
         logger.warn('Could not process message_reaction_count: ', error);
     }
