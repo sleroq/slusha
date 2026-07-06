@@ -1,4 +1,5 @@
 import {
+    foreignKey,
     integer,
     primaryKey,
     real,
@@ -85,10 +86,7 @@ export const chatMessages = sqliteTable('chat_messages', {
 ]);
 
 export const messageReactions = sqliteTable('message_reactions', {
-    chatId: integer('chat_id', { mode: 'number' }).notNull().references(
-        () => chats.id,
-        { onDelete: 'cascade' },
-    ),
+    chatId: integer('chat_id', { mode: 'number' }).notNull(),
     messageId: integer('message_id', { mode: 'number' }).notNull(),
     reactionKey: text('reaction_key').notNull(),
     type: text('type', { enum: ['emoji', 'custom'] }).notNull(),
@@ -99,6 +97,10 @@ export const messageReactions = sqliteTable('message_reactions', {
     primaryKey({
         columns: [table.chatId, table.messageId, table.reactionKey],
     }),
+    foreignKey({
+        columns: [table.chatId, table.messageId],
+        foreignColumns: [chatMessages.chatId, chatMessages.messageId],
+    }).onDelete('cascade'),
 ]);
 
 export const messageReactionUsers = sqliteTable('message_reaction_users', {
@@ -117,6 +119,14 @@ export const messageReactionUsers = sqliteTable('message_reaction_users', {
             table.userId,
         ],
     }),
+    foreignKey({
+        columns: [table.chatId, table.messageId, table.reactionKey],
+        foreignColumns: [
+            messageReactions.chatId,
+            messageReactions.messageId,
+            messageReactions.reactionKey,
+        ],
+    }).onDelete('cascade'),
 ]);
 
 export const chatCharacters = sqliteTable('chat_characters', {

@@ -30,7 +30,9 @@ function parseReactionSet(
     return out;
 }
 
-function parseReactionDelta(messageReaction: MessageReactionUpdated): ReactionDelta {
+function parseReactionDelta(
+    messageReaction: MessageReactionUpdated,
+): ReactionDelta {
     const added = parseReactionSet(messageReaction.new_reaction);
     const removed = parseReactionSet(messageReaction.old_reaction);
 

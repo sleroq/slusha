@@ -22,16 +22,13 @@ logMemoryUsage('startup');
 const sdk = await startTelemetry();
 logMemoryUsage('after telemetry');
 
-// (schemas and reaction utilities moved to dedicated modules)
-
-let config: Config;
-
 await migrateDb();
 
 const db = getDb();
 logger.info('Database ready');
 logMemoryUsage('after database init');
 
+let config: Config;
 try {
     config = await resolveConfig(db);
 } catch (error) {

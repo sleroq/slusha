@@ -16,6 +16,7 @@ export async function startTelemetry(): Promise<NodeSDK | undefined> {
         return undefined;
     }
 
+    // Not loading telemetry dependencies into memory if it's not configured
     const [{ NodeSDK }, { getNodeAutoInstrumentations }, { LangfuseExporter }] =
         await Promise.all([
             import('@opentelemetry/sdk-node'),

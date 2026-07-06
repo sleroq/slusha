@@ -36,6 +36,7 @@ export async function initializeDb() {
             ensureDbCreated();
 
             try {
+                await singletonClient!.execute('PRAGMA foreign_keys = ON;');
                 await singletonClient!.execute('PRAGMA journal_mode = WAL;');
                 await singletonClient!.execute('PRAGMA busy_timeout = 5000;');
             } catch (error) {
