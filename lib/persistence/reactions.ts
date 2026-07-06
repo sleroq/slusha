@@ -22,19 +22,17 @@ export function reactionKey(
 export class ReactionRepository {
     constructor(private db: DbClient, private chatId: number) {}
 
-    async load(messageIds?: number[]): Promise<Map<number, MessageReactions>> {
-        if (messageIds && messageIds.length === 0) return new Map();
+    async load(messageIds: number[]): Promise<Map<number, MessageReactions>> {
+        if (messageIds.length === 0) return new Map();
 
         const reactionRows = await this.db
             .select()
             .from(messageReactions)
             .where(
-                messageIds
-                    ? and(
-                        eq(messageReactions.chatId, this.chatId),
-                        inArray(messageReactions.messageId, messageIds),
-                    )
-                    : eq(messageReactions.chatId, this.chatId),
+                and(
+                    eq(messageReactions.chatId, this.chatId),
+                    inArray(messageReactions.messageId, messageIds),
+                ),
             );
 
         const keys = reactionRows.map((r) => r.reactionKey);
@@ -44,9 +42,7 @@ export class ReactionRepository {
             .where(and(
                 eq(messageReactionUsers.chatId, this.chatId),
                 inArray(messageReactionUsers.reactionKey, keys),
-                messageIds
-                    ? inArray(messageReactionUsers.messageId, messageIds)
-                    : undefined,
+                inArray(messageReactionUsers.messageId, messageIds),
             ));
 
         const usersByReaction = new Map<string, ReactionBy[]>();
