@@ -9,15 +9,12 @@ import { ChatRepository } from '../persistence/chats.ts';
 import { MemberRepository } from '../persistence/members.ts';
 import { MessageRepository } from '../persistence/messages.ts';
 import { OptOutRepository } from '../persistence/opt-outs.ts';
-import type {
-    ReactionCountEntry,
-    ReactionDelta,
-    ReplyTo,
-} from '../persistence/types.ts';
+import type { ReplyTo } from '../persistence/types.ts';
 import { sequentialize } from '@grammyjs/runner';
 import { canMemberSendTextMessages } from './reply-rights.ts';
 import { Message } from 'grammy_types';
 import { isRegisteredCommand } from './register-all.ts';
+import reactions from './handlers/reactions.ts';
 
 interface RequestInfo {
     isRandom: boolean;
@@ -42,99 +39,6 @@ export type SlushaContext = Context & I18nFlavor & {
     messages: MessageRepository;
     optOuts: OptOutRepository;
 };
-
-function isEmojiReactionType(
-    obj: unknown,
-): obj is { type: 'emoji'; emoji: string } {
-    return getUnknownProp(obj, 'type') === 'emoji' &&
-        typeof getUnknownProp(obj, 'emoji') === 'string';
-}
-
-function isCustomReactionType(
-    obj: unknown,
-): obj is { type: 'custom_emoji'; custom_emoji_id: string } {
-    return getUnknownProp(obj, 'type') === 'custom_emoji' &&
-        typeof getUnknownProp(obj, 'custom_emoji_id') === 'string';
-}
-
-function getUnknownProp(obj: unknown, key: string): unknown {
-    if (typeof obj !== 'object' || obj === null) return undefined;
-    return Reflect.get(obj, key);
-}
-
-function pickCount(obj: unknown): number | undefined {
-    const totalCount = getUnknownProp(obj, 'total_count');
-    if (typeof totalCount === 'number') return totalCount;
-
-    const count = getUnknownProp(obj, 'count');
-    if (typeof count === 'number') return count;
-
-    const total = getUnknownProp(obj, 'total');
-    if (typeof total === 'number') return total;
-
-    return undefined;
-}
-
-function parseReactionSet(raw: unknown): { emoji: string[]; custom: string[] } {
-    const out = { emoji: [] as string[], custom: [] as string[] };
-    if (!Array.isArray(raw)) return out;
-
-    for (const reaction of raw) {
-        if (isEmojiReactionType(reaction)) out.emoji.push(reaction.emoji);
-        else if (isCustomReactionType(reaction)) {
-            out.custom.push(reaction.custom_emoji_id);
-        }
-    }
-
-    return out;
-}
-
-function parseReactionDelta(messageReaction: unknown): ReactionDelta {
-    const added = parseReactionSet(
-        getUnknownProp(messageReaction, 'new_reaction'),
-    );
-    const removed = parseReactionSet(
-        getUnknownProp(messageReaction, 'old_reaction'),
-    );
-
-    return {
-        emojiAdded: added.emoji,
-        emojiRemoved: removed.emoji,
-        customAdded: added.custom,
-        customRemoved: removed.custom,
-    };
-}
-
-function parseReactionCounts(
-    messageReactionCount: unknown,
-): ReactionCountEntry[] {
-    const rawCounts = getUnknownProp(messageReactionCount, 'reactions') ??
-        getUnknownProp(messageReactionCount, 'reaction_counts') ??
-        [];
-    const arr = Array.isArray(rawCounts) ? rawCounts : [];
-
-    return arr.map((reaction: unknown) => {
-        const type = getUnknownProp(reaction, 'type') ?? reaction;
-
-        if (isEmojiReactionType(type)) {
-            return {
-                type: 'emoji' as const,
-                emoji: type.emoji,
-                total: pickCount(reaction) ?? 0,
-            };
-        }
-
-        if (isCustomReactionType(type)) {
-            return {
-                type: 'custom' as const,
-                customEmojiId: type.custom_emoji_id,
-                total: pickCount(reaction) ?? 0,
-            };
-        }
-
-        return undefined;
-    }).filter((entry): entry is ReactionCountEntry => entry !== undefined);
-}
 
 function isSameTopic(left: Message, right: Message): boolean {
     const leftTopic = left.message_thread_id;
@@ -203,7 +107,7 @@ export default async function setupBot(
     config: Config,
     db: DbClient,
 ) {
-    Deno.mkdir('./tmp', { recursive: true });
+    void Deno.mkdir('./tmp', { recursive: true });
 
     const bot = new Bot<SlushaContext>(config.botToken);
 
@@ -249,44 +153,7 @@ export default async function setupBot(
         return next();
     });
 
-    // Reaction updates (added/removed/changed by users)
-    bot.on('message_reaction', async (ctx, next) => {
-        try {
-            const mr = ctx.update.message_reaction;
-            if (!mr) return next();
-            const messageId = mr.message_id;
-            const chat = ctx.chat;
-            if (!chat) return next();
-            const delta = parseReactionDelta(mr);
-
-            const by = ctx.from
-                ? {
-                    id: ctx.from.id,
-                    username: ctx.from.username,
-                    first_name: ctx.from.first_name,
-                }
-                : undefined;
-            await ctx.messages.applyReactionDelta(messageId, delta, by);
-        } catch (error) {
-            logger.warn('Could not process message_reaction: ', error);
-        }
-
-        return next();
-    });
-
-    // Channel reaction counts (anonymous) or forwarded channel posts in groups
-    bot.on('message_reaction_count', async (ctx, next) => {
-        try {
-            const mrc = ctx.update.message_reaction_count;
-            if (!mrc) return next();
-            const messageId = mrc.message_id;
-            const counts = parseReactionCounts(mrc);
-            await ctx.messages.replaceReactionCounts(messageId, counts);
-        } catch (error) {
-            logger.warn('Could not process message_reaction_count: ', error);
-        }
-        return next();
-    });
+    bot.use(reactions);
 
     // TODO: Save other message types, like special events
     bot.on('message', async (ctx, next) => {
