@@ -157,22 +157,6 @@ export default async function setupBot(
 
     // TODO: Save other message types, like special events
     bot.on('message', async (ctx, next) => {
-        // Filter out old messages (1 minute)
-        if (ctx.msg.date - startDate.getTime() / 1000 < 1) {
-            // console.log(
-            //     'Skipping old message',
-            //     ctx.msg.date,
-            //     startDate.getTime() / 1000,
-            // );
-            return;
-        } else {
-            // console.log(
-            //     'Processing message',
-            //     ctx.msg.date,
-            //     startDate.getTime() / 1000,
-            // );
-        }
-
         // Ignore opted out users and commands
         if (
             (await ctx.optOuts.list()).some((u) => u.id === ctx.from?.id) &&

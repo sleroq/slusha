@@ -9,6 +9,7 @@ export class OptOutRepository {
     async list() {
         const rows = await this.db.select().from(chatOptOutUsers)
             .where(eq(chatOptOutUsers.chatId, this.chatId));
+
         return rows.map((u): OptOutUser => ({
             id: u.userId,
             username: u.username ?? undefined,
