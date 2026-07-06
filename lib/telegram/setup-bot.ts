@@ -101,8 +101,6 @@ async function resolveThreadForIncomingMessage(
     };
 }
 
-const startDate = new Date();
-
 export default async function setupBot(
     config: Config,
     db: DbClient,
@@ -215,21 +213,16 @@ export default async function setupBot(
     });
 
     bot.on('my_chat_member', async (ctx, next) => {
-        try {
-            const update = ctx.update.my_chat_member;
-            if (!update) return next();
+        const update = ctx.update.my_chat_member;
 
-            if (canMemberSendTextMessages(update.new_chat_member)) {
-                await ctx.chatConfig.clearDisableRepliesDueToRights();
-                await ctx.chatConfig.clearDisabledReplyRightsLastProbeAt();
-            } else {
-                await ctx.chatConfig.disableRepliesDueToRights();
-                await ctx.chatConfig.setDisabledReplyRightsLastProbeAt(
-                    Date.now(),
-                );
-            }
-        } catch (error) {
-            logger.warn('Could not process my_chat_member update: ', error);
+        if (canMemberSendTextMessages(update.new_chat_member)) {
+            await ctx.chatConfig.clearDisableRepliesDueToRights();
+            await ctx.chatConfig.clearDisabledReplyRightsLastProbeAt();
+        } else {
+            await ctx.chatConfig.disableRepliesDueToRights();
+            await ctx.chatConfig.setDisabledReplyRightsLastProbeAt(
+                Date.now(),
+            );
         }
 
         return next();
