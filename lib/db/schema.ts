@@ -2,7 +2,6 @@ import {
     foreignKey,
     integer,
     primaryKey,
-    real,
     sqliteTable,
     text,
 } from 'drizzle-orm/sqlite-core';
@@ -11,26 +10,26 @@ export const chats = sqliteTable('chats', {
     id: integer('id', { mode: 'number' }).primaryKey(),
     info: text('info').notNull(),
     lastUse: integer('last_use', { mode: 'number' }).notNull().default(0),
-    chatModel: text('chat_model'),
-    messagesToPass: integer('messages_to_pass', { mode: 'number' }),
-    randomReplyProbability: real('random_reply_probability'),
     hateMode: integer('hate_mode', { mode: 'boolean' }),
-    locale: text('locale'),
 });
 
-export const globalConfig = sqliteTable('global_config', {
-    id: integer('id', { mode: 'number' }).primaryKey(),
-    payload: text('payload').notNull(),
+export const configEntries = sqliteTable('config_entries', {
+    scopeKey: text('scope_key').notNull(),
+    key: text('key').notNull(),
+    value: text('value').notNull(),
     updatedBy: integer('updated_by', { mode: 'number' }),
     updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(0),
-});
+}, (table) => [
+    primaryKey({ columns: [table.scopeKey, table.key] }),
+]);
 
-export const chatConfigOverrides = sqliteTable('chat_config_overrides', {
-    chatId: integer('chat_id', { mode: 'number' }).primaryKey().references(
-        () => chats.id,
-        { onDelete: 'cascade' },
-    ),
-    payload: text('payload').notNull(),
+export const configEntryHistory = sqliteTable('config_entry_history', {
+    id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+    scopeKey: text('scope_key').notNull(),
+    key: text('key').notNull(),
+    oldValue: text('old_value'),
+    newValue: text('new_value'),
+    action: text('action', { enum: ['set', 'reset'] }).notNull(),
     updatedBy: integer('updated_by', { mode: 'number' }),
     updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(0),
 });

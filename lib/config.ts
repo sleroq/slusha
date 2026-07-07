@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import defaultConfig from './default-config.ts';
 import { DbClient, getDb } from './db/client.ts';
-import { globalConfig } from './db/schema.ts';
+import { configEntries } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { ALLOWED_REACTIONS } from './telegram/reactions.ts';
 
@@ -122,6 +122,7 @@ export const configSchema = z.object({
     tendToIgnore: z.array(matcherSchema).max(256),
     tendToIgnoreProbability: boundedProbability.default(90),
     randomReplyProbability: boundedProbability.default(1),
+    locale: z.string().min(2).max(32).default('ru'),
     blacklistedReactions: z.array(allowedReactionSchema).max(
         ALLOWED_REACTIONS.length,
     ).default([]),
@@ -192,48 +193,131 @@ function fromStoredUserConfig(input: StoredUserConfig): UserConfig {
     };
 }
 
-export function parseUserConfigPayload(payload: string): UserConfig {
-    const raw = JSON.parse(payload) as StoredUserConfig;
-    const parsed = configSchema.safeParse(fromStoredUserConfig(raw));
-    if (!parsed.success) {
-        throw new Error('Invalid global config in DB: ' + parsed.error.message);
+type PlainObject = Record<string, unknown>;
+
+function isPlainObject(value: unknown): value is PlainObject {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function flattenConfig(value: unknown, prefix = ''): Map<string, unknown> {
+    const result = new Map<string, unknown>();
+    if (!isPlainObject(value)) return result;
+
+    for (const [key, child] of Object.entries(value)) {
+        const path = prefix ? `${prefix}.${key}` : key;
+        if (isPlainObject(child) && !('__regex' in child)) {
+            for (const [childPath, childValue] of flattenConfig(child, path)) {
+                result.set(childPath, childValue);
+            }
+        } else {
+            result.set(path, child);
+        }
     }
-    return parsed.data;
+
+    return result;
+}
+
+function setPath(target: PlainObject, path: string, value: unknown) {
+    const parts = path.split('.');
+    let node = target;
+    for (const part of parts.slice(0, -1)) {
+        const next = node[part];
+        if (!isPlainObject(next)) {
+            node[part] = {};
+        }
+        node = node[part] as PlainObject;
+    }
+    node[parts[parts.length - 1]] = value;
+}
+
+function cloneStoredConfig(input: StoredUserConfig): StoredUserConfig {
+    return JSON.parse(JSON.stringify(input)) as StoredUserConfig;
+}
+
+function mergeStoredRows(
+    base: StoredUserConfig,
+    rows: Array<{ key: string; value: string }>,
+): StoredUserConfig {
+    const supportedKeys = flattenConfig(base);
+    const next = cloneStoredConfig(base);
+
+    for (const row of rows) {
+        if (!supportedKeys.has(row.key)) continue;
+        setPath(next as unknown as PlainObject, row.key, JSON.parse(row.value));
+    }
+
+    return next;
+}
+
+export function chatScopeKey(chatId: number) {
+    return `chat:${chatId}`;
+}
+
+function getStoredDefaults(): StoredUserConfig {
+    const parsedDefaults = configSchema.safeParse(defaultConfig);
+    if (!parsedDefaults.success) {
+        throw new Error(
+            'Invalid built-in default config: ' + parsedDefaults.error.message,
+        );
+    }
+    return toStoredUserConfig(parsedDefaults.data);
+}
+
+export function validateConfigEntryValue(key: string, value: unknown): void {
+    const defaults = getStoredDefaults();
+    const supportedKeys = flattenConfig(defaults);
+    if (!supportedKeys.has(key)) {
+        throw new Error(`Unsupported config key: ${key}`);
+    }
+
+    const next = cloneStoredConfig(defaults);
+    setPath(next as unknown as PlainObject, key, value);
+    const parsed = configSchema.safeParse(fromStoredUserConfig(next));
+    if (!parsed.success) {
+        throw new Error(
+            `Invalid config value for ${key}: ${parsed.error.message}`,
+        );
+    }
 }
 
 export async function getGlobalUserConfig(
     db: DbClient = getDb(),
 ): Promise<UserConfig> {
-    let row = await db.query.globalConfig.findFirst({
-        where: eq(globalConfig.id, 1),
+    const defaults = getStoredDefaults();
+
+    const rows = await db.query.configEntries.findMany({
+        where: eq(configEntries.scopeKey, 'global'),
     });
-
-    if (!row) {
-        const parsedDefaults = configSchema.safeParse(defaultConfig);
-        if (!parsedDefaults.success) {
-            throw new Error(
-                'Invalid built-in default config: ' +
-                    parsedDefaults.error.message,
-            );
-        }
-
-        const now = Date.now();
-        await db.insert(globalConfig).values({
-            id: 1,
-            payload: JSON.stringify(toStoredUserConfig(parsedDefaults.data)),
-            updatedAt: now,
-        });
-
-        row = await db.query.globalConfig.findFirst({
-            where: eq(globalConfig.id, 1),
-        });
+    const stored = mergeStoredRows(defaults, rows);
+    const parsed = configSchema.safeParse(fromStoredUserConfig(stored));
+    if (!parsed.success) {
+        throw new Error(
+            'Invalid global config entries in DB: ' + parsed.error.message,
+        );
     }
 
-    if (!row) {
-        throw new Error('Could not initialize global config');
-    }
+    return parsed.data;
+}
 
-    return parseUserConfigPayload(row.payload);
+export async function getEffectiveUserConfig(
+    options: { chatId?: number } = {},
+    db: DbClient = getDb(),
+): Promise<UserConfig> {
+    const global = await getGlobalUserConfig(db);
+    if (options.chatId === undefined) return global;
+
+    const rows = await db.query.configEntries.findMany({
+        where: eq(configEntries.scopeKey, chatScopeKey(options.chatId)),
+    });
+    const stored = mergeStoredRows(toStoredUserConfig(global), rows);
+    const parsed = configSchema.safeParse(fromStoredUserConfig(stored));
+    if (!parsed.success) {
+        throw new Error(
+            'Invalid effective chat config entries in DB: ' +
+                parsed.error.message,
+        );
+    }
+    return parsed.data;
 }
 
 function resolveEnv() {

@@ -147,6 +147,17 @@ export const configFieldManifest = [
         chatRoles: regularTrustedAndAdmin,
     },
     {
+        path: 'locale',
+        overridePath: 'locale',
+        scope: 'global-chat',
+        storage: 'direct',
+        category: 'general',
+        label: 'Locale',
+        description: 'Preferred language for bot UI in this chat.',
+        globalRoles: adminOnly,
+        chatRoles: regularTrustedAndAdmin,
+    },
+    {
         path: 'responseDelay',
         overridePath: 'responseDelay',
         scope: 'global-chat',

@@ -132,6 +132,7 @@ const defaultConfig = {
         'откисаю, попробуй позже',
     ],
     randomReplyProbability: 1,
+    locale: 'ru',
     tendToIgnore: [
         /^ор+/i,
         /^ору+/i,

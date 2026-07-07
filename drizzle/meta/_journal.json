@@ -71,6 +71,13 @@
             "when": 1773237600000,
             "tag": "0009_reaction_foreign_keys",
             "breakpoints": true
+        },
+        {
+            "idx": 10,
+            "version": "7",
+            "when": 1773324000000,
+            "tag": "0010_config_entries",
+            "breakpoints": true
         }
     ]
 }

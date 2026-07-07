@@ -3,11 +3,12 @@ import type { Chat as TgChat } from 'grammy_types';
 import type { DbClient } from '../db/client.ts';
 import {
     chatCharacters,
-    chatConfigOverrides,
     chatMembers,
     chatMessages,
     chatOptOutUsers,
     chats,
+    configEntries,
+    configEntryHistory,
     messageReactions,
     messageReactionUsers,
 } from '../db/schema.ts';
@@ -41,13 +42,19 @@ export class ChatRepository {
         if (!chatRow) return undefined;
 
         const chatConfig = new ChatConfigRepository(this.db, chatId);
-        const [chatState, character, optOutUsers, chatMembersList] =
-            await Promise.all([
-                chatConfig.getChatState(),
-                characters.get(),
-                optOuts.list(),
-                members.list(),
-            ]);
+        const [
+            chatState,
+            effectiveConfig,
+            character,
+            optOutUsers,
+            chatMembersList,
+        ] = await Promise.all([
+            chatConfig.getChatState(),
+            chatConfig.getEffectiveConfig(),
+            characters.get(),
+            optOuts.list(),
+            members.list(),
+        ]);
 
         return {
             history: [],
@@ -60,7 +67,7 @@ export class ChatRepository {
             messagesToPass: undefined,
             randomReplyProbability: undefined,
             hateMode: chatRow.hateMode ?? undefined,
-            locale: chatRow.locale ?? undefined,
+            locale: effectiveConfig.locale,
             disableRepliesDueToRights: chatState
                 ?.disableRepliesDueToRights,
             disabledReplyRightsLastProbeAt: chatState
@@ -81,7 +88,17 @@ export class ChatRepository {
             { lastUse: number; hateMode: boolean | null; locale: string | null }
         >,
     ) {
-        await this.db.update(chats).set(patch).where(eq(chats.id, chatId));
+        const { locale, ...chatPatch } = patch;
+        if (Object.keys(chatPatch).length > 0) {
+            await this.db.update(chats).set(chatPatch).where(
+                eq(chats.id, chatId),
+            );
+        }
+        if (locale !== undefined) {
+            const chatConfig = new ChatConfigRepository(this.db, chatId);
+            if (locale === null) await chatConfig.resetValue('locale');
+            else await chatConfig.setValue('locale', locale);
+        }
     }
 
     async migrateChat(from: number, to: number, toInfo: TgChat) {
@@ -101,13 +118,18 @@ export class ChatRepository {
             await tx.delete(messageReactionUsers).where(
                 eq(messageReactionUsers.chatId, to),
             );
+            await tx.delete(configEntries).where(
+                eq(configEntries.scopeKey, `chat:${to}`),
+            );
+            await tx.delete(configEntryHistory).where(
+                eq(configEntryHistory.scopeKey, `chat:${to}`),
+            );
             await tx.delete(chats).where(eq(chats.id, to));
             await tx.insert(chats).values({
                 id: to,
                 info: JSON.stringify(toInfo),
                 lastUse: fromChat.lastUse,
                 hateMode: fromChat.hateMode,
-                locale: fromChat.locale,
             });
             await tx.update(chatMembers).set({ chatId: to }).where(
                 eq(chatMembers.chatId, from),
@@ -127,8 +149,15 @@ export class ChatRepository {
             await tx.update(chatCharacters).set({ chatId: to }).where(
                 eq(chatCharacters.chatId, from),
             );
-            await tx.update(chatConfigOverrides).set({ chatId: to }).where(
-                eq(chatConfigOverrides.chatId, from),
+            await tx.update(configEntries).set({
+                scopeKey: `chat:${to}`,
+            }).where(
+                eq(configEntries.scopeKey, `chat:${from}`),
+            );
+            await tx.update(configEntryHistory).set({
+                scopeKey: `chat:${to}`,
+            }).where(
+                eq(configEntryHistory.scopeKey, `chat:${from}`),
             );
             await tx.delete(chats).where(eq(chats.id, from));
         });
