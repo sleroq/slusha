@@ -15,12 +15,13 @@
     "jsr:@std/path@^1.1.5": "1.1.5",
     "npm:@ai-sdk/google@^4.0.8": "4.0.8_zod@4.4.3",
     "npm:@ai-sdk/openai-compatible@^3.0.5": "3.0.5_zod@4.4.3",
-    "npm:@ai-sdk/otel@^1.0.16": "1.0.16_zod@4.4.3",
     "npm:@google/genai@^2.10.0": "2.10.0",
     "npm:@grammyjs/i18n@^1.1.2": "1.1.2_grammy@1.44.0",
     "npm:@grammyjs/ratelimiter@^1.2.1": "1.2.1",
     "npm:@grammyjs/runner@^2.0.3": "2.0.3_grammy@1.44.0",
     "npm:@grammyjs/types@^3.28.0": "3.28.0",
+    "npm:@langfuse/otel@^5.9.1": "5.9.1_@opentelemetry+api@1.9.1_@opentelemetry+core@2.9.0__@opentelemetry+api@1.9.1_@opentelemetry+exporter-trace-otlp-http@0.220.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-trace-base@2.9.0__@opentelemetry+api@1.9.1",
+    "npm:@langfuse/vercel-ai-sdk@^5.9.1": "5.9.1_@opentelemetry+api@1.9.1_ai@7.0.16__zod@4.4.3_zod@4.4.3",
     "npm:@libsql/client@~0.17.4": "0.17.4",
     "npm:@opentelemetry/auto-instrumentations-node@0.78": "0.78.0_@opentelemetry+api@1.9.1_@opentelemetry+core@2.9.0__@opentelemetry+api@1.9.1",
     "npm:@opentelemetry/sdk-node@0.220": "0.220.0_@opentelemetry+api@1.9.1",
@@ -31,7 +32,6 @@
     "npm:grammy@^1.44.0": "1.44.0",
     "npm:isomorphic-dompurify@^3.18.0": "3.18.0",
     "npm:ky@^2.0.2": "2.0.2",
-    "npm:langfuse-vercel@^3.38.20": "3.38.20_ai@7.0.16__zod@4.4.3_zod@4.4.3",
     "npm:prom-client@15.1.3": "15.1.3",
     "npm:remark-html@^16.0.1": "16.0.1",
     "npm:remark-parse@11": "11.0.0",
@@ -88,8 +88,17 @@
     "@ai-sdk/gateway@4.0.12_zod@4.4.3": {
       "integrity": "sha512-Y7Fy8xJwPz7ZC0DhSQG3HIVk+drup42hrIj6yqKlib3CxwiR0F7nYyUI8+kPrEtbZEoyKoRstvT4/o0HEyFBHA==",
       "dependencies": [
-        "@ai-sdk/provider",
-        "@ai-sdk/provider-utils",
+        "@ai-sdk/provider@4.0.2",
+        "@ai-sdk/provider-utils@5.0.5_zod@4.4.3",
+        "@vercel/oidc",
+        "zod"
+      ]
+    },
+    "@ai-sdk/gateway@4.0.2_zod@4.4.3": {
+      "integrity": "sha512-Jz1BiiTSvhDsCBJrkFRSqLHDRMVjFtYk9GdbSi3UOqY+/epza+oIESMDzfN4m+YHT/1IYmNEmxaMfjXOvxKDjQ==",
+      "dependencies": [
+        "@ai-sdk/provider@4.0.0",
+        "@ai-sdk/provider-utils@5.0.0_zod@4.4.3",
         "@vercel/oidc",
         "zod"
       ]
@@ -97,35 +106,51 @@
     "@ai-sdk/google@4.0.8_zod@4.4.3": {
       "integrity": "sha512-GELd0RkltieuODzr6tfnEOIufeooctYpGUNxujeh+zrChbHUkX2K6Li4h2EAfizctkY4k3JvC93dU9eh2QxzoQ==",
       "dependencies": [
-        "@ai-sdk/provider",
-        "@ai-sdk/provider-utils",
+        "@ai-sdk/provider@4.0.2",
+        "@ai-sdk/provider-utils@5.0.5_zod@4.4.3",
         "zod"
       ]
     },
     "@ai-sdk/openai-compatible@3.0.5_zod@4.4.3": {
       "integrity": "sha512-4UtDxT6Ga7U225o5fBEgtCFZHba4/iTDXRqMrU62yEfTrFks4o+F4jt0D3OWmUasR9LPFzLy0KnEITxFDtc89g==",
       "dependencies": [
-        "@ai-sdk/provider",
-        "@ai-sdk/provider-utils",
+        "@ai-sdk/provider@4.0.2",
+        "@ai-sdk/provider-utils@5.0.5_zod@4.4.3",
         "zod"
       ]
     },
-    "@ai-sdk/otel@1.0.16_zod@4.4.3": {
-      "integrity": "sha512-ms63498/CihyVdLI5P0YhYlTWGDDk29wjGFrPngN4PJ9gx15UWQ9mKU2fR63O/8NNnPZogNcct54WWjh8tgS6g==",
+    "@ai-sdk/otel@1.0.2_zod@4.4.3": {
+      "integrity": "sha512-vmuuwOxJ5OuwMYDktABTLb9V33hwR2k77QIDPZ8mSHSo04seT88IXCmzZwLjTskHfIa5C9IRizzNy6sr2qOQWQ==",
       "dependencies": [
-        "@ai-sdk/provider",
+        "@ai-sdk/provider@4.0.0",
         "@opentelemetry/api",
-        "ai"
+        "ai@7.0.2_zod@4.4.3"
+      ]
+    },
+    "@ai-sdk/provider-utils@5.0.0_zod@4.4.3": {
+      "integrity": "sha512-zj66M02jc6ASYwIgWZowsooDUwaVngeNZQ3H10GwcPMZ+KR6gHMhcUuKl6tkai+JPXTKDyHY1pnszuxRtw2D4A==",
+      "dependencies": [
+        "@ai-sdk/provider@4.0.0",
+        "@standard-schema/spec",
+        "@workflow/serde",
+        "eventsource-parser",
+        "zod"
       ]
     },
     "@ai-sdk/provider-utils@5.0.5_zod@4.4.3": {
       "integrity": "sha512-oI0t3dvCoqWNV1I8o1Rybi2DXDvHES5r/TrwtJW90tuFLVepgJlftPxrcjh8vaSvjqC2diTuA2vXyjKAyHJm4A==",
       "dependencies": [
-        "@ai-sdk/provider",
+        "@ai-sdk/provider@4.0.2",
         "@standard-schema/spec",
         "@workflow/serde",
         "eventsource-parser",
         "zod"
+      ]
+    },
+    "@ai-sdk/provider@4.0.0": {
+      "integrity": "sha512-fr9Gs89prDWiuox/T+kCA+i2cJkHpxU5S+tr4megjTzRC27ZsvFhwjU/+XrqqMbvBUlfmXxTOYWy8ng45dsjIg==",
+      "dependencies": [
+        "json-schema"
       ]
     },
     "@ai-sdk/provider@4.0.2": {
@@ -663,6 +688,31 @@
     },
     "@js-sdsl/ordered-map@4.4.2": {
       "integrity": "sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw=="
+    },
+    "@langfuse/core@5.9.1_@opentelemetry+api@1.9.1": {
+      "integrity": "sha512-KvyAskAO+2ixJwr9wy148ttR/Zn3oapvOJ2Br4Xcp6zhDpjSIIGB4jW/jkp53/KU9MyEHj0RSFPK/yKoxLC4KA==",
+      "dependencies": [
+        "@opentelemetry/api"
+      ]
+    },
+    "@langfuse/otel@5.9.1_@opentelemetry+api@1.9.1_@opentelemetry+core@2.9.0__@opentelemetry+api@1.9.1_@opentelemetry+exporter-trace-otlp-http@0.220.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-trace-base@2.9.0__@opentelemetry+api@1.9.1": {
+      "integrity": "sha512-viM5Qq/AIPZPXfO7YdSmDHxEDSrNU/MyGzuE9zKA6hGBII1iLowU+qL99O+TjnXqxoADqlNibhY2pg1/WTIPcw==",
+      "dependencies": [
+        "@langfuse/core",
+        "@opentelemetry/api",
+        "@opentelemetry/core",
+        "@opentelemetry/exporter-trace-otlp-http",
+        "@opentelemetry/sdk-trace-base"
+      ]
+    },
+    "@langfuse/vercel-ai-sdk@5.9.1_@opentelemetry+api@1.9.1_ai@7.0.16__zod@4.4.3_zod@4.4.3": {
+      "integrity": "sha512-gZPZJ3JXYTkT7W61VhbNHXgn/88+laoAQGMc082ESeXBwfuMVVPKDueZzM0xy6s0BTtPLW5WmbJ5NkLNCtR3Nw==",
+      "dependencies": [
+        "@ai-sdk/otel",
+        "@langfuse/core",
+        "@opentelemetry/api",
+        "ai@7.0.16_zod@4.4.3"
+      ]
     },
     "@libsql/client@0.17.4": {
       "integrity": "sha512-lYayFWasDV78A+TjlEhr6ubb3odBV6OHjb+wdp8VQcyWWAEIjuwbCHaraEUS4m4yWoo0BvZo96It4VdzZRmRWw==",
@@ -1655,9 +1705,18 @@
     "ai@7.0.16_zod@4.4.3": {
       "integrity": "sha512-OuA+uz6ZUVId+SVeB5bThi25Ofee/FmLvffAA368tlgqYCe2qAhqZUpfHL0dd9QC/iPiszdvCQYENJavSo/0gw==",
       "dependencies": [
-        "@ai-sdk/gateway",
-        "@ai-sdk/provider",
-        "@ai-sdk/provider-utils",
+        "@ai-sdk/gateway@4.0.12_zod@4.4.3",
+        "@ai-sdk/provider@4.0.2",
+        "@ai-sdk/provider-utils@5.0.5_zod@4.4.3",
+        "zod"
+      ]
+    },
+    "ai@7.0.2_zod@4.4.3": {
+      "integrity": "sha512-VMU08jHIDJnnKDrbC9AFa5ZsPpOTfAPRLvTRHtJk4FGAoeldmJROMxvZ2ak5lCjEJ2GP2OLPQbMRyEK8w0+S4A==",
+      "dependencies": [
+        "@ai-sdk/gateway@4.0.2_zod@4.4.3",
+        "@ai-sdk/provider@4.0.0",
+        "@ai-sdk/provider-utils@5.0.0_zod@4.4.3",
         "zod"
       ]
     },
@@ -2120,26 +2179,6 @@
     "ky@2.0.2": {
       "integrity": "sha512-/GmXpo9F9W+f8n4Ivr2iH+7h7wL7jLbLKWkMlpflcCRb6kGjBfTlASEXaZ9qUgNTn4VgS0P2pwxxzQ4EM6Ulgg=="
     },
-    "langfuse-core@3.38.20": {
-      "integrity": "sha512-zBKVmQN/1oT5VWZUBYlWzvokIlkC/6mnpgr/2atMyTeAm+jR3ia7w2iJMjlrF5/oG8ukO1s8+LDRCzJpF1QeEA==",
-      "dependencies": [
-        "mustache"
-      ]
-    },
-    "langfuse-vercel@3.38.20_ai@7.0.16__zod@4.4.3_zod@4.4.3": {
-      "integrity": "sha512-ZDG/m1O+q18r59G20I+nR0r1yTl4qbbJwTxpcJkuWtHV/GYXfl+8iyztKy32cq+Om2snSQVDNvXpPG/tyfkn/w==",
-      "dependencies": [
-        "ai",
-        "langfuse",
-        "langfuse-core"
-      ]
-    },
-    "langfuse@3.38.20": {
-      "integrity": "sha512-MAmBAASSzJtmK1O9HQegA1mFsQhT8Yf+OJRGvE7FXkyv3g/eiBE0glLD0Ohg3pkxhoPdggM5SejK7ue9ctlaMA==",
-      "dependencies": [
-        "langfuse-core"
-      ]
-    },
     "libsql@0.5.29": {
       "integrity": "sha512-8lMP8iMgiBzzoNbAPQ59qdVcj6UaE/Vnm+fiwX4doX4Narook0a4GPKWBEv+CR8a1OwbfkgL18uBfBjWdF0Fzg==",
       "dependencies": [
@@ -2383,10 +2422,6 @@
     },
     "ms@2.1.3": {
       "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
-    },
-    "mustache@4.2.0": {
-      "integrity": "sha512-71ippSywq5Yb7/tVYyGbkBggbU8H3u5Rz56fH60jGFgr8uHwxs+aSKeqmluIVzM0m0kB7xQjKS6qPfd0b2ZoqQ==",
-      "bin": true
     },
     "node-domexception@1.0.0": {
       "integrity": "sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==",
@@ -2979,12 +3014,13 @@
       "jsr:@std/fs@^1.0.24",
       "npm:@ai-sdk/google@^4.0.8",
       "npm:@ai-sdk/openai-compatible@^3.0.5",
-      "npm:@ai-sdk/otel@^1.0.16",
       "npm:@google/genai@^2.10.0",
       "npm:@grammyjs/i18n@^1.1.2",
       "npm:@grammyjs/ratelimiter@^1.2.1",
       "npm:@grammyjs/runner@^2.0.3",
       "npm:@grammyjs/types@^3.28.0",
+      "npm:@langfuse/otel@^5.9.1",
+      "npm:@langfuse/vercel-ai-sdk@^5.9.1",
       "npm:@libsql/client@~0.17.4",
       "npm:@opentelemetry/auto-instrumentations-node@0.78",
       "npm:@opentelemetry/sdk-node@0.220",
@@ -2994,7 +3030,6 @@
       "npm:grammy@^1.44.0",
       "npm:isomorphic-dompurify@^3.18.0",
       "npm:ky@^2.0.2",
-      "npm:langfuse-vercel@^3.38.20",
       "npm:prom-client@15.1.3",
       "npm:remark-html@^16.0.1",
       "npm:remark-parse@11",
