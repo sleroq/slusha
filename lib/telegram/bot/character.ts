@@ -440,7 +440,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
             prompt:
                 `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
                 'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.',
-            experimental_telemetry: {
+            telemetry: {
                 functionId: 'character-names',
             },
             buildTelemetryMetadata: (generationPolicy) =>

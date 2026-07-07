@@ -6,7 +6,7 @@ import { supportedTypesMap } from './history.ts';
 import { exists } from '@std/fs';
 import { Message, PhotoSize, Sticker } from 'grammy_types';
 import { GoogleGenAI } from '@google/genai';
-import { ImagePart, ModelMessage } from 'ai';
+import { FilePart, ModelMessage } from 'ai';
 import type { BotCharacter } from './persistence/types.ts';
 // import { encodeBase64 } from "@std/encoding/base64";
 
@@ -163,12 +163,12 @@ export async function getImageContent(
     token: string,
     fileId: string,
     mediaType: string,
-): Promise<ImagePart> {
+): Promise<FilePart> {
     const file = await downloadFile(api, token, fileId, mediaType);
 
     return {
-        type: 'image',
-        image: file,
+        type: 'file',
+        data: file,
         mediaType,
     };
 }

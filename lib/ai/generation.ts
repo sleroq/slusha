@@ -52,9 +52,8 @@ export async function generateLlmText(
         topK: config.topK,
         topP: config.topP,
         maxOutputTokens: generationPolicy.maxOutputTokens,
-        experimental_telemetry: {
-            isEnabled: true,
-            functionId: options.experimental_telemetry?.functionId,
+        telemetry: {
+            functionId: options.telemetry?.functionId,
             metadata: buildTelemetryMetadata(generationPolicy),
         },
     } as GenerateTextOptions;

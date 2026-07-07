@@ -17,18 +17,26 @@ export async function startTelemetry(): Promise<NodeSDK | undefined> {
     }
 
     // Not loading telemetry dependencies into memory if it's not configured
-    const [{ NodeSDK }, { getNodeAutoInstrumentations }, { LangfuseExporter }] =
-        await Promise.all([
-            import('@opentelemetry/sdk-node'),
-            import('@opentelemetry/auto-instrumentations-node'),
-            import('langfuse-vercel'),
-        ]);
+    const [
+        { NodeSDK },
+        { getNodeAutoInstrumentations },
+        { LangfuseExporter },
+        { registerTelemetry },
+        { OpenTelemetry },
+    ] = await Promise.all([
+        import('@opentelemetry/sdk-node'),
+        import('@opentelemetry/auto-instrumentations-node'),
+        import('langfuse-vercel'),
+        import('ai'),
+        import('@ai-sdk/otel'),
+    ]);
 
     const sdk = new NodeSDK({
         traceExporter: new LangfuseExporter(),
         instrumentations: [getNodeAutoInstrumentations()],
     });
     sdk.start();
+    registerTelemetry(new OpenTelemetry());
     return sdk;
 }
 

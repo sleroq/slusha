@@ -15,6 +15,7 @@
     "jsr:@std/path@^1.1.5": "1.1.5",
     "npm:@ai-sdk/google@^4.0.8": "4.0.8_zod@4.4.3",
     "npm:@ai-sdk/openai-compatible@^3.0.5": "3.0.5_zod@4.4.3",
+    "npm:@ai-sdk/otel@^1.0.16": "1.0.16_zod@4.4.3",
     "npm:@google/genai@^2.10.0": "2.10.0",
     "npm:@grammyjs/i18n@^1.1.2": "1.1.2_grammy@1.44.0",
     "npm:@grammyjs/ratelimiter@^1.2.1": "1.2.1",
@@ -107,6 +108,14 @@
         "@ai-sdk/provider",
         "@ai-sdk/provider-utils",
         "zod"
+      ]
+    },
+    "@ai-sdk/otel@1.0.16_zod@4.4.3": {
+      "integrity": "sha512-ms63498/CihyVdLI5P0YhYlTWGDDk29wjGFrPngN4PJ9gx15UWQ9mKU2fR63O/8NNnPZogNcct54WWjh8tgS6g==",
+      "dependencies": [
+        "@ai-sdk/provider",
+        "@opentelemetry/api",
+        "ai"
       ]
     },
     "@ai-sdk/provider-utils@5.0.5_zod@4.4.3": {
@@ -2970,6 +2979,7 @@
       "jsr:@std/fs@^1.0.24",
       "npm:@ai-sdk/google@^4.0.8",
       "npm:@ai-sdk/openai-compatible@^3.0.5",
+      "npm:@ai-sdk/otel@^1.0.16",
       "npm:@google/genai@^2.10.0",
       "npm:@grammyjs/i18n@^1.1.2",
       "npm:@grammyjs/ratelimiter@^1.2.1",

@@ -503,9 +503,9 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             ? []
             : await ctx.members.getActiveMembers();
 
-        const buildMessagesForAttempt = async (
+        const buildGenerationInputForAttempt = async (
             plan: GenerationAttemptPlan,
-        ): Promise<ModelMessage[]> => {
+        ): Promise<{ instructions: string; messages: ModelMessage[] }> => {
             const messages: ModelMessage[] = [];
 
             let prompt = (effectiveConfig.ai.prePrompt ?? '') + '\n\n';
@@ -555,11 +555,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             }
             prompt += `\n\n${buildTargetRefsPrompt(targetRefs)}`;
 
-            messages.push({
-                role: 'system',
-                content: prompt,
-            });
-
             const includeBinaryAttachments =
                 effectiveConfig.ai.includeAttachmentsInHistory &&
                 parsedModel.provider === 'google';
@@ -593,11 +588,14 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 content: finalPrompt,
             });
 
-            return messages;
+            return {
+                instructions: prompt,
+                messages,
+            };
         };
 
         const generateStructuredActionsOutput = async (
-            messages: ModelMessage[],
+            input: { instructions: string; messages: ModelMessage[] },
         ): Promise<ChatEntry[]> => {
             const result = await generateLlmText({
                 modelRef,
@@ -613,8 +611,9 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                     toolName: 'send_chat_actions',
                 },
                 stopWhen: hasToolCall('send_chat_actions'),
-                messages,
-                experimental_telemetry: {
+                instructions: input.instructions,
+                messages: input.messages,
+                telemetry: {
                     functionId: 'user-message',
                 },
                 buildTelemetryMetadata: (generationPolicy) =>
@@ -640,7 +639,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                         toolCalls: result.toolCalls.map((call) =>
                             call.toolName
                         ),
-                        usage: result.totalUsage,
+                        usage: result.usage,
                     },
                 );
                 throw new Error(
@@ -653,9 +652,12 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
         let generationError: unknown;
 
         for (const attempt of attempts) {
-            let attemptMessages: ModelMessage[];
+            let generationInput: {
+                instructions: string;
+                messages: ModelMessage[];
+            };
             try {
-                attemptMessages = await buildMessagesForAttempt(attempt);
+                generationInput = await buildGenerationInputForAttempt(attempt);
             } catch (error) {
                 generationError = error;
                 logger.warn('Could not get history for generation attempt', {
@@ -668,7 +670,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
 
             try {
                 const generatedOutput = await generateStructuredActionsOutput(
-                    attemptMessages,
+                    generationInput,
                 );
                 if (
                     hasReservedMessageToken(

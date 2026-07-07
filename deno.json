@@ -35,6 +35,7 @@
         "@std/fs": "jsr:@std/fs@^1.0.24",
         "ai": "npm:ai@^7.0.16",
         "@ai-sdk/google": "npm:@ai-sdk/google@^4.0.8",
+        "@ai-sdk/otel": "npm:@ai-sdk/otel@^1.0.16",
         "@ai-sdk/openai-compatible": "npm:@ai-sdk/openai-compatible@^3.0.5",
         "@libsql/client": "npm:@libsql/client@^0.17.4",
         "@deno-library/logger": "jsr:@deno-library/logger@^1.2.0",
