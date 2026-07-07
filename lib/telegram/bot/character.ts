@@ -9,23 +9,24 @@ import { getCharacter, getCharacters, pageSize } from '../../charhub/api.ts';
 import { sliceMessage } from '../../helpers.ts';
 import logger from '../../logger.ts';
 import { InlineQueryResultArticle } from 'grammy_types';
-import { hasToolCall, tool } from 'ai';
+import { generateText, hasToolCall, tool } from 'ai';
 import z from 'zod';
 import { limit } from 'grammy_ratelimiter';
 import DOMPurify from 'isomorphic-dompurify';
 import remarkHtml from 'remark-html';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
-import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
-import { generateLlmText } from '../../ai/generation.ts';
+import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { CharacterRepository } from '../../persistence/characters.ts';
 import { MessageRepository } from '../../persistence/messages.ts';
 
+const characterNamesInputSchema = z.object({
+    names: z.array(z.string()),
+});
+
 const characterNamesTool = tool({
     description: 'Submit generated character name variants.',
-    inputSchema: z.object({
-        names: z.array(z.string()),
-    }),
+    inputSchema: characterNamesInputSchema,
 });
 
 const bot = new Composer<SlushaContext>();
@@ -424,11 +425,20 @@ bot.callbackQuery(/set.*/, async (ctx) => {
 
     let names: string[] = [];
     try {
-        const result = await generateLlmText({
+        const generationPolicy = resolveGenerationPolicy({
             modelRef: model,
             config,
             task: 'character',
             expectsStructuredOutput: true,
+        });
+
+        const result = await generateText({
+            model: generationPolicy.model,
+            providerOptions: generationPolicy.providerOptions,
+            temperature: config.temperature,
+            topK: config.topK,
+            topP: config.topP,
+            maxOutputTokens: generationPolicy.maxOutputTokens,
             tools: {
                 submit_character_names: characterNamesTool,
             },
@@ -443,16 +453,6 @@ bot.callbackQuery(/set.*/, async (ctx) => {
             telemetry: {
                 functionId: 'character-names',
             },
-            buildTelemetryMetadata: (generationPolicy) =>
-                buildGenerationTelemetryMetadata({
-                    sessionId: chatId.toString(),
-                    userId: '',
-                    tags: ['character'],
-                    temperature: config.temperature,
-                    topK: config.topK,
-                    topP: config.topP,
-                    policy: generationPolicy,
-                }),
         });
         const toolCall = result.toolCalls.find((call) =>
             call.toolName === 'submit_character_names'
@@ -460,7 +460,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         if (!toolCall) {
             throw new Error('Character names tool call missing');
         }
-        names = toolCall.input.names;
+        names = characterNamesInputSchema.parse(toolCall.input).names;
     } catch (error) {
         logger.error(error, 'Error getting names for character');
         return await ctx.reply(ctx.t('character-names-error'));

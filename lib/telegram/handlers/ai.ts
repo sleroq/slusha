@@ -1,7 +1,13 @@
 import { Bot, Composer } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
 import logger from '../../logger.ts';
-import { APICallError, hasToolCall, ModelMessage, tool } from 'ai';
+import {
+    APICallError,
+    generateText,
+    hasToolCall,
+    ModelMessage,
+    tool,
+} from 'ai';
 import { makeHistory } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
@@ -31,10 +37,8 @@ import {
 import { canonicalizeReaction, resolveEnabledReactions } from '../reactions.ts';
 import { isMissingSendTextRightsError } from '../reply-rights.ts';
 import { parseModelRef } from '../../ai/model-ref.ts';
-import { buildGenerationTelemetryMetadata } from '../../ai/telemetry-metadata.ts';
 import { buildLanguageProtocol } from '../../ai/language-protocol.ts';
-import { generateLlmText } from '../../ai/generation.ts';
-import type { ResolvedGenerationPolicy } from '../../ai/generation-policy.ts';
+import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 
 const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
@@ -167,25 +171,6 @@ function hasReservedMessageToken(
 function isReservedMessageTokenError(error: unknown): boolean {
     return error instanceof Error &&
         error.message === RESERVED_MESSAGE_TOKEN_ERROR;
-}
-
-function buildTelemetryMetadata(
-    ctx: SlushaContext,
-    chatName: string,
-    tags: string[],
-    effectiveConfig: UserConfig,
-    policy: ResolvedGenerationPolicy,
-) {
-    return buildGenerationTelemetryMetadata({
-        sessionId: ctx.chat?.id.toString() ?? '',
-        userId: ctx.from?.id.toString() ?? '',
-        chatName,
-        tags,
-        temperature: effectiveConfig.ai.temperature,
-        topK: effectiveConfig.ai.topK,
-        topP: effectiveConfig.ai.topP,
-        policy,
-    });
 }
 
 type EffectiveConfig = UserConfig;
@@ -597,11 +582,20 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
         const generateStructuredActionsOutput = async (
             input: { instructions: string; messages: ModelMessage[] },
         ): Promise<ChatEntry[]> => {
-            const result = await generateLlmText({
+            const generationPolicy = resolveGenerationPolicy({
                 modelRef,
                 config: effectiveConfig.ai,
                 task: 'chat',
                 expectsStructuredOutput: true,
+            });
+
+            const result = await generateText({
+                model: generationPolicy.model,
+                providerOptions: generationPolicy.providerOptions,
+                temperature: effectiveConfig.ai.temperature,
+                topK: effectiveConfig.ai.topK,
+                topP: effectiveConfig.ai.topP,
+                maxOutputTokens: generationPolicy.maxOutputTokens,
                 maxRetries: maxGenerationRetries,
                 tools: {
                     send_chat_actions: sendChatActionsTool,
@@ -616,14 +610,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 telemetry: {
                     functionId: 'user-message',
                 },
-                buildTelemetryMetadata: (generationPolicy) =>
-                    buildTelemetryMetadata(
-                        ctx,
-                        chatName,
-                        tags,
-                        effectiveConfig,
-                        generationPolicy,
-                    ),
             });
 
             const entries = parseSendChatActionsEntries(result.toolCalls);

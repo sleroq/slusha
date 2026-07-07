@@ -1,6 +1,6 @@
 import { google } from '@ai-sdk/google';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import type { LanguageModel } from 'ai';
+import type { generateText, LanguageModel } from 'ai';
 import { UserConfig } from '../config.ts';
 import { ModelProvider, parseModelRef } from './model-ref.ts';
 
@@ -33,7 +33,9 @@ interface GenerationPolicyInput {
     expectsStructuredOutput: boolean;
 }
 
-type ProviderOptions = Record<string, unknown>;
+type ProviderOptions = NonNullable<
+    Parameters<typeof generateText>[0]['providerOptions']
+>;
 
 function isGemini3Model(modelId: string): boolean {
     return modelId.startsWith('gemini-3');
