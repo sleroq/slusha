@@ -62,8 +62,8 @@ export function buildGenerationTelemetryMetadata(
     );
     assignIfDefined(
         metadata,
-        'llm.openrouter.reasoning_max_tokens',
-        input.policy.telemetry.openrouterReasoningMaxTokens,
+        'llm.openrouter.reasoning_effort',
+        input.policy.telemetry.openrouterReasoningEffort,
     );
     assignIfDefined(
         metadata,

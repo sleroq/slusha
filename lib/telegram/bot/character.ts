@@ -29,6 +29,38 @@ const characterNamesTool = tool({
     inputSchema: characterNamesInputSchema,
 });
 
+function parseCharacterNamesText(text: string): string[] | undefined {
+    const trimmed = text.trim();
+    if (!trimmed) return undefined;
+
+    const candidates = [trimmed];
+    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fenced?.[1]) {
+        candidates.push(fenced[1].trim());
+    }
+
+    const objectStart = trimmed.indexOf('{');
+    const objectEnd = trimmed.lastIndexOf('}');
+    if (objectStart >= 0 && objectEnd > objectStart) {
+        candidates.push(trimmed.slice(objectStart, objectEnd + 1));
+    }
+
+    for (const candidate of candidates) {
+        try {
+            const parsed = JSON.parse(candidate);
+            const namesObject = characterNamesInputSchema.safeParse(parsed);
+            if (namesObject.success) return namesObject.data.names;
+
+            const namesArray = z.array(z.string()).safeParse(parsed);
+            if (namesArray.success) return namesArray.data;
+        } catch {
+            // Try the next common JSON wrapping style.
+        }
+    }
+
+    return undefined;
+}
+
 const bot = new Composer<SlushaContext>();
 
 bot.command('character', async (ctx) => {
@@ -428,39 +460,74 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         const generationPolicy = resolveGenerationPolicy({
             modelRef: model,
             config,
+            openrouterApiKey: ctx.info.openrouterApiKey,
+            opencodeToken: ctx.info.opencodeToken,
             task: 'character',
             expectsStructuredOutput: true,
         });
 
-        const result = await generateText({
-            model: generationPolicy.model,
-            providerOptions: generationPolicy.providerOptions,
-            temperature: config.temperature,
-            topK: config.topK,
-            topP: config.topP,
-            maxOutputTokens: generationPolicy.maxOutputTokens,
-            tools: {
-                submit_character_names: characterNamesTool,
-            },
-            toolChoice: {
-                type: 'tool',
-                toolName: 'submit_character_names',
-            },
-            stopWhen: hasToolCall('submit_character_names'),
-            prompt:
-                `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
-                'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.',
-            telemetry: {
-                functionId: 'character-names',
-            },
-        });
-        const toolCall = result.toolCalls.find((call) =>
-            call.toolName === 'submit_character_names'
-        );
-        if (!toolCall) {
-            throw new Error('Character names tool call missing');
+        const prompt =
+            `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
+            'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.';
+        const runOpencodeJsonFallback = async (): Promise<string[]> => {
+            const fallback = await generateText({
+                model: generationPolicy.model,
+                temperature: config.temperature,
+                topP: config.topP,
+                maxOutputTokens: generationPolicy.maxOutputTokens,
+                prompt: prompt +
+                    ' Верни только JSON объект вида {"names":["..."]}, без markdown и пояснений.',
+                telemetry: {
+                    functionId: 'character-names-opencode-json-fallback',
+                },
+            });
+            const parsedNames = parseCharacterNamesText(fallback.text);
+            if (parsedNames) return parsedNames;
+            throw new Error('Opencode character names JSON fallback invalid');
+        };
+
+        let result;
+        if (
+            generationPolicy.provider === 'opencode' &&
+            generationPolicy.telemetry.modelId.startsWith('deepseek-v4')
+        ) {
+            names = await runOpencodeJsonFallback();
+        } else {
+            result = await generateText({
+                model: generationPolicy.model,
+                providerOptions: generationPolicy.providerOptions,
+                temperature: config.temperature,
+                topK: config.topK,
+                topP: config.topP,
+                maxOutputTokens: generationPolicy.maxOutputTokens,
+                tools: {
+                    submit_character_names: characterNamesTool,
+                },
+                toolChoice: {
+                    type: 'tool',
+                    toolName: 'submit_character_names',
+                },
+                stopWhen: hasToolCall('submit_character_names'),
+                prompt,
+                telemetry: {
+                    functionId: 'character-names',
+                },
+            });
         }
-        names = characterNamesInputSchema.parse(toolCall.input).names;
+
+        if (names.length === 0) {
+            if (!result) {
+                throw new Error('Character names generation result missing');
+            }
+
+            const toolCall = result.toolCalls.find((call) =>
+                call.toolName === 'submit_character_names'
+            );
+            if (!toolCall) {
+                throw new Error('Character names tool call missing');
+            }
+            names = characterNamesInputSchema.parse(toolCall.input).names;
+        }
     } catch (error) {
         logger.error(error, 'Error getting names for character');
         return await ctx.reply(ctx.t('character-names-error'));

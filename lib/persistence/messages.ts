@@ -62,7 +62,10 @@ export class MessageRepository {
         if (limit <= 0) return [];
         const rows = await this.db.select().from(chatMessages)
             .where(eq(chatMessages.chatId, this.chatId))
-            .orderBy(desc(chatMessages.messageId))
+            .orderBy(
+                desc(sql<number>`json_extract(${chatMessages.info}, '$.date')`),
+                desc(chatMessages.messageId),
+            )
             .limit(limit);
         rows.reverse();
         return this.withReactions(rows);
@@ -187,6 +190,7 @@ export class MessageRepository {
         delta: ReactionDelta,
         by?: Pick<User, 'id' | 'username' | 'first_name'>,
     ) {
+        if (!(await this.messageExists(messageId))) return;
         await this.reactions.applyDelta(
             messageId,
             delta,
@@ -198,10 +202,23 @@ export class MessageRepository {
         messageId: number,
         counts: ReactionCountEntry[],
     ) {
+        if (!(await this.messageExists(messageId))) return;
         await this.reactions.replaceCounts(
             messageId,
             counts,
         );
+    }
+
+    private async messageExists(messageId: number): Promise<boolean> {
+        const rows = await this.db
+            .select({ messageId: chatMessages.messageId })
+            .from(chatMessages)
+            .where(and(
+                eq(chatMessages.chatId, this.chatId),
+                eq(chatMessages.messageId, messageId),
+            ))
+            .limit(1);
+        return rows.length > 0;
     }
 
     private async withReactions(rows: (typeof chatMessages.$inferSelect)[]) {

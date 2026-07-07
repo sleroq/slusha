@@ -18,6 +18,7 @@ import {
     ChatEntry,
     isReactEntry,
     isTextEntry,
+    parseChatEntriesFromUnknown,
 } from '../../ai/schema.ts';
 import {
     annotateHistoryWithTargetRefs,
@@ -154,6 +155,35 @@ function hasReservedMessageToken(entries: ChatEntry[]): boolean {
 function isReservedMessageTokenError(error: unknown): boolean {
     return error instanceof Error &&
         error.message === RESERVED_MESSAGE_TOKEN_ERROR;
+}
+
+function parseJsonActionsText(text: string): ChatEntry[] | undefined {
+    const trimmed = text.trim();
+    if (!trimmed) return undefined;
+
+    const candidates = [trimmed];
+    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fenced?.[1]) {
+        candidates.push(fenced[1].trim());
+    }
+
+    const arrayStart = trimmed.indexOf('[');
+    const arrayEnd = trimmed.lastIndexOf(']');
+    if (arrayStart >= 0 && arrayEnd > arrayStart) {
+        candidates.push(trimmed.slice(arrayStart, arrayEnd + 1));
+    }
+
+    for (const candidate of candidates) {
+        try {
+            const parsed = JSON.parse(candidate);
+            const entries = parseChatEntriesFromUnknown(parsed);
+            if (entries) return entries;
+        } catch {
+            // Try the next common JSON wrapping style.
+        }
+    }
+
+    return undefined;
 }
 
 type EffectiveConfig = UserConfig;
@@ -564,9 +594,53 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             const generationPolicy = resolveGenerationPolicy({
                 modelRef,
                 config: effectiveConfig.ai,
+                openrouterApiKey: ctx.info.openrouterApiKey,
+                opencodeToken: ctx.info.opencodeToken,
                 task: 'chat',
                 expectsStructuredOutput: true,
             });
+
+            const runOpencodeJsonFallback = async (): Promise<ChatEntry[]> => {
+                const fallback = await generateText({
+                    model: generationPolicy.model,
+                    temperature: effectiveConfig.ai.temperature,
+                    topP: effectiveConfig.ai.topP,
+                    maxOutputTokens: generationPolicy.maxOutputTokens,
+                    maxRetries: maxGenerationRetries,
+                    instructions: input.instructions,
+                    messages: [
+                        ...input.messages,
+                        {
+                            role: 'user',
+                            content:
+                                'Return only a valid JSON array of actions. Do not use markdown fences or prose.',
+                        },
+                    ],
+                    telemetry: {
+                        functionId: 'user-message-opencode-json-fallback',
+                    },
+                });
+
+                const fallbackEntries = parseJsonActionsText(fallback.text);
+                if (fallbackEntries) {
+                    return fallbackEntries;
+                }
+
+                logger.warn('Opencode JSON fallback output invalid', {
+                    modelRef,
+                    chatId: ctx.chat.id,
+                    finishReason: fallback.finishReason,
+                    usage: fallback.usage,
+                });
+                throw new Error('Opencode JSON fallback output invalid');
+            };
+
+            if (
+                generationPolicy.provider === 'opencode' &&
+                generationPolicy.telemetry.modelId.startsWith('deepseek-v4')
+            ) {
+                return await runOpencodeJsonFallback();
+            }
 
             const result = await generateText({
                 model: generationPolicy.model,
@@ -594,23 +668,21 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             const entries = parseSendChatActionsEntries(result.toolCalls);
             if (entries) {
                 return entries;
-            } else {
-                logger.warn(
-                    'Structured tool call missing or invalid after retries',
-                    {
-                        modelRef,
-                        chatId: ctx.chat.id,
-                        finishReason: result.finishReason,
-                        toolCalls: result.toolCalls.map((call) =>
-                            call.toolName
-                        ),
-                        usage: result.usage,
-                    },
-                );
-                throw new Error(
-                    'Structured tool call missing or invalid after retries',
-                );
             }
+
+            logger.warn(
+                'Structured tool call missing or invalid after retries',
+                {
+                    modelRef,
+                    chatId: ctx.chat.id,
+                    finishReason: result.finishReason,
+                    toolCalls: result.toolCalls.map((call) => call.toolName),
+                    usage: result.usage,
+                },
+            );
+            throw new Error(
+                'Structured tool call missing or invalid after retries',
+            );
         };
 
         let output: ChatEntry[] | undefined;

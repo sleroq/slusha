@@ -20,6 +20,8 @@ interface RequestInfo {
     isRandom: boolean;
     userToReply?: string;
     config: Config['ai'];
+    openrouterApiKey?: string;
+    opencodeToken?: string;
 }
 
 interface ThreadResolution {
@@ -146,7 +148,12 @@ export default async function setupBot(
             const effective = await ctx.chatConfig.getEffectiveConfig();
             aiConfig = effective.ai;
         }
-        ctx.info = { isRandom: false, config: aiConfig };
+        ctx.info = {
+            isRandom: false,
+            config: aiConfig,
+            openrouterApiKey: config.openrouterApiKey,
+            opencodeToken: config.opencodeToken,
+        };
 
         return next();
     });

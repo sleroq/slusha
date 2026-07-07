@@ -61,7 +61,8 @@ const googleSafetySettings = [
 const defaultConfig = {
     startMessage: 'Привет! Я Слюша, бот-гений.',
     ai: {
-        model: 'gemini-3.1-flash-lite-preview',
+        // model: 'gemini-3.1-flash-lite-preview',
+        model: 'opencode-go/deepseek-v4-flash',
         prePrompt,
         prompt,
         privateChatPromptAddition,
@@ -86,7 +87,6 @@ const defaultConfig = {
         },
         generation: {
             chat: {
-                maxOutputTokens: 512,
                 thinking: {
                     thinkingLevel: 'low',
                 },

@@ -25,12 +25,8 @@ const googleThinkingConfigSchema = z.object({
     thinkingLevel: thinkingLevelSchema.optional(),
     includeThoughts: z.boolean().optional(),
 });
-const openrouterReasoningSchema = z.object({
-    maxTokens: z.number().int().min(0).max(65536).optional(),
-});
 const generationTaskSchema = z.object({
     thinking: googleThinkingConfigSchema.optional(),
-    openrouterReasoning: openrouterReasoningSchema.optional(),
     maxOutputTokens: z.number().int().min(1).max(65536).optional(),
 });
 const defaultGoogleSafetySettings: Array<
@@ -129,7 +125,7 @@ export const configSchema = z.object({
             'gemini-3.1-flash-lite-preview',
         ]),
     maxMessagesToStore: boundedPositiveInt(1, 10000).default(100),
-    responseDelay: z.number().min(0).max(120).default(1),
+    responseDelay: z.number().min(0).max(120).default(0),
 });
 
 export const safetySettings: Array<{ category: string; threshold: string }> = [
@@ -141,6 +137,7 @@ const config = configSchema.extend({
     botToken: z.string(),
     aiToken: z.string().optional(),
     openrouterApiKey: z.string().optional(),
+    opencodeToken: z.string().optional(),
 });
 
 export type Config = z.infer<typeof config>;
@@ -320,10 +317,11 @@ function resolveEnv() {
 
     const aiToken = Deno.env.get('AI_TOKEN');
     const openrouterApiKey = Deno.env.get('OPENROUTER_API_KEY');
+    const opencodeToken = Deno.env.get('OPENCODE_TOKEN');
 
-    if (!aiToken && !openrouterApiKey) {
+    if (!aiToken && !openrouterApiKey && !opencodeToken) {
         throw new Error(
-            'At least one provider token is required: AI_TOKEN or OPENROUTER_API_KEY',
+            'At least one provider token is required: AI_TOKEN, OPENROUTER_API_KEY, or OPENCODE_TOKEN',
         );
     }
 
@@ -335,7 +333,12 @@ function resolveEnv() {
         Deno.env.set('OPENROUTER_API_KEY', openrouterApiKey);
     }
 
-    return { botToken, aiToken, openrouterApiKey };
+    return {
+        botToken,
+        aiToken,
+        openrouterApiKey,
+        opencodeToken,
+    };
 }
 
 /**
@@ -353,5 +356,6 @@ export default async function resolveConfig(db?: DbClient): Promise<Config> {
         botToken: env.botToken,
         aiToken: env.aiToken,
         openrouterApiKey: env.openrouterApiKey,
+        opencodeToken: env.opencodeToken,
     };
 }
