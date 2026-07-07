@@ -3,10 +3,7 @@ import defaultConfig from './default-config.ts';
 import { DbClient, getDb } from './db/client.ts';
 import { globalConfig } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
-import {
-    ALLOWED_REACTIONS,
-    normalizeReactionBlacklist,
-} from './telegram/reactions.ts';
+import { ALLOWED_REACTIONS } from './telegram/reactions.ts';
 
 function isValidRegex(val: unknown): val is RegExp {
     if (val instanceof RegExp) return true;
@@ -140,46 +137,11 @@ export const configSchema = z.object({
     responseDelay: z.number().min(0).max(120).default(1),
 });
 
-const chatOverrideAiSchema = z.object({
-    model: z.string().min(1).max(200).optional(),
-    temperature: z.number().min(0).max(2).optional(),
-    topK: z.number().min(1).max(200).optional(),
-    topP: z.number().min(0).max(1).optional(),
-    prompt: z.string().max(20000).optional(),
-    privateChatPromptAddition: z.string().max(10000).optional(),
-    groupChatPromptAddition: z.string().max(10000).optional(),
-    commentsPromptAddition: z.string().max(10000).optional(),
-    hateModePrompt: z.string().max(10000).optional(),
-    messagesToPass: boundedPositiveInt(1, 100).optional(),
-    messageMaxLength: boundedPositiveInt(200, 20000).optional(),
-    includeAttachmentsInHistory: z.boolean().optional(),
-    bytesLimit: boundedPositiveInt(1024, 100 * 1024 * 1024).optional(),
-});
-
-export const chatConfigOverrideSchema = z.object({
-    ai: chatOverrideAiSchema.optional(),
-    names: z.array(matcherSchema).max(256).optional(),
-    tendToReply: z.array(matcherSchema).max(256).optional(),
-    tendToReplyProbability: boundedProbability.optional(),
-    tendToIgnore: z.array(matcherSchema).max(256).optional(),
-    tendToIgnoreProbability: boundedProbability.optional(),
-    randomReplyProbability: boundedProbability.optional(),
-    blacklistedReactions: z.array(allowedReactionSchema).max(
-        ALLOWED_REACTIONS.length,
-    ).optional(),
-    nepons: z.array(z.string().max(500)).max(256).optional(),
-    responseDelay: z.number().min(0).max(120).optional(),
-    disableRepliesDueToRights: z.boolean().optional(),
-    disabledReplyRightsLastProbeAt: z.number().int().min(0).optional(),
-});
-
 export const safetySettings: Array<{ category: string; threshold: string }> = [
     ...defaultGoogleSafetySettings,
 ];
 
 export type UserConfig = z.infer<typeof configSchema>;
-export type ChatConfigOverride = z.infer<typeof chatConfigOverrideSchema>;
-
 const config = configSchema.extend({
     botToken: z.string(),
     aiToken: z.string().optional(),
@@ -200,13 +162,6 @@ interface StoredUserConfig
     names: SerializedMatcher[];
     tendToReply: SerializedMatcher[];
     tendToIgnore: SerializedMatcher[];
-}
-
-interface StoredChatConfigOverride
-    extends Omit<ChatConfigOverride, 'names' | 'tendToReply' | 'tendToIgnore'> {
-    names?: SerializedMatcher[];
-    tendToReply?: SerializedMatcher[];
-    tendToIgnore?: SerializedMatcher[];
 }
 
 function serializeMatcher(item: string | RegExp): SerializedMatcher {
@@ -237,46 +192,11 @@ function fromStoredUserConfig(input: StoredUserConfig): UserConfig {
     };
 }
 
-export function toStoredChatOverride(
-    input: ChatConfigOverride,
-): StoredChatConfigOverride {
-    return {
-        ...input,
-        names: input.names?.map(serializeMatcher),
-        tendToReply: input.tendToReply?.map(serializeMatcher),
-        tendToIgnore: input.tendToIgnore?.map(serializeMatcher),
-    };
-}
-
-function fromStoredChatOverride(
-    input: StoredChatConfigOverride,
-): ChatConfigOverride {
-    return {
-        ...input,
-        names: input.names?.map(deserializeMatcher),
-        tendToReply: input.tendToReply?.map(deserializeMatcher),
-        tendToIgnore: input.tendToIgnore?.map(deserializeMatcher),
-    };
-}
-
 export function parseUserConfigPayload(payload: string): UserConfig {
     const raw = JSON.parse(payload) as StoredUserConfig;
     const parsed = configSchema.safeParse(fromStoredUserConfig(raw));
     if (!parsed.success) {
         throw new Error('Invalid global config in DB: ' + parsed.error.message);
-    }
-    return parsed.data;
-}
-
-export function parseChatOverridePayload(payload: string): ChatConfigOverride {
-    const raw = JSON.parse(payload) as StoredChatConfigOverride;
-    const parsed = chatConfigOverrideSchema.safeParse(
-        fromStoredChatOverride(raw),
-    );
-    if (!parsed.success) {
-        throw new Error(
-            'Invalid chat config override in DB: ' + parsed.error.message,
-        );
     }
     return parsed.data;
 }
@@ -314,93 +234,6 @@ export async function getGlobalUserConfig(
     }
 
     return parseUserConfigPayload(row.payload);
-}
-
-export async function setGlobalUserConfig(
-    value: UserConfig,
-    updatedBy?: number,
-    db: DbClient = getDb(),
-): Promise<UserConfig> {
-    const parsed = configSchema.safeParse(value);
-    if (!parsed.success) {
-        throw new Error(
-            'Invalid global config payload: ' + parsed.error.message,
-        );
-    }
-
-    const normalizedModels = Array.from(
-        new Set(parsed.data.availableModels.map((m) => m.trim())),
-    )
-        .filter((m) => m.length > 0);
-    if (normalizedModels.length === 0) {
-        throw new Error('availableModels must contain at least one model');
-    }
-
-    const model = parsed.data.ai.model;
-    if (!normalizedModels.includes(model)) {
-        throw new Error(
-            `Model "${model}" is not listed in availableModels`,
-        );
-    }
-
-    const nextValue: UserConfig = {
-        ...parsed.data,
-        availableModels: normalizedModels,
-        blacklistedReactions: normalizeReactionBlacklist(
-            parsed.data.blacklistedReactions,
-        ),
-    };
-
-    const now = Date.now();
-
-    await db
-        .insert(globalConfig)
-        .values({
-            id: 1,
-            payload: JSON.stringify(toStoredUserConfig(nextValue)),
-            updatedBy,
-            updatedAt: now,
-        })
-        .onConflictDoUpdate({
-            target: [globalConfig.id],
-            set: {
-                payload: JSON.stringify(toStoredUserConfig(nextValue)),
-                updatedBy,
-                updatedAt: now,
-            },
-        });
-
-    return nextValue;
-}
-
-export function mergeWithChatOverride(
-    base: UserConfig,
-    override?: ChatConfigOverride,
-): UserConfig {
-    if (!override) return base;
-
-    const merged: UserConfig = {
-        ...base,
-        ai: {
-            ...base.ai,
-            ...(override.ai ?? {}),
-        },
-    };
-
-    const entries = Object.entries(override).filter(([k]) =>
-        k !== 'ai'
-    ) as Array<[
-        keyof Omit<ChatConfigOverride, 'ai'>,
-        ChatConfigOverride[keyof Omit<ChatConfigOverride, 'ai'>],
-    ]>;
-
-    for (const [key, value] of entries) {
-        if (value !== undefined) {
-            (merged as Record<string, unknown>)[key] = value;
-        }
-    }
-
-    return merged;
 }
 
 function resolveEnv() {

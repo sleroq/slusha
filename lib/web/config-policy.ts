@@ -1,24 +1,6 @@
-import { ChatConfigOverride, UserConfig } from '../config.ts';
-import {
-    categoriesEditableByRole,
-    chatOverrideContract,
-} from '../config-contract.ts';
+import { UserConfig } from '../config.ts';
+import { categoriesEditableByRole } from '../config-contract.ts';
 import { ConfigRole } from './permissions.ts';
-import { normalizeReactionBlacklist } from '../telegram/reactions.ts';
-
-type ChatEditableAi = NonNullable<ChatConfigOverride['ai']>;
-type ChatOverrideKey = keyof Omit<
-    ChatConfigOverride,
-    'ai'
->;
-type ChatEditableAiKey = keyof ChatEditableAi;
-
-const regularDirectOverrideKeys = chatOverrideContract
-    .regularDirect as readonly ChatOverrideKey[];
-const regularDeltaOverrideKeys = chatOverrideContract
-    .regularDelta as readonly ChatOverrideKey[];
-const trustedAiKeys = chatOverrideContract
-    .trustedAi as readonly ChatEditableAiKey[];
 
 function uniqueModels(models: string[]): string[] {
     return Array.from(new Set(models.map((item) => item.trim()))).filter((
@@ -30,58 +12,6 @@ function resolveAvailableModels(config: UserConfig): string[] {
     const models = uniqueModels(config.availableModels ?? []);
     if (models.length > 0) return models;
     return uniqueModels([config.ai.model]);
-}
-
-function pickTrustedAi(config: Partial<UserConfig['ai']>): ChatEditableAi {
-    const picked: Record<string, unknown> = {};
-    for (const key of trustedAiKeys) {
-        picked[key] = config[key];
-    }
-    // Key iteration loses field correlation; trustedAiKeys constrains the shape.
-    return picked as ChatEditableAi;
-}
-
-function hasDefinedValues(value: Record<string, unknown>): boolean {
-    return Object.values(value).some((item) => item !== undefined);
-}
-
-function hasDefinedPrimitiveDelta<T>(
-    value: T | undefined,
-    base: T,
-): value is T {
-    return value !== undefined && value !== base;
-}
-
-function copyDefinedOverrides(
-    source: ChatConfigOverride,
-    target: ChatConfigOverride,
-    keys: readonly ChatOverrideKey[],
-): void {
-    // Key iteration loses field correlation; keys are constrained by ChatOverrideKey.
-    const targetRecord = target as Record<string, unknown>;
-    for (const key of keys) {
-        const value = source[key];
-        if (value !== undefined) {
-            targetRecord[key] = value;
-        }
-    }
-}
-
-function copyPrimitiveDeltas(
-    source: ChatConfigOverride,
-    target: ChatConfigOverride,
-    base: UserConfig,
-    keys: readonly ChatOverrideKey[],
-): void {
-    // Key iteration loses field correlation; keys are constrained by ChatOverrideKey.
-    const targetRecord = target as Record<string, unknown>;
-    for (const key of keys) {
-        const value = source[key];
-        const baseValue = base[key as keyof UserConfig];
-        if (value !== undefined && value !== baseValue) {
-            targetRecord[key] = value;
-        }
-    }
 }
 
 export function buildBootstrapCapabilities(role: ConfigRole): {
@@ -103,90 +33,6 @@ export function projectGlobalConfigForRole(
     }
 
     return undefined;
-}
-
-export function projectEffectiveConfigForRole(
-    config: UserConfig,
-    role: ConfigRole,
-): Record<string, unknown> {
-    const base: Record<string, unknown> = {
-        names: config.names,
-        tendToReply: config.tendToReply,
-        tendToReplyProbability: config.tendToReplyProbability,
-        tendToIgnore: config.tendToIgnore,
-        tendToIgnoreProbability: config.tendToIgnoreProbability,
-        randomReplyProbability: config.randomReplyProbability,
-        blacklistedReactions: config.blacklistedReactions,
-        nepons: config.nepons,
-        responseDelay: config.responseDelay,
-        ai: {},
-    };
-
-    if (role === 'trusted' || role === 'admin') {
-        base.ai = pickTrustedAi(config.ai);
-    }
-
-    return base;
-}
-
-export function projectChatBaseConfigForRole(
-    config: UserConfig,
-    role: ConfigRole,
-): Record<string, unknown> {
-    return projectEffectiveConfigForRole(config, role);
-}
-
-export function sanitizeChatOverrideForRole(
-    override: ChatConfigOverride,
-    role: ConfigRole,
-    globalConfig: UserConfig,
-    strictModel = true,
-): ChatConfigOverride {
-    if (role !== 'regular' && role !== 'trusted' && role !== 'admin') {
-        return {};
-    }
-
-    const next: ChatConfigOverride = {};
-
-    copyDefinedOverrides(override, next, regularDirectOverrideKeys);
-    copyPrimitiveDeltas(
-        override,
-        next,
-        globalConfig,
-        regularDeltaOverrideKeys,
-    );
-    if (next.blacklistedReactions) {
-        next.blacklistedReactions = normalizeReactionBlacklist(
-            next.blacklistedReactions,
-        );
-    }
-
-    if ((role === 'trusted' || role === 'admin') && override.ai) {
-        const ai = pickTrustedAi(override.ai);
-        const availableModels = resolveAvailableModels(globalConfig);
-
-        if (ai.model && !availableModels.includes(ai.model)) {
-            if (strictModel) {
-                throw new Error('Selected model is not available');
-            }
-
-            delete ai.model;
-        }
-
-        const aiDelta: Partial<ChatEditableAi> = {};
-        const aiDeltaRecord = aiDelta as Record<string, unknown>;
-        for (const key of trustedAiKeys) {
-            if (hasDefinedPrimitiveDelta(ai[key], globalConfig.ai[key])) {
-                aiDeltaRecord[key] = ai[key];
-            }
-        }
-
-        if (hasDefinedValues(aiDelta as Record<string, unknown>)) {
-            next.ai = aiDelta;
-        }
-    }
-
-    return next;
 }
 
 export function getModelOptionsForRole(

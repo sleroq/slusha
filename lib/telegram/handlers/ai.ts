@@ -452,9 +452,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             effectiveConfig.ai.reservedMessageTokens,
         );
 
-        const baseMessagesToPass = chatState.messagesToPass ??
-            effectiveConfig.ai.messagesToPass;
-        const messagesToPass = baseMessagesToPass;
+        const messagesToPass = effectiveConfig.ai.messagesToPass;
         const bytesLimit = effectiveConfig.ai.bytesLimit;
         const maxTargetCount = Math.min(
             Math.max(messagesToPass * 2, 12),
@@ -486,7 +484,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             await ctx.i18n.getLocale();
         const character = chatState.character;
 
-        const modelRef = chatState.chatModel ?? effectiveConfig.ai.model;
+        const modelRef = effectiveConfig.ai.model;
         const parsedModel = parseModelRef(modelRef);
 
         const time = new Date().getTime();

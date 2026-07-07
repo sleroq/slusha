@@ -6,13 +6,10 @@ import {
 import logger from '../logger.ts';
 import { jsonResponse } from './http.ts';
 import { handleBootstrapRequest } from './handlers/bootstrap.ts';
-import { handlePutChatConfigRequest } from './handlers/chat-config.ts';
-import { handlePutGlobalConfigRequest } from './handlers/global-config.ts';
 import {
     resolveRequestContext,
     UnauthorizedRequestError,
 } from './request-context.ts';
-import { parseChatConfigChatId } from './routes.ts';
 import { StartWebServerOptions } from './types.ts';
 
 function contentType(filePath: string): string {
@@ -76,20 +73,6 @@ async function dispatchApiConfigRoute(
 
     if (pathname === '/api/config/bootstrap') {
         return await handleBootstrapRequest(req, url, options, context);
-    }
-
-    if (pathname === '/api/config/global' && req.method === 'PUT') {
-        return await handlePutGlobalConfigRequest(req, options, context);
-    }
-
-    const chatConfigId = parseChatConfigChatId(pathname);
-    if (chatConfigId !== undefined && req.method === 'PUT') {
-        return await handlePutChatConfigRequest(
-            req,
-            options,
-            context,
-            chatConfigId,
-        );
     }
 
     return new Response('Not found', { status: 404 });

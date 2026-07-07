@@ -420,7 +420,7 @@ bot.callbackQuery(/set.*/, async (ctx) => {
 
     const config = ctx.info.config;
     // TODO: Allow to set different model for generating character names
-    const model = chat.chatModel ?? config.model;
+    const model = config.model;
 
     let names: string[] = [];
     try {

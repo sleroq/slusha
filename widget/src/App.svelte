@@ -1,34 +1,18 @@
 <script lang="ts">
     import { hapticFeedback, themeParams } from '@tma.js/sdk';
     import { init } from '@tma.js/sdk-svelte';
-    import { fade } from 'svelte/transition';
-    import { onDestroy, onMount, untrack } from 'svelte';
-    import ChatOverrideForm from '$lib/components/config/ChatOverrideForm.svelte';
+    import { onDestroy, onMount } from 'svelte';
     import ConfigToolbar from '$lib/components/config/ConfigToolbar.svelte';
-    import { buildGlobalPayload } from '$lib/config/model';
-    import { buildChatPayload, collectChatOverridePaths } from '$lib/config/override';
     import GlobalConfigForm from '$lib/components/config/GlobalConfigForm.svelte';
     import { createConfigController } from '$lib/config/controller.svelte';
-    import { Button } from '$lib/components/ui/button';
     import { Input } from '$lib/components/ui/input';
     import { setI18nContext } from '$lib/i18n/context.svelte';
 
     const controller = createConfigController();
     const t = setI18nContext(() => controller.locale);
 
-    type SaveFeedback = {
-        kind: 'success' | 'error';
-        message: string;
-    };
-
-    let saveFeedback = $state<SaveFeedback | null>(null);
-    let saveFeedbackTimer: ReturnType<typeof setTimeout> | undefined;
     let settingsSearch = $state('');
     let launchError = $state<string | null>(null);
-    let savedGlobalSignature = $state<string | null>(null);
-    let savedChatSignature = $state<string | null>(null);
-    let isSavingGlobal = $state(false);
-    let isSavingChat = $state(false);
     let isReloading = $state(false);
     let detachThemeListener: (() => void) | undefined;
 
@@ -132,62 +116,6 @@
         notifyError();
     };
 
-    const clearSaveFeedbackTimer = () => {
-        if (!saveFeedbackTimer) {
-            return;
-        }
-
-        clearTimeout(saveFeedbackTimer);
-        saveFeedbackTimer = undefined;
-    };
-
-    const showSaveFeedback = (ok: boolean) => {
-        saveFeedback = {
-            kind: ok ? 'success' : 'error',
-            message: controller.status,
-        };
-
-        clearSaveFeedbackTimer();
-        saveFeedbackTimer = setTimeout(() => {
-            saveFeedback = null;
-            saveFeedbackTimer = undefined;
-        }, 2400);
-    };
-
-    const saveScopeWithFeedback = async () => {
-        if (controller.scope === 'global') {
-            isSavingGlobal = true;
-            let ok: boolean;
-            try {
-                ok = await controller.saveGlobal();
-            } finally {
-                isSavingGlobal = false;
-            }
-            notifyFromResult(ok);
-            showSaveFeedback(ok);
-
-            if (ok) {
-                savedGlobalSignature = computeGlobalPayloadSignature();
-            }
-
-            return;
-        }
-
-        isSavingChat = true;
-        let ok: boolean;
-        try {
-            ok = await controller.saveChat();
-        } finally {
-            isSavingChat = false;
-        }
-        notifyFromResult(ok);
-        showSaveFeedback(ok);
-
-        if (ok) {
-            savedChatSignature = computeChatPayloadSignature();
-        }
-    };
-
     const reloadWithFeedback = async () => {
         minorImpact();
 
@@ -201,50 +129,7 @@
         notifyFromResult(ok);
     };
 
-    const computeChatPayloadSignature = (): string =>
-        JSON.stringify(
-            buildChatPayload(
-                controller.chatOverrideConfig,
-                controller.chatText,
-                controller.chatBaseConfig,
-            ),
-        );
-
-    const computeGlobalPayloadSignature = (): string =>
-        JSON.stringify(buildGlobalPayload(controller.globalConfig, controller.globalText));
-
-    let chatPayloadPreview = $derived(
-        buildChatPayload(
-            controller.chatOverrideConfig,
-            controller.chatText,
-            controller.chatBaseConfig,
-        ),
-    );
-    let overriddenFieldPaths = $derived(collectChatOverridePaths(chatPayloadPreview));
-    let hasUnsavedGlobal = $derived(
-        savedGlobalSignature !== null && computeGlobalPayloadSignature() !== savedGlobalSignature,
-    );
-    let hasUnsavedChat = $derived(
-        savedChatSignature !== null && computeChatPayloadSignature() !== savedChatSignature,
-    );
-    let activeHasUnsavedChanges = $derived(controller.scope === 'global' ? hasUnsavedGlobal : hasUnsavedChat);
-    let activeCanSave = $derived(
-        controller.scope === 'global' ? controller.canSaveGlobal : controller.canSaveChat,
-    );
-    let activeIsSaving = $derived(controller.scope === 'global' ? isSavingGlobal : isSavingChat);
-    let isBusy = $derived(activeIsSaving || isReloading || controller.isLoading);
-
-    $effect(() => {
-        const bootstrap = controller.bootstrap;
-        if (!bootstrap) {
-            return;
-        }
-
-        untrack(() => {
-            savedGlobalSignature = computeGlobalPayloadSignature();
-            savedChatSignature = computeChatPayloadSignature();
-        });
-    });
+    let isBusy = $derived(isReloading || controller.isLoading);
 
     onMount(() => {
         try {
@@ -266,7 +151,6 @@
     onDestroy(() => {
         detachThemeListener?.();
         detachThemeListener = undefined;
-        clearSaveFeedbackTimer();
         controller.dispose();
     });
 </script>
@@ -299,12 +183,8 @@
 {:else}
     <main class="mx-auto max-w-3xl space-y-8 p-4 pb-28 md:p-6 md:pb-32">
         <ConfigToolbar
-            bind:scope={controller.scope}
-            bind:chatId={controller.chatId}
             status={controller.status}
-            canViewGlobal={controller.canViewGlobal}
             role={controller.role}
-            availableChats={controller.availableChats}
             onReload={reloadWithFeedback}
             isReloading={isReloading}
             isLoading={controller.isLoading}
@@ -347,65 +227,14 @@
                                 searchQuery={settingsSearch}
                             />
                         </div>
-
-                        <div hidden={controller.scope !== 'chat'} aria-hidden={controller.scope !== 'chat'}>
-                            <ChatOverrideForm
-                                bind:config={controller.chatOverrideConfig}
-                                bind:text={controller.chatText}
-                                baseConfig={controller.chatBaseConfig}
-                                availableModels={controller.availableModels}
-                                availableReactions={controller.availableReactions}
-                                currentCharacter={controller.currentCharacter}
-                                canConfigureTrustedSettings={controller.canConfigureTrustedSettings}
-                                overriddenFieldPaths={overriddenFieldPaths}
-                                searchQuery={settingsSearch}
-                            />
-                        </div>
                     {:else}
-                        <ChatOverrideForm
-                            bind:config={controller.chatOverrideConfig}
-                            bind:text={controller.chatText}
-                            baseConfig={controller.chatBaseConfig}
-                            availableModels={controller.availableModels}
-                            availableReactions={controller.availableReactions}
-                            currentCharacter={controller.currentCharacter}
-                            canConfigureTrustedSettings={controller.canConfigureTrustedSettings}
-                            overriddenFieldPaths={overriddenFieldPaths}
-                            searchQuery={settingsSearch}
-                        />
+                        <p class="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+                            {t('status.readOnlyGlobal')}
+                        </p>
                     {/if}
                 </div>
             {/if}
         </section>
     </main>
 
-    <div class="pointer-events-none fixed bottom-4 right-4 z-40">
-        <div class="pointer-events-auto flex flex-col items-end gap-2">
-            <Button
-                class="min-w-40 shadow-lg"
-                variant={activeHasUnsavedChanges ? 'default' : 'outline'}
-                onclick={saveScopeWithFeedback}
-                disabled={isBusy || !activeCanSave || !activeHasUnsavedChanges}
-                aria-busy={activeIsSaving}
-            >
-                {#if activeIsSaving}
-                    {controller.scope === 'global' ? t('app.savingGlobal') : t('app.savingChat')}
-                {:else}
-                    {controller.scope === 'global' ? t('app.saveGlobal') : t('app.saveChat')}
-                {/if}
-            </Button>
-        </div>
-    </div>
-{/if}
-
-{#if saveFeedback}
-    <div class="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4" transition:fade={{ duration: 180 }}>
-        <div
-            class={`pointer-events-auto w-full max-w-md rounded-md border px-4 py-3 text-sm shadow-lg ${saveFeedback.kind === 'success' ? 'border-[var(--success-border)] bg-[var(--success-bg)] text-foreground' : 'border-[var(--danger-border)] bg-[var(--danger-bg)] text-foreground'}`}
-            role="status"
-            aria-live="polite"
-        >
-            {saveFeedback.message}
-        </div>
-    </div>
 {/if}

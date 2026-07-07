@@ -14,27 +14,10 @@ export function registerModel(
             return ctx.reply(ctx.t('admin-only'));
         }
 
-        const args = ctx.msg.text
-            .split(' ')
-            .map((arg) => arg.trim())
-            .filter((arg) => arg !== '');
-
-        if (args.length === 1) {
-            return ctx.reply(
-                ctx.t('model-current', {
-                    model: (await ctx.chats.getChat(ctx.chat)).chatModel ??
-                        globalConfig.ai.model,
-                }),
-            );
-        }
-
-        const newModel = args[1];
-        if (newModel === 'default') {
-            await ctx.chatConfig.clearChatModel();
-            return ctx.reply(ctx.t('model-reset'));
-        }
-
-        await ctx.chatConfig.setChatModel(newModel);
-        return ctx.reply(ctx.t('model-set', { model: newModel }));
+        return ctx.reply(
+            ctx.t('model-current', {
+                model: globalConfig.ai.model,
+            }),
+        );
     });
 }

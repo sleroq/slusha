@@ -1,127 +1,71 @@
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import type { DbClient } from '../db/client.ts';
 import { chatConfigOverrides } from '../db/schema.ts';
-import {
-    type ChatConfigOverride,
-    chatConfigOverrideSchema,
-    getGlobalUserConfig,
-    mergeWithChatOverride,
-    parseChatOverridePayload,
-    toStoredChatOverride,
-} from '../config.ts';
+import { getGlobalUserConfig } from '../config.ts';
+
+const chatStateSchema = z.object({
+    disableRepliesDueToRights: z.boolean().optional(),
+    disabledReplyRightsLastProbeAt: z.number().int().min(0).optional(),
+});
+
+type ChatState = z.infer<typeof chatStateSchema>;
 
 export class ChatConfigRepository {
     constructor(private db: DbClient, private chatId: number) {}
 
-    async getChatConfigOverride(): Promise<ChatConfigOverride | undefined> {
+    async getChatState(): Promise<ChatState | undefined> {
         const row = await this.db.query.chatConfigOverrides.findFirst({
             where: eq(chatConfigOverrides.chatId, this.chatId),
         });
-        return row ? parseChatOverridePayload(row.payload) : undefined;
-    }
-
-    async setChatConfigOverride(
-        value: ChatConfigOverride,
-        updatedBy?: number,
-    ) {
-        const parsed = chatConfigOverrideSchema.safeParse(value);
+        if (!row) return undefined;
+        const parsed = chatStateSchema.safeParse(JSON.parse(row.payload));
         if (!parsed.success) {
             throw new Error(
-                'Invalid chat config override payload: ' + parsed.error.message,
+                'Invalid chat state payload: ' + parsed.error.message,
             );
         }
-        await this.setRaw(parsed.data, updatedBy);
-    }
-
-    async clearChatConfigOverride() {
-        await this.db.delete(chatConfigOverrides).where(
-            eq(chatConfigOverrides.chatId, this.chatId),
-        );
+        return parsed.data;
     }
 
     async getEffectiveConfig() {
-        const base = await getGlobalUserConfig(this.db);
-        return mergeWithChatOverride(base, await this.getChatConfigOverride());
-    }
-
-    setChatModel(value: string) {
-        return this.updateOverride((override) => {
-            const ai = { ...(override.ai ?? {}) };
-            ai.model = value;
-            override.ai = ai;
-        });
-    }
-
-    clearChatModel() {
-        return this.updateOverride((override) => {
-            if (!override.ai) return;
-            delete override.ai.model;
-            if (Object.keys(override.ai).length === 0) delete override.ai;
-        });
-    }
-
-    setMessagesToPass(value: number) {
-        return this.updateOverride((override) => {
-            const ai = { ...(override.ai ?? {}) };
-            ai.messagesToPass = value;
-            override.ai = ai;
-        });
-    }
-
-    clearMessagesToPass() {
-        return this.updateOverride((override) => {
-            if (!override.ai) return;
-            delete override.ai.messagesToPass;
-            if (Object.keys(override.ai).length === 0) delete override.ai;
-        });
-    }
-
-    setRandomReplyProbability(value: number) {
-        return this.updateOverride((override) => {
-            override.randomReplyProbability = value;
-        });
-    }
-
-    clearRandomReplyProbability() {
-        return this.updateOverride((override) => {
-            delete override.randomReplyProbability;
-        });
+        return await getGlobalUserConfig(this.db);
     }
 
     disableRepliesDueToRights() {
-        return this.updateOverride((override) => {
-            override.disableRepliesDueToRights = true;
+        return this.updateState((state) => {
+            state.disableRepliesDueToRights = true;
         });
     }
 
     clearDisableRepliesDueToRights() {
-        return this.updateOverride((override) => {
-            delete override.disableRepliesDueToRights;
+        return this.updateState((state) => {
+            delete state.disableRepliesDueToRights;
         });
     }
 
     setDisabledReplyRightsLastProbeAt(value: number) {
-        return this.updateOverride((override) => {
-            override.disabledReplyRightsLastProbeAt = value;
+        return this.updateState((state) => {
+            state.disabledReplyRightsLastProbeAt = value;
         });
     }
 
     clearDisabledReplyRightsLastProbeAt() {
-        return this.updateOverride((override) => {
-            delete override.disabledReplyRightsLastProbeAt;
+        return this.updateState((state) => {
+            delete state.disabledReplyRightsLastProbeAt;
         });
     }
 
-    private async updateOverride(
-        mutate: (override: ChatConfigOverride) => void,
+    private async updateState(
+        mutate: (state: ChatState) => void,
     ) {
-        const next = { ...((await this.getChatConfigOverride()) ?? {}) };
+        const next = { ...((await this.getChatState()) ?? {}) };
         mutate(next);
         await this.setRaw(next);
     }
 
     private async setRaw(
-        value: ChatConfigOverride,
+        value: ChatState,
         updatedBy?: number,
     ) {
         if (this.isEmpty(value)) {
@@ -130,7 +74,7 @@ export class ChatConfigRepository {
             );
             return;
         }
-        const payload = JSON.stringify(toStoredChatOverride(value));
+        const payload = JSON.stringify(value);
         await this.db.insert(chatConfigOverrides).values({
             chatId: this.chatId,
             payload,
@@ -142,7 +86,7 @@ export class ChatConfigRepository {
         });
     }
 
-    private isEmpty(value: ChatConfigOverride) {
-        return JSON.stringify(toStoredChatOverride(value)) === '{}';
+    private isEmpty(value: ChatState) {
+        return JSON.stringify(value) === '{}';
     }
 }

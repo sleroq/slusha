@@ -11,7 +11,7 @@ import {
     messageReactions,
     messageReactionUsers,
 } from '../db/schema.ts';
-import { parseChatOverridePayload } from '../config.ts';
+import { ChatConfigRepository } from './chat-config.ts';
 import { CharacterRepository } from './characters.ts';
 import { MemberRepository } from './members.ts';
 import { OptOutRepository } from './opt-outs.ts';
@@ -40,34 +40,30 @@ export class ChatRepository {
         });
         if (!chatRow) return undefined;
 
-        const [configOverrideRow, character, optOutUsers, chatMembersList] =
+        const chatConfig = new ChatConfigRepository(this.db, chatId);
+        const [chatState, character, optOutUsers, chatMembersList] =
             await Promise.all([
-                this.db.query.chatConfigOverrides.findFirst({
-                    where: eq(chatConfigOverrides.chatId, chatId),
-                }),
+                chatConfig.getChatState(),
                 characters.get(),
                 optOuts.list(),
                 members.list(),
             ]);
 
-        const configOverride = configOverrideRow
-            ? parseChatOverridePayload(configOverrideRow.payload)
-            : undefined;
         return {
             history: [],
             lastUse: chatRow.lastUse,
             info: JSON.parse(chatRow.info) as TgChat,
-            chatModel: configOverride?.ai?.model,
+            chatModel: undefined,
             character,
             optOutUsers,
             members: chatMembersList,
-            messagesToPass: configOverride?.ai?.messagesToPass,
-            randomReplyProbability: configOverride?.randomReplyProbability,
+            messagesToPass: undefined,
+            randomReplyProbability: undefined,
             hateMode: chatRow.hateMode ?? undefined,
             locale: chatRow.locale ?? undefined,
-            disableRepliesDueToRights: configOverride
+            disableRepliesDueToRights: chatState
                 ?.disableRepliesDueToRights,
-            disabledReplyRightsLastProbeAt: configOverride
+            disabledReplyRightsLastProbeAt: chatState
                 ?.disabledReplyRightsLastProbeAt,
         };
     }

@@ -93,11 +93,7 @@ export function shouldReply() {
             return next();
         }
 
-        const randomReplyProbability =
-            (await ctx.chats.getChat(chat)).randomReplyProbability ??
-                effectiveConfig.randomReplyProbability;
-
-        if (probability(randomReplyProbability)) {
+        if (probability(effectiveConfig.randomReplyProbability)) {
             ctx.info.isRandom = true;
             return next();
         }

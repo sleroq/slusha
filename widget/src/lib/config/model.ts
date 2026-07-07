@@ -16,11 +16,7 @@ export interface BootstrapResponse {
   availableChats: AvailableChat[];
   canViewGlobal: boolean;
   canEditGlobal: boolean;
-  canEditChat: boolean;
   globalPayload?: unknown;
-  chatBasePayload?: unknown;
-  chatOverridePayload?: unknown;
-  effectiveConfigPayload?: unknown;
   currentCharacter?: unknown;
 }
 
