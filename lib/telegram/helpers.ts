@@ -125,7 +125,6 @@ export function replyWithMarkdownId<Other>(
 }
 
 export function doTyping(ctx: SlushaContext, logger: Logger) {
-    const controller = new AbortController();
     let errorCount = 0;
 
     let isTyping = true;
@@ -134,17 +133,12 @@ export function doTyping(ctx: SlushaContext, logger: Logger) {
 
     function stop() {
         clearInterval(typingInterval);
-        controller.abort();
         isTyping = false;
     }
 
     async function type() {
         try {
-            await ctx.replyWithChatAction(
-                'typing',
-                undefined,
-                controller.signal,
-            );
+            await ctx.replyWithChatAction('typing');
         } catch (_) {
             errorCount++;
             if (errorCount > 5) {
