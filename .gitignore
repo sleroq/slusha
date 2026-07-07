@@ -8,3 +8,4 @@
 /backups/
 /node_modules/
 /docs/
+/.envrc
