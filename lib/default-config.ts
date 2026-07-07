@@ -75,10 +75,6 @@ const defaultConfig = {
         topP: 0.85,
         messagesToPass: 10,
         messageMaxLength: 4096,
-        reservedMessageTokens: [
-            'slusha_meta',
-            'target_ref',
-        ],
         includeAttachmentsInHistory: true,
         bytesLimit: 20971520,
         google: {

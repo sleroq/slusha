@@ -43,10 +43,7 @@ import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
 
-const defaultReservedMessageTokens = [
-    'slusha_meta',
-    'target_ref',
-];
+const reservedMessageTokens = ['slusha_meta', 'target_ref'];
 const RESERVED_MESSAGE_TOKEN_ERROR =
     'Generated output contains reserved metadata token';
 
@@ -143,28 +140,14 @@ function parseSendChatActionsEntries(
     return undefined;
 }
 
-function normalizeReservedMessageTokens(rawTokens: string[]): string[] {
-    const normalized = Array.from(
-        new Set(
-            rawTokens
-                .map((token) => token.trim().toLowerCase())
-                .filter((token) => token.length > 0),
-        ),
-    );
-    return normalized.length > 0 ? normalized : defaultReservedMessageTokens;
-}
-
-function hasReservedMessageToken(
-    entries: ChatEntry[],
-    reservedTokens: string[],
-): boolean {
+function hasReservedMessageToken(entries: ChatEntry[]): boolean {
     return entries.some((entry) => {
         if (!isTextEntry(entry) || typeof entry.text !== 'string') {
             return false;
         }
 
         const text = entry.text.toLowerCase();
-        return reservedTokens.some((token) => text.includes(token));
+        return reservedMessageTokens.some((token) => text.includes(token));
     });
 }
 
@@ -433,10 +416,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
         const enabledReactions = resolveEnabledReactions(
             effectiveConfig.blacklistedReactions,
         );
-        const reservedMessageTokens = normalizeReservedMessageTokens(
-            effectiveConfig.ai.reservedMessageTokens,
-        );
-
         const messagesToPass = effectiveConfig.ai.messagesToPass;
         const bytesLimit = effectiveConfig.ai.bytesLimit;
         const maxTargetCount = Math.min(
@@ -658,12 +637,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 const generatedOutput = await generateStructuredActionsOutput(
                     generationInput,
                 );
-                if (
-                    hasReservedMessageToken(
-                        generatedOutput,
-                        reservedMessageTokens,
-                    )
-                ) {
+                if (hasReservedMessageToken(generatedOutput)) {
                     throw new Error(RESERVED_MESSAGE_TOKEN_ERROR);
                 }
                 output = generatedOutput;

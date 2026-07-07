@@ -21,7 +21,6 @@ const matcherSchema = z.union([
 ]);
 
 const thinkingLevelSchema = z.enum(['minimal', 'low', 'medium', 'high']);
-const reservedMessageTokenSchema = z.string().min(1).max(128);
 const googleThinkingConfigSchema = z.object({
     thinkingLevel: thinkingLevelSchema.optional(),
     includeThoughts: z.boolean().optional(),
@@ -77,11 +76,6 @@ export const configSchema = z.object({
         chatActionsToolDescription: z.string().max(20000).optional(),
         messagesToPass: boundedPositiveInt(1, 100).default(5),
         messageMaxLength: boundedPositiveInt(200, 20000).default(4096),
-        reservedMessageTokens: z.array(reservedMessageTokenSchema).max(64)
-            .default([
-                'slusha_meta',
-                'target_ref',
-            ]),
         /**
          * Whether to include attachments (images, videos, voice, etc.)
          * from user messages when constructing model history
