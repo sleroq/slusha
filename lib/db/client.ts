@@ -15,6 +15,7 @@ export function resolveDbUrl(): string {
 export function createDb() {
     const client = createClient({
         url: resolveDbUrl(),
+        timeout: 5000,
     });
 
     const db = drizzle({ client, schema });
