@@ -17,7 +17,6 @@ interface HistoryOptions {
     messagesLimit: number;
     bytesLimit: number;
     attachments?: boolean;
-    resolveReplyThread?: boolean;
     includeReactions?: boolean;
     activeMessageId?: number;
 }
@@ -610,57 +609,33 @@ async function constructMsg(
     } as ModelMessage;
 }
 
-interface BuildHistoryContextOptions {
-    mode: 'chat';
-    symbolLimit: number;
-    messagesLimit: number;
-    bytesLimit: number;
-    attachments?: boolean;
-    resolveReplyThread?: boolean;
-    includeReactions?: boolean;
-    characterName?: string;
-    activeMessageId?: number;
-}
-
-export async function buildHistoryContext(
+export async function makeHistory(
     botInfo: { token: string; id: number },
     api: Api<RawApi>,
     logger: Logger,
     history: ChatMessage[],
-    options: BuildHistoryContextOptions,
+    options: HistoryOptions,
 ): Promise<ModelMessage[]> {
-    const { mode, messagesLimit, bytesLimit, symbolLimit } = options;
-    const resolveReplies = mode === 'chat'
-        ? (options.resolveReplyThread ?? true)
-        : false;
+    const { messagesLimit, bytesLimit, symbolLimit } = options;
 
     let totalBytes = 0;
     let totalAttachments = 0;
     const prompt: ModelMessage[] = [];
-    let textPart = '';
 
-    const candidates = mode === 'chat'
-        ? selectHistoryCandidates(history, {
-            maxRootMessages: undefined,
-            activeMessageId: options.activeMessageId,
-        })
-        : selectHistoryCandidatesLegacy(history, {
-            resolveReplyThread: resolveReplies,
-            maxRootMessages: undefined,
-        });
+    const candidates = selectHistoryCandidates(history, {
+        maxRootMessages: undefined,
+        activeMessageId: options.activeMessageId,
+    });
 
     for (const candidate of candidates) {
         const msg = candidate.msg;
 
-        let attachAttachments = false;
-        if (mode === 'chat') {
-            attachAttachments = options.attachments ?? true;
-            if (
-                candidate.rootIndex < history.length - 10 ||
-                totalAttachments > 2
-            ) {
-                attachAttachments = false;
-            }
+        let attachAttachments = options.attachments ?? true;
+        if (
+            candidate.rootIndex < history.length - 10 ||
+            totalAttachments > 2
+        ) {
+            attachAttachments = false;
         }
 
         let msgRes;
@@ -673,98 +648,40 @@ export async function buildHistoryContext(
                     symbolLimit,
                     attachments: attachAttachments,
                     includeReactions: options.includeReactions,
-                    characterName: options.characterName,
                 },
             );
         } catch (error) {
-            logger.error(
-                mode === 'chat'
-                    ? 'Could not construct replied message'
-                    : 'Could not construct message',
-                {
-                    error,
-                    messageId: msg.id,
-                    isMyself: msg.isMyself,
-                    hasText: Boolean(msg.text),
-                    textLength: msg.text?.length ?? 0,
-                    supportedFields: getSupportedContentFields(msg.info),
-                    unsupportedFields: getUnsupportedContentFields(msg.info),
-                },
+            logger.error('Could not construct replied message', {
+                error,
+                messageId: msg.id,
+                isMyself: msg.isMyself,
+                hasText: Boolean(msg.text),
+                textLength: msg.text?.length ?? 0,
+                supportedFields: getSupportedContentFields(msg.info),
+                unsupportedFields: getUnsupportedContentFields(msg.info),
+            });
+            continue;
+        }
+
+        if (Array.isArray(msgRes.content)) {
+            const attachmentsPart = msgRes.content.find((m) =>
+                m.type === 'file' || m.type === 'image'
             );
-            continue;
+            totalAttachments += attachmentsPart ? 1 : 0;
         }
 
-        if (mode === 'chat') {
-            if (Array.isArray(msgRes.content)) {
-                const attachmentsPart = msgRes.content.find((m) =>
-                    m.type === 'file' || m.type === 'image'
-                );
-                totalAttachments += attachmentsPart ? 1 : 0;
-            }
-
-            const size = JSON.stringify(msgRes).length;
-            if (totalBytes + size >= bytesLimit) {
-                break;
-            }
-
-            prompt.push(msgRes);
-            totalBytes += size;
-            continue;
-        }
-
-        let content = msgRes.content;
-        if (Array.isArray(content) && 'text' in content[0]) {
-            content = content[0].text;
-        }
-
-        if (!content) {
-            logger.warn('Message content is empty: ', msgRes);
-            continue;
-        }
-
-        const size = JSON.stringify(content).length;
+        const size = JSON.stringify(msgRes).length;
         if (totalBytes + size >= bytesLimit) {
-            logger.info(
-                `Skipping old messages because prompt is too big ${size} (${
-                    totalBytes + size
-                } > ${bytesLimit})`,
-            );
             break;
         }
 
-        textPart += content;
-        textPart += '\n--- ---\n';
+        prompt.push(msgRes);
         totalBytes += size;
     }
 
     prompt.reverse();
     prompt.splice(0, prompt.length - messagesLimit);
     return prompt;
-}
-
-export function makeHistory(
-    botInfo: { token: string; id: number },
-    api: Api<RawApi>,
-    logger: Logger,
-    history: ChatMessage[],
-    options: HistoryOptions,
-): Promise<ModelMessage[]> {
-    return buildHistoryContext(
-        botInfo,
-        api,
-        logger,
-        history,
-        {
-            mode: 'chat',
-            symbolLimit: options.symbolLimit,
-            messagesLimit: options.messagesLimit,
-            bytesLimit: options.bytesLimit,
-            attachments: options.attachments,
-            resolveReplyThread: options.resolveReplyThread,
-            includeReactions: options.includeReactions,
-            activeMessageId: options.activeMessageId,
-        },
-    );
 }
 
 async function getAttachments(
