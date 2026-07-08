@@ -173,7 +173,7 @@ const defaultConfig = {
         'gemini-3.1-flash-lite-preview',
     ],
     maxMessagesToStore: 200,
-    responseDelay: 1,
+    responseDelay: 0,
 };
 
 export default defaultConfig;
