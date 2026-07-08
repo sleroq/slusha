@@ -129,6 +129,8 @@ export function doTyping(ctx: SlushaContext, logger: Logger) {
 
     let isTyping = true;
 
+    void type();
+
     const typingInterval = setInterval(() => void type(), 1000);
 
     function stop() {
@@ -139,16 +141,14 @@ export function doTyping(ctx: SlushaContext, logger: Logger) {
     async function type() {
         try {
             await ctx.replyWithChatAction('typing');
-        } catch (_) {
+        } catch (error) {
             errorCount++;
             if (errorCount > 5) {
                 stop();
             }
-            logger.debug('Could not send typing signal');
+            logger.warn('Could not send typing signal: ', error);
         }
     }
-
-    void type();
 
     // Stop after 1 minute
     setTimeout(() => {
