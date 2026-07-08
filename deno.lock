@@ -6,6 +6,7 @@
     "jsr:@std/fmt@1.0.3": "1.0.3",
     "jsr:@std/fs@^1.0.24": "1.0.24",
     "jsr:@std/fs@^1.0.6": "1.0.24",
+    "jsr:@std/http@^1.1.2": "1.1.2",
     "jsr:@std/internal@^1.0.10": "1.0.14",
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "jsr:@std/internal@^1.0.14": "1.0.14",
@@ -60,6 +61,9 @@
         "jsr:@std/internal@^1.0.14",
         "jsr:@std/path@^1.1.5"
       ]
+    },
+    "@std/http@1.1.2": {
+      "integrity": "1c0473590d5e5b75b30b2be4833c08047dd799aeea35624fd34ec58d67fc9240"
     },
     "@std/internal@1.0.14": {
       "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
@@ -3007,6 +3011,7 @@
       "jsr:@deno-library/logger@^1.2.0",
       "jsr:@std/assert@^1.0.19",
       "jsr:@std/fs@^1.0.24",
+      "jsr:@std/http@^1.1.2",
       "npm:@ai-sdk/google@^4.0.8",
       "npm:@ai-sdk/openai-compatible@^3.0.5",
       "npm:@google/genai@^2.10.0",

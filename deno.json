@@ -34,6 +34,7 @@
         "@langfuse/vercel-ai-sdk": "npm:@langfuse/vercel-ai-sdk@^5.9.1",
         "@std/assert": "jsr:@std/assert@^1.0.19",
         "@std/fs": "jsr:@std/fs@^1.0.24",
+        "@std/http/unstable-route": "jsr:@std/http@^1.1.2/unstable-route",
         "ai": "npm:ai@^7.0.16",
         "@ai-sdk/google": "npm:@ai-sdk/google@^4.0.8",
         "@ai-sdk/openai-compatible": "npm:@ai-sdk/openai-compatible@^3.0.5",
