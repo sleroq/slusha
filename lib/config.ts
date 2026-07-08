@@ -128,10 +128,6 @@ export const configSchema = z.object({
     responseDelay: z.number().min(0).max(120).default(0),
 });
 
-export const safetySettings: Array<{ category: string; threshold: string }> = [
-    ...defaultGoogleSafetySettings,
-];
-
 export type UserConfig = z.infer<typeof configSchema>;
 const config = configSchema.extend({
     botToken: z.string(),

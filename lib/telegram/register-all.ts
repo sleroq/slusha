@@ -146,7 +146,7 @@ function shouldLoadCommand(...commands: string[]) {
     };
 }
 
-export default function registerAll(bot: Bot<SlushaContext>, _config: Config) {
+export default function registerAll(bot: Bot<SlushaContext>) {
     const i18n = createI18n();
 
     bot.use(i18n);

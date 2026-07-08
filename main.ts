@@ -5,10 +5,7 @@ import { run } from '@grammyjs/runner';
 import { migrateDb } from './lib/db/migrate.ts';
 import { getDb } from './lib/db/client.ts';
 
-// AI runtime details moved to handler module
-
 // reply helpers used inside handler module
-// rate limiter helpers moved to middlewares
 import registerAll from './lib/telegram/register-all.ts';
 import { startTelemetry } from './lib/app/observability.ts';
 import { startSchedulers } from './lib/app/scheduler.ts';
@@ -41,7 +38,7 @@ logMemoryUsage('after bot setup');
 startWebServer();
 
 // Register everything in correct order
-registerAll(bot, config);
+registerAll(bot);
 logMemoryUsage('after middleware registration');
 
 run(bot, {

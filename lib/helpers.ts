@@ -4,19 +4,14 @@ import { Api, RawApi } from 'grammy';
 import { Logger } from '@deno-library/logger';
 import { supportedTypesMap } from './history.ts';
 import { exists } from '@std/fs';
-import { Message, PhotoSize, Sticker } from 'grammy_types';
+import { Message, PhotoSize } from 'grammy_types';
 import { GoogleGenAI } from '@google/genai';
-import { FilePart, ModelMessage } from 'ai';
-import type { BotCharacter } from './persistence/types.ts';
+import { FilePart } from 'ai';
 
 export function getRandomInt(min: number, max: number) {
     min = Math.ceil(min);
     max = Math.floor(max);
     return Math.floor(Math.random() * (max - min) + min); // The maximum is exclusive and the minimum is inclusive
-}
-
-export function stickerToText({ emoji }: Sticker): string {
-    return emoji ? `[Sticker ${emoji}]` : '[Sticker]';
 }
 
 export function sliceMessage(message: string, maxLength: number): string {
@@ -337,81 +332,4 @@ export function createNameMatcher(names: Array<string | RegExp>) {
     });
 
     return new RegExp(patterns.join('|'), 'gmi');
-}
-
-export function formatReply(
-    m:
-        | ModelMessage
-        | ({ type: 'reply'; text: string; target_ref?: string } | {
-            type: 'react';
-            react: string;
-            target_ref?: string;
-        })[],
-    char?: BotCharacter,
-) {
-    const charName = char?.name ?? 'Slusha';
-    let text = '';
-
-    let content;
-    if (!Array.isArray(m)) {
-        content = m.content;
-    } else {
-        content = m;
-    }
-
-    if (!('content' in m) || m.role === 'assistant') {
-        text += `${charName}:`;
-
-        if (Array.isArray(content)) {
-            content = content.map((c) => {
-                if ('text' in c) {
-                    return {
-                        ...c,
-                        text: '\n' + c.text,
-                    };
-                } else {
-                    return c;
-                }
-            });
-        }
-    }
-
-    if (!Array.isArray(content)) {
-        return '\n    ' + content.trim().replace(/\n/g, '\n    ');
-    }
-
-    text += content.map((c) => {
-        let res = '';
-
-        if (
-            'type' in c &&
-            (c.type === 'text' || c.type === 'image' || c.type === 'file')
-        ) {
-            switch (c.type) {
-                case 'text':
-                    res = c.text;
-                    break;
-                case 'image':
-                    res = `    image: ${c.image}`;
-                    break;
-                case 'file':
-                    res = `    file: ${c.data}`;
-                    break;
-                default:
-                    res = '';
-            }
-        } else {
-            if (c.type === 'reply') {
-                res = `    ${c.text}`;
-            } else if (c.type === 'react') {
-                res = `    [react ${c.react}${
-                    c.target_ref ? ' -> ' + c.target_ref : ''
-                }]`;
-            }
-        }
-
-        return res.replace(/\n/g, '\n    ');
-    }).join('\n');
-
-    return text;
 }
