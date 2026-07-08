@@ -25,9 +25,6 @@ export const chatResponseSchema = z.array(chatActionSchema);
 export const chatActionsToolInputSchema = z.object({
     entries: chatResponseSchema,
 });
-export const chatReactionsToolInputSchema = z.object({
-    entries: z.array(reactionEntrySchema),
-});
 
 const legacyChatEntrySchema = z.object({
     text: z.string().optional(),

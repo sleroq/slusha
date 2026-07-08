@@ -35,80 +35,6 @@ function buildHistoryMetadataBlock(metadata: Record<string, unknown>): string {
     }\n${HISTORY_META_CLOSE}`;
 }
 
-function collectReplyThread(
-    history: ChatMessage[],
-    msg: ChatMessage,
-    thread: ChatMessage[] = [],
-): ChatMessage[] {
-    thread.push(msg);
-
-    const replyTo = msg.replyTo;
-    if (!replyTo) {
-        return thread;
-    }
-
-    const replyToMsg = history.find((m) => m.id === replyTo.id);
-    if (replyToMsg) {
-        return collectReplyThread(history, replyToMsg, thread);
-    } else {
-        // For bot relies and stuff not saved in history
-        thread.push({
-            id: replyTo.id,
-            text: replyTo.text ?? replyTo.info.caption ?? '',
-            replyTo: replyTo,
-            isMyself: false,
-            info: replyTo.info,
-        });
-    }
-
-    return thread;
-}
-
-export function selectHistoryCandidatesLegacy(
-    history: ChatMessage[],
-    options: {
-        resolveReplyThread: boolean;
-        maxRootMessages?: number;
-    },
-): HistoryCandidate[] {
-    const selected: HistoryCandidate[] = [];
-    const seen = new Set<number>();
-    let rootMessagesProcessed = 0;
-
-    for (let i = history.length - 1; i >= 0; i--) {
-        if (
-            typeof options.maxRootMessages === 'number' &&
-            rootMessagesProcessed >= options.maxRootMessages
-        ) {
-            break;
-        }
-        rootMessagesProcessed += 1;
-
-        const rootMsg = history[i];
-        if (seen.has(rootMsg.id)) {
-            continue;
-        }
-
-        const thread = options.resolveReplyThread
-            ? collectReplyThread(history, rootMsg)
-            : [rootMsg];
-
-        for (const threadMsg of thread) {
-            if (seen.has(threadMsg.id)) {
-                continue;
-            }
-
-            selected.push({
-                msg: threadMsg,
-                rootIndex: i,
-            });
-            seen.add(threadMsg.id);
-        }
-    }
-
-    return selected;
-}
-
 function sameThread(left: ChatMessage, right: ChatMessage): boolean {
     if (left.threadId && right.threadId) {
         return left.threadId === right.threadId;
@@ -121,12 +47,6 @@ function sameThread(left: ChatMessage, right: ChatMessage): boolean {
     return false;
 }
 
-function hasThreadMetadata(history: ChatMessage[]): boolean {
-    return history.some((msg) =>
-        Boolean(msg.threadId) || typeof msg.threadRootMessageId === 'number'
-    );
-}
-
 export function selectHistoryCandidates(
     history: ChatMessage[],
     options: {
@@ -134,13 +54,6 @@ export function selectHistoryCandidates(
         activeMessageId?: number;
     },
 ): HistoryCandidate[] {
-    if (!hasThreadMetadata(history)) {
-        return selectHistoryCandidatesLegacy(history, {
-            resolveReplyThread: true,
-            maxRootMessages: options.maxRootMessages,
-        });
-    }
-
     const selected: HistoryCandidate[] = [];
     const seen = new Set<number>();
 

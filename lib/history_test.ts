@@ -2,10 +2,7 @@ import { assertEquals } from '@std/assert';
 import { Message } from 'grammy_types';
 import { ReplyMessage } from './telegram/helpers.ts';
 import type { ChatMessage, ReplyTo } from './persistence/types.ts';
-import {
-    selectHistoryCandidates,
-    selectHistoryCandidatesLegacy,
-} from './history.ts';
+import { selectHistoryCandidates } from './history.ts';
 
 function createReplyTo(id: number): ReplyTo {
     return {
@@ -48,36 +45,6 @@ function createMessage(
     };
 }
 
-Deno.test('selectHistoryCandidatesLegacy includes reply threads and deduplicates', () => {
-    const history: ChatMessage[] = [
-        createMessage(1),
-        createMessage(2, 1),
-        createMessage(3),
-        createMessage(4, 2),
-    ];
-
-    const selected = selectHistoryCandidatesLegacy(history, {
-        resolveReplyThread: true,
-    });
-
-    assertEquals(selected.map((m) => m.msg.id), [4, 2, 1, 3]);
-});
-
-Deno.test('selectHistoryCandidatesLegacy respects maxRootMessages', () => {
-    const history: ChatMessage[] = [
-        createMessage(1),
-        createMessage(2),
-        createMessage(3),
-    ];
-
-    const selected = selectHistoryCandidatesLegacy(history, {
-        resolveReplyThread: false,
-        maxRootMessages: 2,
-    });
-
-    assertEquals(selected.map((m) => m.msg.id), [3, 2]);
-});
-
 Deno.test('selectHistoryCandidates prioritizes active thread', () => {
     const history: ChatMessage[] = [
         createMessage(1, undefined, {
@@ -110,18 +77,6 @@ Deno.test('selectHistoryCandidates prioritizes active thread', () => {
     const selected = selectHistoryCandidates(history, {});
 
     assertEquals(selected.map((m) => m.msg.id), [5, 3, 1, 4, 2]);
-});
-
-Deno.test('selectHistoryCandidates falls back to reply threads without metadata', () => {
-    const history: ChatMessage[] = [
-        createMessage(1),
-        createMessage(2, 1),
-        createMessage(3),
-        createMessage(4, 2),
-    ];
-
-    const selected = selectHistoryCandidates(history, {});
-    assertEquals(selected.map((m) => m.msg.id), [4, 2, 1, 3]);
 });
 
 Deno.test(
