@@ -1,4 +1,3 @@
-import _Werror from './lib/werror.ts';
 import logger from './lib/logger.ts';
 import resolveConfig, { Config } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';

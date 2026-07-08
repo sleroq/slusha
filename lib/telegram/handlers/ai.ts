@@ -804,7 +804,3 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
 
     return composer;
 }
-
-export default function registerAI(bot: Bot<SlushaContext>) {
-    bot.use(createAIMiddleware(bot));
-}

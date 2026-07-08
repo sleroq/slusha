@@ -35,7 +35,8 @@ export class ChatConfigRepository {
         const parsed = chatStateSchema.safeParse(state);
         if (!parsed.success) {
             throw new Error(
-                'Invalid chat state entries: ' + parsed.error.message,
+                'Invalid chat state entries',
+                { cause: parsed.error },
             );
         }
         return parsed.data;

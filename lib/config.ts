@@ -248,7 +248,8 @@ function getStoredDefaults(): StoredUserConfig {
     const parsedDefaults = configSchema.safeParse(defaultConfig);
     if (!parsedDefaults.success) {
         throw new Error(
-            'Invalid built-in default config: ' + parsedDefaults.error.message,
+            'Invalid built-in default config',
+            { cause: parsedDefaults.error },
         );
     }
     return toStoredUserConfig(parsedDefaults.data);
@@ -266,7 +267,8 @@ export function validateConfigEntryValue(key: string, value: unknown): void {
     const parsed = configSchema.safeParse(fromStoredUserConfig(next));
     if (!parsed.success) {
         throw new Error(
-            `Invalid config value for ${key}: ${parsed.error.message}`,
+            `Invalid config value for ${key}`,
+            { cause: parsed.error },
         );
     }
 }
@@ -283,7 +285,8 @@ export async function getGlobalUserConfig(
     const parsed = configSchema.safeParse(fromStoredUserConfig(stored));
     if (!parsed.success) {
         throw new Error(
-            'Invalid global config entries in DB: ' + parsed.error.message,
+            'Invalid global config entries in DB',
+            { cause: parsed.error },
         );
     }
 
@@ -304,8 +307,8 @@ export async function getEffectiveUserConfig(
     const parsed = configSchema.safeParse(fromStoredUserConfig(stored));
     if (!parsed.success) {
         throw new Error(
-            'Invalid effective chat config entries in DB: ' +
-                parsed.error.message,
+            'Invalid effective chat config entries in DB',
+            { cause: parsed.error },
         );
     }
     return parsed.data;
