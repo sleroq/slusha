@@ -75,13 +75,6 @@ const lazyCommands = [
             return createCommandMiddleware(registerHateMode);
         },
     },
-    {
-        names: ['config', 'settings'],
-        load: async () => {
-            const { registerConfig } = await import('./commands/config.ts');
-            return createCommandMiddleware(registerConfig);
-        },
-    },
 ] as const satisfies readonly LazyCommandDescriptor[];
 
 export const registeredCommandNames = [

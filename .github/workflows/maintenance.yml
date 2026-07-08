@@ -28,11 +28,8 @@ jobs:
             - name: Update root dependencies
               run: deno outdated --update --latest
 
-            - name: Update widget dependencies
-              run: deno outdated --config widget/deno.json --update --latest
-
             - name: Refresh lockfiles
-              run: deno cache --allow-import main.ts && deno cache --config widget/deno.json widget/src/main.ts
+              run: deno cache --allow-import main.ts
 
             - name: Create update PR
               uses: peter-evans/create-pull-request@v7
@@ -42,9 +39,7 @@ jobs:
                   commit-message: 'chore: weekly dependency updates'
                   title: 'chore: weekly dependency updates'
                   body: |
-                      Automated dependency refresh for root and widget Deno configs.
+                      Automated dependency refresh for root Deno config.
                   add-paths: |
                       deno.json
                       deno.lock
-                      widget/deno.json
-                      widget/deno.lock

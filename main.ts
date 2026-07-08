@@ -36,18 +36,10 @@ try {
     Deno.exit(1);
 }
 
-const runtimeConfig = {
-    getBotToken: () => config.botToken,
-};
-
 const bot = await setupBot(config, db);
 logMemoryUsage('after bot setup');
 
-startWebServer({
-    bot,
-    db,
-    runtimeConfig,
-});
+startWebServer();
 
 // Register everything in correct order
 registerAll(bot, config);

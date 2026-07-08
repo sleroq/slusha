@@ -1,84 +1,10 @@
-import { extname, join, normalize } from 'node:path';
 import {
     prometheusContentType,
     renderPrometheusMetrics,
 } from '../app/metrics.ts';
 import logger from '../logger.ts';
-import { jsonResponse } from './http.ts';
-import { handleBootstrapRequest } from './handlers/bootstrap.ts';
-import {
-    resolveRequestContext,
-    UnauthorizedRequestError,
-} from './request-context.ts';
-import { StartWebServerOptions } from './types.ts';
 
-function contentType(filePath: string): string {
-    const ext = extname(filePath).toLowerCase();
-    if (ext === '.html') return 'text/html; charset=utf-8';
-    if (ext === '.js') return 'application/javascript; charset=utf-8';
-    if (ext === '.css') return 'text/css; charset=utf-8';
-    if (ext === '.json') return 'application/json; charset=utf-8';
-    if (ext === '.svg') return 'image/svg+xml';
-    if (ext === '.png') return 'image/png';
-    if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
-    if (ext === '.ico') return 'image/x-icon';
-    return 'application/octet-stream';
-}
-
-async function serveWidgetAsset(
-    pathname: string,
-): Promise<Response | undefined> {
-    if (!pathname.startsWith('/widget')) return undefined;
-
-    const baseDir = normalize(join(Deno.cwd(), 'widget', 'dist'));
-    const relPath = pathname.replace(/^\/widget\/?/, '');
-    const requested = relPath.length > 0 ? relPath : 'index.html';
-    const target = normalize(join(baseDir, requested));
-
-    if (!target.startsWith(baseDir)) {
-        return new Response('Forbidden', { status: 403 });
-    }
-
-    try {
-        const data = await Deno.readFile(target);
-        return new Response(data, {
-            status: 200,
-            headers: { 'content-type': contentType(target) },
-        });
-    } catch {
-        if (pathname.startsWith('/widget/')) {
-            try {
-                const indexPath = join(baseDir, 'index.html');
-                const html = await Deno.readFile(indexPath);
-                return new Response(html, {
-                    status: 200,
-                    headers: { 'content-type': 'text/html; charset=utf-8' },
-                });
-            } catch {
-                return new Response('Widget is not built', { status: 503 });
-            }
-        }
-
-        return new Response('Not found', { status: 404 });
-    }
-}
-
-async function dispatchApiConfigRoute(
-    req: Request,
-    url: URL,
-    options: StartWebServerOptions,
-): Promise<Response> {
-    const { pathname } = url;
-    const context = await resolveRequestContext(req, options);
-
-    if (pathname === '/api/config/bootstrap') {
-        return await handleBootstrapRequest(req, url, options, context);
-    }
-
-    return new Response('Not found', { status: 404 });
-}
-
-export function startWebServer(options: StartWebServerOptions) {
+export function startWebServer() {
     const port = Number(Deno.env.get('WEB_PORT') ?? '8080');
     const hostname = Deno.env.get('WEB_HOST') ?? '0.0.0.0';
 
@@ -88,11 +14,6 @@ export function startWebServer(options: StartWebServerOptions) {
         let response: Response;
         try {
             response = await (async () => {
-                if (req.method === 'GET') {
-                    const staticResponse = await serveWidgetAsset(url.pathname);
-                    if (staticResponse) return staticResponse;
-                }
-
                 if (url.pathname === '/healthz') {
                     return new Response('ok');
                 }
@@ -107,30 +28,19 @@ export function startWebServer(options: StartWebServerOptions) {
                     });
                 }
 
-                if (!url.pathname.startsWith('/api/config/')) {
-                    return new Response('Not found', { status: 404 });
-                }
-
-                try {
-                    return await dispatchApiConfigRoute(req, url, options);
-                } catch (error) {
-                    if (error instanceof UnauthorizedRequestError) {
-                        return jsonResponse(
-                            { error: error.message },
-                            error.status,
-                        );
-                    }
-
-                    logger.error('Web API error: ', error);
-                    const message = error instanceof Error
-                        ? error.message
-                        : 'Unknown error';
-                    return jsonResponse({ error: message }, 400);
-                }
+                return new Response('Not found', { status: 404 });
             })();
         } catch (error) {
             logger.error('Unhandled web server error: ', error);
-            response = jsonResponse({ error: 'Internal server error' }, 500);
+            response = new Response(
+                JSON.stringify({ error: 'Internal server error' }),
+                {
+                    status: 500,
+                    headers: {
+                        'content-type': 'application/json; charset=utf-8',
+                    },
+                },
+            );
         }
 
         return response;

@@ -56,18 +56,6 @@ Smartest girl in telegram.
 scripts/run.bash
 ```
 
-## Config web widget (Telegram Mini App)
-
-- Set `WIDGET_BASE_URL` to your public bot URL (example: `https://example.com`)
-- Optional web server env vars: `WEB_HOST` (default `0.0.0.0`), `WEB_PORT` (default `8080`)
-- Build widget assets (Deno-first):
-
-```bash
-scripts/build-widget.bash
-```
-
-- Use `/config` in chat (`/config global` for global config)
-
 ## Metrics (Prometheus + Grafana)
 
 - `slusha_http_requests_total`

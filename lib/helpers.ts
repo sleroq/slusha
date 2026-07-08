@@ -8,7 +8,6 @@ import { Message, PhotoSize, Sticker } from 'grammy_types';
 import { GoogleGenAI } from '@google/genai';
 import { FilePart, ModelMessage } from 'ai';
 import type { BotCharacter } from './persistence/types.ts';
-// import { encodeBase64 } from "@std/encoding/base64";
 
 export function getRandomInt(min: number, max: number) {
     min = Math.ceil(min);
@@ -140,7 +139,6 @@ export async function downloadFile(
 ) {
     const filePath = `./tmp/${fileId}`;
     if (await exists(filePath)) {
-        // return encodeBase64(await Deno.readFile(filePath))
         return uploadToGoogle(filePath, fileId, mimeType);
     }
 
@@ -154,7 +152,6 @@ export async function downloadFile(
 
     await Deno.writeFile(filePath, buffer);
 
-    // return encodeBase64(buffer);
     return uploadToGoogle(filePath, fileId, mimeType);
 }
 

@@ -3,7 +3,6 @@
   "specifiers": {
     "jsr:@deno-library/logger@^1.2.0": "1.2.0",
     "jsr:@std/assert@^1.0.19": "1.0.19",
-    "jsr:@std/encoding@^1.0.11": "1.0.11",
     "jsr:@std/fmt@1.0.3": "1.0.3",
     "jsr:@std/fs@^1.0.24": "1.0.24",
     "jsr:@std/fs@^1.0.6": "1.0.24",
@@ -51,9 +50,6 @@
       "dependencies": [
         "jsr:@std/internal@^1.0.12"
       ]
-    },
-    "@std/encoding@1.0.11": {
-      "integrity": "e7cef2f0b3153bccc17431e7c864a1de03a4b6d9647389c43e08aaa775d37385"
     },
     "@std/fmt@1.0.3": {
       "integrity": "97765c16aa32245ff4e2204ecf7d8562496a3cb8592340a80e7e554e0bb9149f"
@@ -3010,7 +3006,6 @@
     "dependencies": [
       "jsr:@deno-library/logger@^1.2.0",
       "jsr:@std/assert@^1.0.19",
-      "jsr:@std/encoding@^1.0.11",
       "jsr:@std/fs@^1.0.24",
       "npm:@ai-sdk/google@^4.0.8",
       "npm:@ai-sdk/openai-compatible@^3.0.5",
