@@ -1,6 +1,5 @@
 import { Bot, Composer } from 'grammy';
 import type { SlushaContext } from './setup-bot.ts';
-import type { Config } from '../config.ts';
 import { applyLocaleFromPersistence, createI18n } from '../i18n/index.ts';
 import optOut from './bot/opt-out.ts';
 import language from './bot/language.ts';
