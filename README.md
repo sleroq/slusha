@@ -1,6 +1,6 @@
 # Slusha
 
-Smartest girl in telegram.
+Dumbest girl in telegram.
 
 > Try it out - [@sl_chatbot](https://t.me/sl_chatbot) yourself or check out quotes - [@slushaquotes](https://t.me/s/slushaquotes)
 
