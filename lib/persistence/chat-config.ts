@@ -42,8 +42,8 @@ export class ChatConfigRepository {
         return parsed.data;
     }
 
-    async getEffectiveConfig() {
-        return await getEffectiveUserConfig({ chatId: this.chatId }, this.db);
+    getEffectiveConfig() {
+        return getEffectiveUserConfig({ chatId: this.chatId }, this.db);
     }
 
     setValue(key: string, value: unknown, updatedBy?: number) {
