@@ -5,6 +5,7 @@ import { UserConfig } from '../config.ts';
 import { ModelProvider, parseModelRef } from './model-ref.ts';
 
 export type GenerationTask = 'chat' | 'character';
+export type StructuredOutputMode = 'tool' | 'json-text';
 
 const OPENCODE_BASE_URL = 'https://opencode.ai/zen/go/v1';
 
@@ -25,7 +26,18 @@ export interface ResolvedGenerationPolicy {
     provider: ModelProvider;
     providerOptions?: ProviderOptions;
     maxOutputTokens?: number;
+    capabilities: ModelCapabilities;
     telemetry: GenerationPolicyTelemetry;
+}
+
+/**
+ * Model behavior that generation callers need to adapt to. Keep this limited
+ * to actual compatibility differences; Telegram and prompt policy stay in
+ * their respective layers.
+ */
+export interface ModelCapabilities {
+    binaryHistoryAttachments: boolean;
+    structuredOutputMode: StructuredOutputMode;
 }
 
 interface GenerationPolicyInput {
@@ -40,6 +52,53 @@ interface GenerationPolicyInput {
 type ProviderOptions = NonNullable<
     Parameters<typeof generateText>[0]['providerOptions']
 >;
+
+const providerCapabilities: Record<ModelProvider, ModelCapabilities> = {
+    google: {
+        binaryHistoryAttachments: true,
+        structuredOutputMode: 'tool',
+    },
+    openrouter: {
+        binaryHistoryAttachments: false,
+        structuredOutputMode: 'tool',
+    },
+    opencode: {
+        binaryHistoryAttachments: false,
+        structuredOutputMode: 'tool',
+    },
+};
+
+interface ModelCapabilityRule {
+    matches(modelId: string): boolean;
+    capabilities: Partial<ModelCapabilities>;
+}
+
+const providerModelCapabilityRules: Partial<
+    Record<ModelProvider, ModelCapabilityRule[]>
+> = {
+    opencode: [
+        {
+            matches: (modelId) => modelId.startsWith('deepseek-v4'),
+            capabilities: { structuredOutputMode: 'json-text' },
+        },
+    ],
+};
+
+export function resolveModelCapabilities(
+    provider: ModelProvider,
+    modelId: string,
+): ModelCapabilities {
+    const capabilities = { ...providerCapabilities[provider] };
+    const rules = providerModelCapabilityRules[provider] ?? [];
+
+    for (const rule of rules) {
+        if (rule.matches(modelId)) {
+            Object.assign(capabilities, rule.capabilities);
+        }
+    }
+
+    return capabilities;
+}
 
 function buildGoogleOptions(
     config: UserConfig['ai'],
@@ -136,13 +195,9 @@ function createOpencodeModel(
     return opencodeProvider.chatModel(modelId);
 }
 
-export function resolveGenerationPolicy(input: GenerationPolicyInput): {
-    model: LanguageModel;
-    provider: ModelProvider;
-    providerOptions?: ProviderOptions;
-    maxOutputTokens?: number;
-    telemetry: GenerationPolicyTelemetry;
-} {
+export function resolveGenerationPolicy(
+    input: GenerationPolicyInput,
+): ResolvedGenerationPolicy {
     const parsed = parseModelRef(input.modelRef);
     const taskConfig = input.config.generation[input.task];
 
@@ -174,6 +229,10 @@ export function resolveGenerationPolicy(input: GenerationPolicyInput): {
                 ? providerOptions
                 : undefined,
             maxOutputTokens: taskConfig.maxOutputTokens,
+            capabilities: resolveModelCapabilities(
+                parsed.provider,
+                parsed.modelId,
+            ),
             telemetry,
         };
     }
@@ -187,6 +246,10 @@ export function resolveGenerationPolicy(input: GenerationPolicyInput): {
             model: createOpencodeModel(parsed.modelId, input.opencodeToken),
             provider: parsed.provider,
             maxOutputTokens: taskConfig.maxOutputTokens,
+            capabilities: resolveModelCapabilities(
+                parsed.provider,
+                parsed.modelId,
+            ),
             telemetry: {
                 provider: parsed.provider,
                 modelRef: parsed.raw,
@@ -222,6 +285,10 @@ export function resolveGenerationPolicy(input: GenerationPolicyInput): {
             ? providerOptions
             : undefined,
         maxOutputTokens: taskConfig.maxOutputTokens,
+        capabilities: resolveModelCapabilities(
+            parsed.provider,
+            parsed.modelId,
+        ),
         telemetry,
     };
 }
