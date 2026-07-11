@@ -1,13 +1,7 @@
 import { Bot, Composer } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
 import logger from '../../logger.ts';
-import {
-    APICallError,
-    generateText,
-    hasToolCall,
-    ModelMessage,
-    tool,
-} from 'ai';
+import { APICallError, type ModelMessage, tool } from 'ai';
 import { makeHistory } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
@@ -37,9 +31,9 @@ import {
 } from '../../ai/chat-context.ts';
 import { canonicalizeReaction, resolveEnabledReactions } from '../reactions.ts';
 import { isMissingSendTextRightsError } from '../reply-rights.ts';
-import { parseModelRef } from '../../ai/model-ref.ts';
 import { buildLanguageProtocol } from '../../ai/language-protocol.ts';
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
+import { generateStructuredOutput } from '../../ai/structured-generation.ts';
 
 const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
@@ -122,25 +116,6 @@ function createSendChatActionsTool(description: string) {
     });
 }
 
-function parseSendChatActionsEntries(
-    toolCalls: Array<{ toolName: string; input: unknown }>,
-): ChatEntry[] | undefined {
-    const chatActionsToolCall = toolCalls.find((call) =>
-        call.toolName === 'send_chat_actions'
-    );
-    const parsedToolCallInput = chatActionsToolCall
-        ? chatActionsToolInputSchema.safeParse(
-            chatActionsToolCall.input,
-        )
-        : undefined;
-
-    if (parsedToolCallInput?.success) {
-        return parsedToolCallInput.data.entries;
-    }
-
-    return undefined;
-}
-
 function hasReservedMessageToken(entries: ChatEntry[]): boolean {
     return entries.some((entry) => {
         if (!isTextEntry(entry) || typeof entry.text !== 'string') {
@@ -155,35 +130,6 @@ function hasReservedMessageToken(entries: ChatEntry[]): boolean {
 function isReservedMessageTokenError(error: unknown): boolean {
     return error instanceof Error &&
         error.message === RESERVED_MESSAGE_TOKEN_ERROR;
-}
-
-function parseJsonActionsText(text: string): ChatEntry[] | undefined {
-    const trimmed = text.trim();
-    if (!trimmed) return undefined;
-
-    const candidates = [trimmed];
-    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-    if (fenced?.[1]) {
-        candidates.push(fenced[1].trim());
-    }
-
-    const arrayStart = trimmed.indexOf('[');
-    const arrayEnd = trimmed.lastIndexOf(']');
-    if (arrayStart >= 0 && arrayEnd > arrayStart) {
-        candidates.push(trimmed.slice(arrayStart, arrayEnd + 1));
-    }
-
-    for (const candidate of candidates) {
-        try {
-            const parsed = JSON.parse(candidate);
-            const entries = parseChatEntriesFromUnknown(parsed);
-            if (entries) return entries;
-        } catch {
-            // Try the next common JSON wrapping style.
-        }
-    }
-
-    return undefined;
 }
 
 type EffectiveConfig = UserConfig;
@@ -206,9 +152,10 @@ async function sendGeneratedOutput(params: {
         effectiveConfig,
         historyById,
     } = params;
-    const chatTopicId = typeof ctx.msg?.message_thread_id === 'number'
-        ? ctx.msg.message_thread_id
-        : undefined;
+    let chatTopicId: number | undefined;
+    if (typeof ctx.msg?.message_thread_id === 'number') {
+        chatTopicId = ctx.msg.message_thread_id;
+    }
 
     function resolveTargetMessageId(targetRef?: string): number | undefined {
         if (targetRef) {
@@ -295,10 +242,13 @@ async function sendGeneratedOutput(params: {
             replyText = '-' + replyText;
         }
 
-        const explicitTargetRef = typeof res.target_ref === 'string' &&
-                res.target_ref.trim().length > 0
-            ? res.target_ref.trim()
-            : undefined;
+        let explicitTargetRef: string | undefined;
+        if (
+            typeof res.target_ref === 'string' &&
+            res.target_ref.trim().length > 0
+        ) {
+            explicitTargetRef = res.target_ref.trim();
+        }
         let msgToReply: number | undefined;
         if (explicitTargetRef) {
             msgToReply = resolveTargetMessageId(explicitTargetRef);
@@ -311,17 +261,21 @@ async function sendGeneratedOutput(params: {
         if (typeof chatTopicId === 'number' && typeof msgToReply === 'number') {
             const targetMsg = historyById.get(msgToReply);
             const targetTopicId = targetMsg?.info.message_thread_id;
-            const targetInSameTopic = targetMsg
-                ? targetTopicId === chatTopicId
-                : msgToReply === ctx.msg?.message_id;
+            let targetInSameTopic: boolean;
+            if (targetMsg) {
+                targetInSameTopic = targetTopicId === chatTopicId;
+            } else {
+                targetInSameTopic = msgToReply === ctx.msg?.message_id;
+            }
             if (!targetInSameTopic) {
                 msgToReply = undefined;
             }
         }
 
-        const replyOther = typeof chatTopicId === 'number'
-            ? { message_thread_id: chatTopicId }
-            : undefined;
+        let replyOther: { message_thread_id: number } | undefined;
+        if (typeof chatTopicId === 'number') {
+            replyOther = { message_thread_id: chatTopicId };
+        }
 
         let replyInfo;
         try {
@@ -373,10 +327,13 @@ async function sendGeneratedOutput(params: {
             threadParentMessageId = replyInfo.reply_to_message.message_id;
             const parent = historyById.get(threadParentMessageId);
             if (parent) {
-                threadId = parent.threadId ??
-                    (typeof parent.threadRootMessageId === 'number'
-                        ? `thread:${parent.threadRootMessageId}`
-                        : `thread:${threadParentMessageId}`);
+                if (parent.threadId) {
+                    threadId = parent.threadId;
+                } else if (typeof parent.threadRootMessageId === 'number') {
+                    threadId = `thread:${parent.threadRootMessageId}`;
+                } else {
+                    threadId = `thread:${threadParentMessageId}`;
+                }
                 threadRootMessageId = parent.threadRootMessageId ?? parent.id;
                 threadSource = 'bot_parent';
             } else {
@@ -417,10 +374,10 @@ async function sendGeneratedOutput(params: {
 
         const typingSpeed = 1200; // symbol per minute
         const next = output[i + 1];
-        const nextLen =
-            next && isTextEntry(next) && typeof next.text === 'string'
-                ? next.text.length
-                : 0;
+        let nextLen = 0;
+        if (next && isTextEntry(next) && typeof next.text === 'string') {
+            nextLen = next.text.length;
+        }
         let msToWait = nextLen / typingSpeed * 60 * 1000;
         if (msToWait > 5000) {
             msToWait = 5000;
@@ -461,10 +418,10 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             Math.max(maxTargetCount, maxAttemptHistoryLimit),
         );
 
-        const activeMessageThreadId = typeof ctx.msg.message_thread_id ===
-                'number'
-            ? ctx.msg.message_thread_id
-            : undefined;
+        let activeMessageThreadId: number | undefined;
+        if (typeof ctx.msg.message_thread_id === 'number') {
+            activeMessageThreadId = ctx.msg.message_thread_id;
+        }
         const targetRefs = buildTargetRefs(savedHistory, maxTargetCount, {
             activeMessageThreadId,
         });
@@ -479,7 +436,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
         const character = chatState.character;
 
         const modelRef = effectiveConfig.ai.model;
-        const parsedModel = parseModelRef(modelRef);
 
         const time = new Date().getTime();
         const maxGenerationRetries = 2;
@@ -493,9 +449,30 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
         }
         const chatName = ctx.chat.first_name ?? ctx.chat.title;
 
-        const activeMembers = ctx.chat.type === 'private'
-            ? []
-            : await ctx.members.getActiveMembers();
+        let activeMembers: Awaited<
+            ReturnType<typeof ctx.members.getActiveMembers>
+        > = [];
+        if (ctx.chat.type !== 'private') {
+            activeMembers = await ctx.members.getActiveMembers();
+        }
+
+        let generationPolicy: ReturnType<typeof resolveGenerationPolicy>;
+        try {
+            generationPolicy = resolveGenerationPolicy({
+                modelRef,
+                config: effectiveConfig.ai,
+                openrouterApiKey: ctx.info.openrouterApiKey,
+                opencodeToken: ctx.info.opencodeToken,
+                task: 'chat',
+                expectsStructuredOutput: true,
+            });
+        } catch (error) {
+            logger.error('Could not resolve generation policy', error);
+            if (!ctx.info.isRandom) {
+                await ctx.reply(getRandomNepon(effectiveConfig));
+            }
+            return;
+        }
 
         const buildGenerationInputForAttempt = async (
             plan: GenerationAttemptPlan,
@@ -551,7 +528,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
 
             const includeBinaryAttachments =
                 effectiveConfig.ai.includeAttachmentsInHistory &&
-                parsedModel.provider === 'google';
+                generationPolicy.capabilities.binaryHistoryAttachments;
 
             const history = await makeHistory(
                 { token: bot.token, id: bot.botInfo.id },
@@ -588,103 +565,6 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             };
         };
 
-        const generateStructuredActionsOutput = async (
-            input: { instructions: string; messages: ModelMessage[] },
-        ): Promise<ChatEntry[]> => {
-            const generationPolicy = resolveGenerationPolicy({
-                modelRef,
-                config: effectiveConfig.ai,
-                openrouterApiKey: ctx.info.openrouterApiKey,
-                opencodeToken: ctx.info.opencodeToken,
-                task: 'chat',
-                expectsStructuredOutput: true,
-            });
-
-            const runOpencodeJsonFallback = async (): Promise<ChatEntry[]> => {
-                const fallback = await generateText({
-                    model: generationPolicy.model,
-                    temperature: effectiveConfig.ai.temperature,
-                    topP: effectiveConfig.ai.topP,
-                    maxOutputTokens: generationPolicy.maxOutputTokens,
-                    maxRetries: maxGenerationRetries,
-                    instructions: input.instructions,
-                    messages: [
-                        ...input.messages,
-                        {
-                            role: 'user',
-                            content:
-                                'Return only a valid JSON array of actions. Do not use markdown fences or prose.',
-                        },
-                    ],
-                    telemetry: {
-                        functionId: 'user-message-opencode-json-fallback',
-                    },
-                });
-
-                const fallbackEntries = parseJsonActionsText(fallback.text);
-                if (fallbackEntries) {
-                    return fallbackEntries;
-                }
-
-                logger.warn('Opencode JSON fallback output invalid', {
-                    modelRef,
-                    chatId: ctx.chat.id,
-                    finishReason: fallback.finishReason,
-                    usage: fallback.usage,
-                });
-                throw new Error('Opencode JSON fallback output invalid');
-            };
-
-            if (
-                generationPolicy.provider === 'opencode' &&
-                generationPolicy.telemetry.modelId.startsWith('deepseek-v4')
-            ) {
-                return await runOpencodeJsonFallback();
-            }
-
-            const result = await generateText({
-                model: generationPolicy.model,
-                providerOptions: generationPolicy.providerOptions,
-                temperature: effectiveConfig.ai.temperature,
-                topK: effectiveConfig.ai.topK,
-                topP: effectiveConfig.ai.topP,
-                maxOutputTokens: generationPolicy.maxOutputTokens,
-                maxRetries: maxGenerationRetries,
-                tools: {
-                    send_chat_actions: sendChatActionsTool,
-                },
-                toolChoice: {
-                    type: 'tool',
-                    toolName: 'send_chat_actions',
-                },
-                stopWhen: hasToolCall('send_chat_actions'),
-                instructions: input.instructions,
-                messages: input.messages,
-                telemetry: {
-                    functionId: 'user-message',
-                },
-            });
-
-            const entries = parseSendChatActionsEntries(result.toolCalls);
-            if (entries) {
-                return entries;
-            }
-
-            logger.warn(
-                'Structured tool call missing or invalid after retries',
-                {
-                    modelRef,
-                    chatId: ctx.chat.id,
-                    finishReason: result.finishReason,
-                    toolCalls: result.toolCalls.map((call) => call.toolName),
-                    usage: result.usage,
-                },
-            );
-            throw new Error(
-                'Structured tool call missing or invalid after retries',
-            );
-        };
-
         let output: ChatEntry[] | undefined;
         let generationError: unknown;
 
@@ -706,9 +586,46 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             }
 
             try {
-                const generatedOutput = await generateStructuredActionsOutput(
-                    generationInput,
-                );
+                const generatedOutput = await generateStructuredOutput({
+                    policy: generationPolicy,
+                    prompt: {
+                        kind: 'messages',
+                        instructions: generationInput.instructions,
+                        messages: generationInput.messages,
+                    },
+                    temperature: effectiveConfig.ai.temperature,
+                    topK: effectiveConfig.ai.topK,
+                    topP: effectiveConfig.ai.topP,
+                    maxRetries: maxGenerationRetries,
+                    tool: {
+                        definition: sendChatActionsTool,
+                        name: 'send_chat_actions',
+                        parse: (value) => {
+                            const parsed = chatActionsToolInputSchema.safeParse(
+                                value,
+                            );
+                            if (parsed.success) {
+                                return parsed.data.entries;
+                            }
+                            return undefined;
+                        },
+                    },
+                    json: {
+                        instruction:
+                            'Return only a valid JSON array of actions. Do not use markdown fences or prose.',
+                        parse: (value) => {
+                            const entries = parseChatEntriesFromUnknown(value);
+                            if (entries) {
+                                return entries;
+                            }
+                            return undefined;
+                        },
+                    },
+                    telemetry: {
+                        toolFunctionId: 'user-message',
+                        jsonFunctionId: 'user-message-opencode-json-fallback',
+                    },
+                });
                 if (hasReservedMessageToken(generatedOutput)) {
                     throw new Error(RESERVED_MESSAGE_TOKEN_ERROR);
                 }
@@ -753,9 +670,12 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 }
             }
 
-            const blockedByProviderMessage = character
-                ? 'API провайдер запрещает тебе отвечать. Возможно это из-за персонажа: '
-                : 'API провайдер запрещает тебе отвечать: ';
+            let blockedByProviderMessage =
+                'API провайдер запрещает тебе отвечать: ';
+            if (character) {
+                blockedByProviderMessage =
+                    'API провайдер запрещает тебе отвечать. Возможно это из-за персонажа: ';
+            }
 
             if (blockReason === 'PROHIBITED_CONTENT') {
                 logger.warn(
@@ -781,10 +701,17 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
         }
 
         const name = chatName;
-        const username = ctx.chat?.username ? `(@${ctx.chat.username})` : '';
+        let username = '';
+        if (ctx.chat?.username) {
+            username = `(@${ctx.chat.username})`;
+        }
+        let randomMessageSuffix = '';
+        if (ctx.info.isRandom) {
+            randomMessageSuffix = '(random)';
+        }
 
         logger.info(
-            `Time to get response ${ctx.info.isRandom ? '(random)' : ''}:`,
+            `Time to get response ${randomMessageSuffix}:`,
             (new Date().getTime() - time) / 1000,
             `for "${name}" ${username}. `,
         );

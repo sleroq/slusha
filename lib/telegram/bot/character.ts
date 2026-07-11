@@ -9,7 +9,7 @@ import { getCharacter, getCharacters, pageSize } from '../../charhub/api.ts';
 import { sliceMessage } from '../../helpers.ts';
 import logger from '../../logger.ts';
 import { InlineQueryResultArticle } from 'grammy_types';
-import { generateText, hasToolCall, tool } from 'ai';
+import { tool } from 'ai';
 import z from 'zod';
 import { limit } from 'grammy_ratelimiter';
 import DOMPurify from 'isomorphic-dompurify';
@@ -17,6 +17,7 @@ import remarkHtml from 'remark-html';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
+import { generateStructuredOutput } from '../../ai/structured-generation.ts';
 import { CharacterRepository } from '../../persistence/characters.ts';
 import { MessageRepository } from '../../persistence/messages.ts';
 
@@ -28,38 +29,6 @@ const characterNamesTool = tool({
     description: 'Submit generated character name variants.',
     inputSchema: characterNamesInputSchema,
 });
-
-function parseCharacterNamesText(text: string): string[] | undefined {
-    const trimmed = text.trim();
-    if (!trimmed) return undefined;
-
-    const candidates = [trimmed];
-    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-    if (fenced?.[1]) {
-        candidates.push(fenced[1].trim());
-    }
-
-    const objectStart = trimmed.indexOf('{');
-    const objectEnd = trimmed.lastIndexOf('}');
-    if (objectStart >= 0 && objectEnd > objectStart) {
-        candidates.push(trimmed.slice(objectStart, objectEnd + 1));
-    }
-
-    for (const candidate of candidates) {
-        try {
-            const parsed = JSON.parse(candidate);
-            const namesObject = characterNamesInputSchema.safeParse(parsed);
-            if (namesObject.success) return namesObject.data.names;
-
-            const namesArray = z.array(z.string()).safeParse(parsed);
-            if (namesArray.success) return namesArray.data;
-        } catch {
-            // Try the next common JSON wrapping style.
-        }
-    }
-
-    return undefined;
-}
 
 const bot = new Composer<SlushaContext>();
 
@@ -469,65 +438,38 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         const prompt =
             `Напиши варианты имени "${character.name}", которые пользователи могут использовать в качестве обращения к этому персонажу. ` +
             'Варианты должны быть на русском, английском, уменьшительно ласкательные и очевидные похожие формы.';
-        const runOpencodeJsonFallback = async (): Promise<string[]> => {
-            const fallback = await generateText({
-                model: generationPolicy.model,
-                temperature: config.temperature,
-                topP: config.topP,
-                maxOutputTokens: generationPolicy.maxOutputTokens,
-                prompt: prompt +
-                    ' Верни только JSON объект вида {"names":["..."]}, без markdown и пояснений.',
-                telemetry: {
-                    functionId: 'character-names-opencode-json-fallback',
+        names = await generateStructuredOutput({
+            policy: generationPolicy,
+            prompt: { kind: 'prompt', prompt },
+            temperature: config.temperature,
+            topK: config.topK,
+            topP: config.topP,
+            tool: {
+                definition: characterNamesTool,
+                name: 'submit_character_names',
+                parse: (value) => {
+                    const parsed = characterNamesInputSchema.safeParse(value);
+                    return parsed.success ? parsed.data.names : undefined;
                 },
-            });
-            const parsedNames = parseCharacterNamesText(fallback.text);
-            if (parsedNames) return parsedNames;
-            throw new Error('Opencode character names JSON fallback invalid');
-        };
+            },
+            json: {
+                instruction:
+                    'Верни только JSON объект вида {"names":["..."]}, без markdown и пояснений.',
+                parse: (value) => {
+                    const namesObject = characterNamesInputSchema.safeParse(
+                        value,
+                    );
+                    if (namesObject.success) return namesObject.data.names;
 
-        let result;
-        if (
-            generationPolicy.provider === 'opencode' &&
-            generationPolicy.telemetry.modelId.startsWith('deepseek-v4')
-        ) {
-            names = await runOpencodeJsonFallback();
-        } else {
-            result = await generateText({
-                model: generationPolicy.model,
-                providerOptions: generationPolicy.providerOptions,
-                temperature: config.temperature,
-                topK: config.topK,
-                topP: config.topP,
-                maxOutputTokens: generationPolicy.maxOutputTokens,
-                tools: {
-                    submit_character_names: characterNamesTool,
+                    const namesArray = z.array(z.string()).safeParse(value);
+                    return namesArray.success ? namesArray.data : undefined;
                 },
-                toolChoice: {
-                    type: 'tool',
-                    toolName: 'submit_character_names',
-                },
-                stopWhen: hasToolCall('submit_character_names'),
-                prompt,
-                telemetry: {
-                    functionId: 'character-names',
-                },
-            });
-        }
-
-        if (names.length === 0) {
-            if (!result) {
-                throw new Error('Character names generation result missing');
-            }
-
-            const toolCall = result.toolCalls.find((call) =>
-                call.toolName === 'submit_character_names'
-            );
-            if (!toolCall) {
-                throw new Error('Character names tool call missing');
-            }
-            names = characterNamesInputSchema.parse(toolCall.input).names;
-        }
+            },
+            telemetry: {
+                toolFunctionId: 'character-names',
+                jsonFunctionId: 'character-names-opencode-json-fallback',
+            },
+        });
     } catch (error) {
         logger.error(error, 'Error getting names for character');
         return await ctx.reply(ctx.t('character-names-error'));
