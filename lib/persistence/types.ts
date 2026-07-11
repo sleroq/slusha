@@ -59,7 +59,6 @@ export interface Member {
     id: number;
     username?: string;
     first_name: string;
-    description: string;
     info: User;
     lastUse: number;
 }

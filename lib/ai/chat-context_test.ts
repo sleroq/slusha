@@ -24,7 +24,6 @@ function createMember(first_name: string, username?: string): Member {
         id: 1,
         first_name,
         username,
-        description: '',
         info: {} as unknown as User,
         lastUse: Date.now(),
     };

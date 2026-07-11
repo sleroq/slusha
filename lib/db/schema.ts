@@ -1,5 +1,6 @@
 import {
     foreignKey,
+    index,
     integer,
     primaryKey,
     sqliteTable,
@@ -34,19 +35,27 @@ export const configEntryHistory = sqliteTable('config_entry_history', {
     updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(0),
 });
 
+export const telegramUsers = sqliteTable('telegram_users', {
+    id: integer('id', { mode: 'number' }).primaryKey(),
+    username: text('username'),
+    firstName: text('first_name').notNull(),
+    info: text('info').notNull(),
+    lastSeen: integer('last_seen', { mode: 'number' }).notNull().default(0),
+});
+
 export const chatMembers = sqliteTable('chat_members', {
     chatId: integer('chat_id', { mode: 'number' }).notNull().references(
         () => chats.id,
         { onDelete: 'cascade' },
     ),
-    userId: integer('user_id', { mode: 'number' }).notNull(),
-    username: text('username'),
-    firstName: text('first_name').notNull(),
-    description: text('description').notNull().default(''),
-    info: text('info').notNull(),
+    userId: integer('user_id', { mode: 'number' }).notNull().references(
+        () => telegramUsers.id,
+    ),
     lastUse: integer('last_use', { mode: 'number' }).notNull().default(0),
 }, (table) => [
     primaryKey({ columns: [table.chatId, table.userId] }),
+    index('chat_members_chat_activity_idx').on(table.chatId, table.lastUse),
+    index('chat_members_user_activity_idx').on(table.userId, table.lastUse),
 ]);
 
 export const chatOptOutUsers = sqliteTable('chat_opt_out_users', {
