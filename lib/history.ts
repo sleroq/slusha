@@ -263,32 +263,30 @@ const messageMetadataFields = new Set<string>([
     'reply_markup',
 ]);
 
-const supportedTextContentTypes = new Set<string>([
-    ...Array.from(supportedTypesMap.keys()).map(String),
-    ...jsonTypes.map(String),
-]);
-
-function getPresentMessageFields(msgInfo: Message): string[] {
-    const rawMsg = msgInfo as unknown as Record<string, unknown>;
-
-    return Object.keys(rawMsg).filter((key) => rawMsg[key] !== undefined);
-}
-
-function getPresentContentFields(msgInfo: Message): string[] {
-    return getPresentMessageFields(msgInfo).filter((field) =>
-        !messageMetadataFields.has(field)
+function throwUnsupportedMessageError(msg: ChatMessage): never {
+    const contentFields = Object.entries(msg.info)
+        .filter(([field, value]) =>
+            value !== undefined && !messageMetadataFields.has(field)
+        )
+        .map(([field]) => field);
+    const supportedMessageFields = new Set<string>(
+        supportedTypesMap.keys(),
     );
-}
-
-function getSupportedContentFields(msgInfo: Message): string[] {
-    return getPresentContentFields(msgInfo).filter((field) =>
-        supportedTextContentTypes.has(field)
+    const jsonMessageFields = new Set<string>(jsonTypes);
+    const supportedFields = contentFields.filter((field) =>
+        supportedMessageFields.has(field) || jsonMessageFields.has(field)
     );
-}
-
-function getUnsupportedContentFields(msgInfo: Message): string[] {
-    return getPresentContentFields(msgInfo).filter((field) =>
-        !supportedTextContentTypes.has(field)
+    const unsupportedFields = contentFields.filter((field) =>
+        !supportedMessageFields.has(field) && !jsonMessageFields.has(field)
+    );
+    throw new Error(
+        [
+            'Message is not supported',
+            `(message_id=${msg.id})`,
+            `(has_text=${Boolean(msg.text)})`,
+            `(supported_fields=${supportedFields.join(',') || 'none'})`,
+            `(unsupported_fields=${unsupportedFields.join(',') || 'none'})`,
+        ].join(' '),
     );
 }
 
@@ -352,17 +350,7 @@ async function constructMsg(
     }
 
     if (!text) {
-        const supportedFields = getSupportedContentFields(msg.info);
-        const unsupportedFields = getUnsupportedContentFields(msg.info);
-        throw new Error(
-            [
-                'Message is not supported',
-                `(message_id=${msg.id})`,
-                `(has_text=${Boolean(msg.text)})`,
-                `(supported_fields=${supportedFields.join(',') || 'none'})`,
-                `(unsupported_fields=${unsupportedFields.join(',') || 'none'})`,
-            ].join(' '),
-        );
+        throwUnsupportedMessageError(msg);
     }
 
     const parts: UserContent = [];
@@ -499,14 +487,25 @@ async function constructMsg(
         try {
             attachments = await getAttachments(api, botInfo.token, msg);
         } catch (error) {
+            const rawMsg = msg.info as unknown as Record<string, unknown>;
+            const contentFields = Object.keys(rawMsg).filter((field) =>
+                rawMsg[field] !== undefined &&
+                !messageMetadataFields.has(field)
+            );
             logger.error('Could not download message attachments', {
                 error,
                 messageId: msg.id,
                 isMyself: msg.isMyself,
                 hasText: Boolean(msg.text),
                 textLength: msg.text?.length ?? 0,
-                supportedFields: getSupportedContentFields(msg.info),
-                unsupportedFields: getUnsupportedContentFields(msg.info),
+                supportedFields: contentFields.filter((field) =>
+                    supportedTypesMap.has(field as keyof Message) ||
+                    jsonTypes.includes(field as keyof Message)
+                ),
+                unsupportedFields: contentFields.filter((field) =>
+                    !supportedTypesMap.has(field as keyof Message) &&
+                    !jsonTypes.includes(field as keyof Message)
+                ),
             });
         }
 
@@ -564,14 +563,25 @@ export async function makeHistory(
                 },
             );
         } catch (error) {
+            const rawMsg = msg.info as unknown as Record<string, unknown>;
+            const contentFields = Object.keys(rawMsg).filter((field) =>
+                rawMsg[field] !== undefined &&
+                !messageMetadataFields.has(field)
+            );
             logger.error('Could not construct replied message', {
                 error,
                 messageId: msg.id,
                 isMyself: msg.isMyself,
                 hasText: Boolean(msg.text),
                 textLength: msg.text?.length ?? 0,
-                supportedFields: getSupportedContentFields(msg.info),
-                unsupportedFields: getUnsupportedContentFields(msg.info),
+                supportedFields: contentFields.filter((field) =>
+                    supportedTypesMap.has(field as keyof Message) ||
+                    jsonTypes.includes(field as keyof Message)
+                ),
+                unsupportedFields: contentFields.filter((field) =>
+                    !supportedTypesMap.has(field as keyof Message) &&
+                    !jsonTypes.includes(field as keyof Message)
+                ),
             });
             continue;
         }
