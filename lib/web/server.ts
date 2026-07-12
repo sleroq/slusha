@@ -23,15 +23,8 @@ const routes: Route[] = [
             }),
     },
     {
-        pattern: new URLPattern({ pathname: '/web/' }),
-        handler: (req) => {
-            console.log(req.url);
-
-            return serveDir(req, {
-                fsRoot: './web/build',
-                urlRoot: 'web',
-            });
-        },
+        pattern: new URLPattern({ pathname: '/' }),
+        handler: (req) => serveDir(req, { fsRoot: './web/build' }),
     },
 ];
 
