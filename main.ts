@@ -10,19 +10,14 @@ import registerAll from './lib/telegram/register-all.ts';
 import { startTelemetry } from './lib/app/observability.ts';
 import { startSchedulers } from './lib/app/scheduler.ts';
 import { wireShutdown } from './lib/app/shutdown.ts';
-import { logMemoryUsage } from './lib/app/memory-debug.ts';
 import { startWebServer } from './lib/web/server.ts';
 
-logMemoryUsage('startup');
-
 const sdk = await startTelemetry();
-logMemoryUsage('after telemetry');
 
 await migrateDb();
 
 const db = getDb();
 logger.info('Database ready');
-logMemoryUsage('after database init');
 
 let config: Config;
 try {
@@ -33,13 +28,11 @@ try {
 }
 
 const bot = await setupBot(config, db);
-logMemoryUsage('after bot setup');
 
 startWebServer();
 
 // Register everything in correct order
 registerAll(bot);
-logMemoryUsage('after middleware registration');
 
 run(bot, {
     runner: {
@@ -73,7 +66,6 @@ run(bot, {
     },
 });
 logger.info('Bot started');
-logMemoryUsage('bot started');
 
 // TODO: Remind users about bot existence
 
