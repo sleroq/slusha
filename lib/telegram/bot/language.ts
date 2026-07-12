@@ -2,6 +2,7 @@ import { Composer, InlineKeyboard } from 'grammy';
 import logger from '../../logger.ts';
 import { replyWithHTML } from '../helpers.ts';
 import { SlushaContext } from '../setup-bot.ts';
+import { ConfigurationService } from '../../configuration-service.ts';
 
 const bot = new Composer<SlushaContext>();
 
@@ -72,13 +73,38 @@ bot.callbackQuery(/set-lang .*/, async (ctx) => {
             return ctx.answerCallbackQuery(ctx.t('language-invalid-locale'));
         }
 
+        let isChatAdmin = chat.type === 'private';
+        if (!ctx.globalRoles.has('bot_admin') && !isChatAdmin) {
+            try {
+                const member = await ctx.api.getChatMember(
+                    chat.id,
+                    ctx.from.id,
+                );
+                isChatAdmin = member.status === 'administrator' ||
+                    member.status === 'creator';
+            } catch (error) {
+                logger.warn(
+                    'Could not check chat admin for language change',
+                    error,
+                );
+            }
+            if (!isChatAdmin) {
+                return ctx.answerCallbackQuery(ctx.t('admin-only'));
+            }
+        }
+
         const current = (await ctx.chats.getChat(chat)).locale ??
             await ctx.i18n.getLocale();
         if (current === locale) {
             return ctx.answerCallbackQuery(ctx.t('language-already-set'));
         }
 
-        await ctx.chats.patchChat(chat.id, { locale });
+        await new ConfigurationService(ctx.db, ctx.from.id, {
+            globalRoles: ctx.globalRoles,
+            chatId: chat.id,
+            isChatMember: true,
+            isChatAdmin,
+        }).setValue({ scope: 'chat', chatId: chat.id }, 'locale', locale);
         ctx.i18n.useLocale(locale);
 
         const keyboard = buildLanguageKeyboard(locale, ownerId);

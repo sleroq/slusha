@@ -1,12 +1,9 @@
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbClient } from '../db/client.ts';
-import { configEntries, configEntryHistory } from '../db/schema.ts';
-import {
-    chatScopeKey,
-    getEffectiveUserConfig,
-    validateConfigEntryValue,
-} from '../config.ts';
+import { configEntries } from '../db/schema.ts';
+import { chatScopeKey, getEffectiveUserConfig } from '../config.ts';
+import { ConfigEntryRepository, type ConfigTx } from './config-entries.ts';
 
 const chatStateSchema = z.object({
     disableRepliesDueToRights: z.boolean().optional(),
@@ -14,13 +11,13 @@ const chatStateSchema = z.object({
 });
 
 type ChatState = z.infer<typeof chatStateSchema>;
-type Tx = Parameters<Parameters<DbClient['transaction']>[0]>[0];
-
 export class ChatConfigRepository {
     private scopeKey: string;
+    private entries: ConfigEntryRepository;
 
     constructor(private db: DbClient, private chatId: number) {
         this.scopeKey = chatScopeKey(chatId);
+        this.entries = new ConfigEntryRepository(db, this.scopeKey, 'chat');
     }
 
     async getChatState(): Promise<ChatState | undefined> {
@@ -47,12 +44,11 @@ export class ChatConfigRepository {
     }
 
     setValue(key: string, value: unknown, updatedBy?: number) {
-        validateConfigEntryValue(key, value);
-        return this.setRow(key, value, updatedBy);
+        return this.entries.setValue(key, value, updatedBy);
     }
 
     resetValue(key: string, updatedBy?: number) {
-        return this.deleteRow(key, updatedBy);
+        return this.entries.resetValue(key, updatedBy);
     }
 
     disableRepliesDueToRights() {
@@ -96,7 +92,7 @@ export class ChatConfigRepository {
             unknown,
         ]>;
         const expectedKeys = new Set(entries.map(([key]) => `state.${key}`));
-        await this.db.transaction(async (tx: Tx) => {
+        await this.db.transaction(async (tx: ConfigTx) => {
             for (
                 const key of [
                     'state.disableRepliesDueToRights',
@@ -104,91 +100,17 @@ export class ChatConfigRepository {
                 ]
             ) {
                 if (!expectedKeys.has(key)) {
-                    await this.deleteRowInTx(tx, key, updatedBy);
+                    await this.entries.resetRawValueInTx(tx, key, updatedBy);
                 }
             }
             for (const [key, entryValue] of entries) {
-                await this.setRowInTx(
+                await this.entries.setRawValueInTx(
                     tx,
                     `state.${key}`,
                     entryValue,
                     updatedBy,
                 );
             }
-        });
-    }
-
-    private async setRow(key: string, value: unknown, updatedBy?: number) {
-        await this.db.transaction(async (tx: Tx) => {
-            await this.setRowInTx(tx, key, value, updatedBy);
-        });
-    }
-
-    private async setRowInTx(
-        tx: Tx,
-        key: string,
-        value: unknown,
-        updatedBy?: number,
-    ) {
-        const old = await tx.query.configEntries.findFirst({
-            where: and(
-                eq(configEntries.scopeKey, this.scopeKey),
-                eq(configEntries.key, key),
-            ),
-        });
-        const oldValue = old?.value ?? null;
-        const newValue = JSON.stringify(value);
-        const now = Date.now();
-        await tx.insert(configEntries).values({
-            scopeKey: this.scopeKey,
-            key,
-            value: newValue,
-            updatedBy,
-            updatedAt: now,
-        }).onConflictDoUpdate({
-            target: [configEntries.scopeKey, configEntries.key],
-            set: { value: newValue, updatedBy, updatedAt: now },
-        });
-        await tx.insert(configEntryHistory).values({
-            scopeKey: this.scopeKey,
-            key,
-            oldValue,
-            newValue,
-            action: 'set',
-            updatedBy,
-            updatedAt: now,
-        });
-    }
-
-    private async deleteRow(key: string, updatedBy?: number) {
-        await this.db.transaction(async (tx: Tx) => {
-            await this.deleteRowInTx(tx, key, updatedBy);
-        });
-    }
-
-    private async deleteRowInTx(tx: Tx, key: string, updatedBy?: number) {
-        const old = await tx.query.configEntries.findFirst({
-            where: and(
-                eq(configEntries.scopeKey, this.scopeKey),
-                eq(configEntries.key, key),
-            ),
-        });
-        const oldValue = old?.value ?? null;
-        if (oldValue === null) return;
-        const now = Date.now();
-        await tx.delete(configEntries).where(
-            and(
-                eq(configEntries.scopeKey, this.scopeKey),
-                eq(configEntries.key, key),
-            ),
-        );
-        await tx.insert(configEntryHistory).values({
-            scopeKey: this.scopeKey,
-            key,
-            oldValue,
-            action: 'reset',
-            updatedBy,
-            updatedAt: now,
         });
     }
 }

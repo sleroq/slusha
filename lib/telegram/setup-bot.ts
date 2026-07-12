@@ -15,6 +15,8 @@ import { canMemberSendTextMessages } from './reply-rights.ts';
 import { Message } from 'grammy_types';
 import { isRegisteredCommand } from './register-all.ts';
 import reactions from './handlers/reactions.ts';
+import { UserRoleRepository } from '../persistence/user-roles.ts';
+import type { GlobalRole } from '../persistence/user-roles.ts';
 
 interface RequestInfo {
     isRandom: boolean;
@@ -40,6 +42,7 @@ export type SlushaContext = Context & I18nFlavor & {
     members: MemberRepository;
     messages: MessageRepository;
     optOuts: OptOutRepository;
+    globalRoles: ReadonlySet<GlobalRole>;
 };
 
 function isSameTopic(left: Message, right: Message): boolean {
@@ -136,6 +139,9 @@ export default async function setupBot(
     bot.use(async (ctx, next) => {
         // Init custom context
         ctx.db = db;
+        ctx.globalRoles = ctx.from
+            ? await new UserRoleRepository(db).getActiveRoles(ctx.from.id)
+            : new Set();
         ctx.chats = new ChatRepository(db);
         let aiConfig = config.ai;
         if (ctx.chat) {

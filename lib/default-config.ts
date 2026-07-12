@@ -160,15 +160,6 @@ const defaultConfig = {
     tendToIgnoreProbability: 90,
     blacklistedReactions: [],
     filesMaxAge: 72,
-    adminIds: [
-        308552322,
-        855109381,
-        783255786,
-        585847096,
-        5371117573,
-        210860903,
-    ],
-    trustedIds: [],
     availableModels: [
         'gemini-3.1-flash-lite-preview',
     ],

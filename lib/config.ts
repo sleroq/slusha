@@ -4,6 +4,7 @@ import { DbClient, getDb } from './db/client.ts';
 import { configEntries } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { ALLOWED_REACTIONS } from './telegram/reactions.ts';
+import { getConfigOptionPolicy } from './config-access.ts';
 
 function isValidRegex(val: unknown): val is RegExp {
     if (val instanceof RegExp) return true;
@@ -118,8 +119,6 @@ export const configSchema = z.object({
     ).default([]),
     nepons: z.array(z.string().max(500)).max(256),
     filesMaxAge: boundedPositiveInt(1, 720).default(72),
-    adminIds: z.array(z.number().int()).max(256).optional(),
-    trustedIds: z.array(z.number().int()).max(10000).default([]),
     availableModels: z.array(z.string().min(1).max(200)).min(1).max(256)
         .default([
             'gemini-3.1-flash-lite-preview',
@@ -186,24 +185,6 @@ function isPlainObject(value: unknown): value is PlainObject {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function flattenConfig(value: unknown, prefix = ''): Map<string, unknown> {
-    const result = new Map<string, unknown>();
-    if (!isPlainObject(value)) return result;
-
-    for (const [key, child] of Object.entries(value)) {
-        const path = prefix ? `${prefix}.${key}` : key;
-        if (isPlainObject(child) && !('__regex' in child)) {
-            for (const [childPath, childValue] of flattenConfig(child, path)) {
-                result.set(childPath, childValue);
-            }
-        } else {
-            result.set(path, child);
-        }
-    }
-
-    return result;
-}
-
 function setPath(target: PlainObject, path: string, value: unknown) {
     const parts = path.split('.');
     let node = target;
@@ -224,12 +205,14 @@ function cloneStoredConfig(input: StoredUserConfig): StoredUserConfig {
 function mergeStoredRows(
     base: StoredUserConfig,
     rows: Array<{ key: string; value: string }>,
+    scope: 'global' | 'chat',
 ): StoredUserConfig {
-    const supportedKeys = flattenConfig(base);
     const next = cloneStoredConfig(base);
 
     for (const row of rows) {
-        if (!supportedKeys.has(row.key)) continue;
+        if (!getConfigOptionPolicy(row.key)?.[scope]) {
+            continue;
+        }
         setPath(next as unknown as PlainObject, row.key, JSON.parse(row.value));
     }
 
@@ -251,10 +234,14 @@ function getStoredDefaults(): StoredUserConfig {
     return toStoredUserConfig(parsedDefaults.data);
 }
 
-export function validateConfigEntryValue(key: string, value: unknown): void {
+export function validateConfigEntryValue(
+    key: string,
+    value: unknown,
+    scope?: 'global' | 'chat',
+): void {
     const defaults = getStoredDefaults();
-    const supportedKeys = flattenConfig(defaults);
-    if (!supportedKeys.has(key)) {
+    const policy = getConfigOptionPolicy(key);
+    if (!policy || (scope !== undefined && !policy[scope])) {
         throw new Error(`Unsupported config key: ${key}`);
     }
 
@@ -277,7 +264,7 @@ export async function getGlobalUserConfig(
     const rows = await db.query.configEntries.findMany({
         where: eq(configEntries.scopeKey, 'global'),
     });
-    const stored = mergeStoredRows(defaults, rows);
+    const stored = mergeStoredRows(defaults, rows, 'global');
     const parsed = configSchema.safeParse(fromStoredUserConfig(stored));
     if (!parsed.success) {
         throw new Error(
@@ -299,7 +286,7 @@ export async function getEffectiveUserConfig(
     const rows = await db.query.configEntries.findMany({
         where: eq(configEntries.scopeKey, chatScopeKey(options.chatId)),
     });
-    const stored = mergeStoredRows(toStoredUserConfig(global), rows);
+    const stored = mergeStoredRows(toStoredUserConfig(global), rows, 'chat');
     const parsed = configSchema.safeParse(fromStoredUserConfig(stored));
     if (!parsed.success) {
         throw new Error(

@@ -35,6 +35,30 @@ export const configEntryHistory = sqliteTable('config_entry_history', {
     updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(0),
 });
 
+export const userRoles = sqliteTable('user_roles', {
+    userId: integer('user_id', { mode: 'number' }).notNull(),
+    role: text('role', {
+        enum: ['bot_admin', 'trusted_user', 'paid_user'],
+    }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'number' }),
+    grantedBy: integer('granted_by', { mode: 'number' }),
+    grantedAt: integer('granted_at', { mode: 'number' }).notNull(),
+}, (table) => [
+    primaryKey({ columns: [table.userId, table.role] }),
+]);
+
+export const userRoleHistory = sqliteTable('user_role_history', {
+    id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+    userId: integer('user_id', { mode: 'number' }).notNull(),
+    role: text('role', {
+        enum: ['bot_admin', 'trusted_user', 'paid_user'],
+    }).notNull(),
+    action: text('action', { enum: ['grant', 'revoke'] }).notNull(),
+    changedBy: integer('changed_by', { mode: 'number' }),
+    changedAt: integer('changed_at', { mode: 'number' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'number' }),
+});
+
 export const telegramUsers = sqliteTable('telegram_users', {
     id: integer('id', { mode: 'number' }).primaryKey(),
     username: text('username'),

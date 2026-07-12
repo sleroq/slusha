@@ -328,9 +328,30 @@ bot.callbackQuery(/set.*/, async (ctx) => {
         return ctx.answerCallbackQuery(ctx.t('character-invalid-chat-id'));
     }
 
-    const userInChat = chat.members.find((member) => member.id === ctx.from.id);
-    if (!userInChat) {
-        return ctx.answerCallbackQuery(ctx.t('character-not-member'));
+    if (!ctx.globalRoles.has('bot_admin')) {
+        const userInChat = chat.members.find((member) =>
+            member.id === ctx.from.id
+        );
+        if (!userInChat) {
+            return ctx.answerCallbackQuery(ctx.t('character-not-member'));
+        }
+
+        if (chat.info.type !== 'private') {
+            let isAdmin = false;
+            try {
+                const member = await ctx.api.getChatMember(chatId, ctx.from.id);
+                isAdmin = member.status === 'administrator' ||
+                    member.status === 'creator';
+            } catch (error) {
+                logger.warn(
+                    'Could not check chat admin for character change',
+                    error,
+                );
+            }
+            if (!isAdmin) {
+                return ctx.answerCallbackQuery(ctx.t('admin-only'));
+            }
+        }
     }
 
     const characters = new CharacterRepository(ctx.db, chatId);
