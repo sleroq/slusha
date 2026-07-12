@@ -5,3 +5,5 @@
 !/lib/
 !/locales/
 !/drizzle/
+!/web/build/
+!/web/package.json*

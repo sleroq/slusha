@@ -4,6 +4,7 @@ import {
 } from '../app/metrics.ts';
 import logger from '../logger.ts';
 import { type Route, route } from '@std/http/unstable-route';
+import { serveDir } from '@std/http/file-server';
 
 const routes: Route[] = [
     {
@@ -20,6 +21,17 @@ const routes: Route[] = [
                     'cache-control': 'no-store',
                 },
             }),
+    },
+    {
+        pattern: new URLPattern({ pathname: '/web/' }),
+        handler: (req) => {
+            console.log(req.url);
+
+            return serveDir(req, {
+                fsRoot: './web/build',
+                urlRoot: 'web',
+            });
+        },
     },
 ];
 

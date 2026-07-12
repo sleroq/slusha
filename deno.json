@@ -20,7 +20,7 @@
     "unstable": ["fmt-component"],
     "nodeModulesDir": "auto",
     "imports": {
-        "@google/genai": "npm:@google/genai@^2.10.0",
+        "@google/genai": "npm:@google/genai@^2.11.0",
         "@opentelemetry/auto-instrumentations-node": "npm:@opentelemetry/auto-instrumentations-node@^0.78.0",
         "@opentelemetry/sdk-node": "npm:@opentelemetry/sdk-node@^0.220.0",
         "@langfuse/otel": "npm:@langfuse/otel@^5.9.1",
@@ -28,9 +28,10 @@
         "@std/assert": "jsr:@std/assert@^1.0.19",
         "@std/fs": "jsr:@std/fs@^1.0.24",
         "@std/http/unstable-route": "jsr:@std/http@^1.1.2/unstable-route",
-        "ai": "npm:ai@^7.0.16",
-        "@ai-sdk/google": "npm:@ai-sdk/google@^4.0.8",
-        "@ai-sdk/openai-compatible": "npm:@ai-sdk/openai-compatible@^3.0.5",
+        "@std/http/file-server": "jsr:@std/http@^1.1.2/file-server",
+        "ai": "npm:ai@^7.0.22",
+        "@ai-sdk/google": "npm:@ai-sdk/google@^4.0.12",
+        "@ai-sdk/openai-compatible": "npm:@ai-sdk/openai-compatible@^3.0.7",
         "@libsql/client": "npm:@libsql/client@^0.17.4",
         "@deno-library/logger": "jsr:@deno-library/logger@^1.2.0",
         "drizzle-kit": "npm:drizzle-kit@^0.31.10",
@@ -49,13 +50,8 @@
         "unified": "npm:unified@^11.0.5",
         "zod": "npm:zod@^4.4.3"
     },
-    "allowScripts": [
-        "npm:@google/genai@2.10.0",
-        "npm:esbuild@0.18.20",
-        "npm:esbuild@0.25.12",
-        "npm:esbuild@0.28.1",
-        "npm:fsevents@2.3.3",
-        "npm:protobufjs@7.6.5"
-    ],
+    "allowScripts": {
+        "allow": ["npm:@google/genai@2.11.0", "npm:esbuild@0.18.20", "npm:esbuild@0.25.12", "npm:esbuild@0.28.1", "npm:fsevents@2.3.3", "npm:protobufjs@7.6.5"]
+    },
     "workspace": ["./web/"]
 }
