@@ -1,0 +1,1 @@
+- Prefer if / else over ternary operators
