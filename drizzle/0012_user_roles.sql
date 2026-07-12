@@ -18,7 +18,7 @@ CREATE TABLE `user_role_history` (
 );
 --> statement-breakpoint
 INSERT INTO `user_roles` (`user_id`, `role`, `granted_at`)
-SELECT CAST(`value` AS integer), 'bot_admin', unixepoch() * 1000
+SELECT DISTINCT CAST(`value` AS integer), 'bot_admin', unixepoch() * 1000
 FROM json_each((
     SELECT `value` FROM `config_entries`
     WHERE `scope_key` = 'global' AND `key` = 'adminIds'
@@ -26,7 +26,7 @@ FROM json_each((
 WHERE json_type(`value`) = 'integer';
 --> statement-breakpoint
 INSERT INTO `user_roles` (`user_id`, `role`, `granted_at`)
-SELECT CAST(`value` AS integer), 'trusted_user', unixepoch() * 1000
+SELECT DISTINCT CAST(`value` AS integer), 'trusted_user', unixepoch() * 1000
 FROM json_each((
     SELECT `value` FROM `config_entries`
     WHERE `scope_key` = 'global' AND `key` = 'trustedIds'
