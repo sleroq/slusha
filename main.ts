@@ -29,12 +29,12 @@ try {
 
 const bot = await setupBot(config, db);
 
-startWebServer();
+const webServer = startWebServer();
 
 // Register everything in correct order
 registerAll(bot);
 
-run(bot, {
+const runner = run(bot, {
     runner: {
         // @ts-expect-error drop_pending_updates is supported by grammY runner
         drop_pending_updates: true,
@@ -71,7 +71,6 @@ logger.info('Bot started');
 
 // TODO: Remind users about bot existence
 
-const _stopSchedulers = startSchedulers({ db, logger });
+const stopSchedulers = startSchedulers({ db, logger });
 
-// Save memory on exit
-wireShutdown(bot, sdk);
+wireShutdown({ runner, webServer, stopSchedulers, sdk });
