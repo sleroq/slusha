@@ -6,5 +6,5 @@
 /tmp/
 /backups/
 /node_modules/
-# /docs/
+/docs/
 /.envrc

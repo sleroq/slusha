@@ -3,21 +3,13 @@
         "strict": true
     },
     "lint": {
-        "include": [
-            "*.ts",
-            "lib/"
-        ],
+        "include": ["*.ts", "lib/"],
         "rules": {
-            "tags": [
-                "recommended"
-            ]
+            "tags": ["recommended"]
         }
     },
     "fmt": {
-        "include": [
-            "*.ts",
-            "lib/"
-        ],
+        "include": ["*.ts", "lib/"],
         "useTabs": false,
         "lineWidth": 80,
         "indentWidth": 4,
@@ -25,6 +17,7 @@
         "singleQuote": true,
         "proseWrap": "preserve"
     },
+    "unstable": ["fmt-component"],
     "nodeModulesDir": "auto",
     "imports": {
         "@google/genai": "npm:@google/genai@^2.10.0",
@@ -63,5 +56,6 @@
         "npm:esbuild@0.28.1",
         "npm:fsevents@2.3.3",
         "npm:protobufjs@7.6.5"
-    ]
+    ],
+    "workspace": ["./web/"]
 }
