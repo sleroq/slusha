@@ -29,7 +29,7 @@ try {
 
 const bot = await setupBot(config, db);
 
-const webServer = startWebServer();
+const webServer = startWebServer(config);
 
 // Register everything in correct order
 registerAll(bot);
