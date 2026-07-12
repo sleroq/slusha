@@ -52,6 +52,7 @@
     "npm:svelte-check@^4.7.2": "4.7.2_svelte@5.56.4_typescript@6.0.3",
     "npm:svelte@^5.56.4": "5.56.4",
     "npm:tailwindcss@^4.3.2": "4.3.2",
+    "npm:telegram-webapps@^9.6.0": "9.6.0",
     "npm:typescript-eslint@^8.63.0": "8.63.0_eslint@10.7.0_typescript@6.0.3",
     "npm:typescript@^6.0.3": "6.0.3",
     "npm:unified@^11.0.5": "11.0.5",
@@ -3773,6 +3774,9 @@
         "bintrees"
       ]
     },
+    "telegram-webapps@9.6.0": {
+      "integrity": "sha512-1Tb7H+YiPe2XNq2ANRw6VWyIb4aXEir/Ra1uuxpfBGLRDYq6lD7CRFnF6YX6QBD+8j7d0d6wHW8f7Qm55uQKyQ=="
+    },
     "tinyglobby@0.2.17": {
       "integrity": "sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==",
       "dependencies": [
@@ -4110,6 +4114,7 @@
             "npm:svelte-check@^4.7.2",
             "npm:svelte@^5.56.4",
             "npm:tailwindcss@^4.3.2",
+            "npm:telegram-webapps@^9.6.0",
             "npm:typescript-eslint@^8.63.0",
             "npm:typescript@^6.0.3",
             "npm:vite@^8.1.4"
