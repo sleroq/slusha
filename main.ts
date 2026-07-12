@@ -67,6 +67,14 @@ const runner = run(bot, {
         },
     },
 });
+
+// The runner polls Telegram in a detached task; observe failures so Deno does
+// not terminate with an unhelpful "Uncaught null" message.
+void runner.task()?.catch((error) => {
+    logger.error('Telegram polling runner stopped unexpectedly:', error);
+    Deno.exit(1);
+});
+
 logger.info('Bot started');
 
 // TODO: Remind users about bot existence
