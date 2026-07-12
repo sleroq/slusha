@@ -1,7 +1,7 @@
 {
-  "recommendations": [
-    "svelte.svelte-vscode",
-    "dbaeumer.vscode-eslint",
-    "bradlc.vscode-tailwindcss"
-  ]
+	"recommendations": [
+		"svelte.svelte-vscode",
+		"dbaeumer.vscode-eslint",
+		"bradlc.vscode-tailwindcss"
+	]
 }
