@@ -79,7 +79,7 @@ bot.callbackQuery(/set-lang .*/, async (ctx) => {
         }
 
         await ctx.chats.patchChat(chat.id, { locale });
-        await ctx.i18n.useLocale(locale);
+        ctx.i18n.useLocale(locale);
 
         const keyboard = buildLanguageKeyboard(locale, ownerId);
 
