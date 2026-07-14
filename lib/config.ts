@@ -24,11 +24,9 @@ const matcherSchema = z.union([
 const thinkingLevelSchema = z.enum(['minimal', 'low', 'medium', 'high']);
 const googleThinkingConfigSchema = z.object({
     thinkingLevel: thinkingLevelSchema.optional(),
-    includeThoughts: z.boolean().optional(),
 });
 const generationTaskSchema = z.object({
     thinking: googleThinkingConfigSchema.optional(),
-    maxOutputTokens: z.number().int().min(1).max(65536).optional(),
 });
 const defaultGoogleSafetySettings: Array<
     { category: string; threshold: string }

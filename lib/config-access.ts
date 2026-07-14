@@ -73,23 +73,7 @@ const configOptionPolicyDefinitions = {
         global: managedGlobal,
         chat: managedChat,
     },
-    'ai.generation.chat.thinking.includeThoughts': {
-        global: managedGlobal,
-        chat: managedChat,
-    },
-    'ai.generation.chat.maxOutputTokens': {
-        global: managedGlobal,
-        chat: managedChat,
-    },
     'ai.generation.character.thinking.thinkingLevel': {
-        global: managedGlobal,
-        chat: managedChat,
-    },
-    'ai.generation.character.thinking.includeThoughts': {
-        global: managedGlobal,
-        chat: managedChat,
-    },
-    'ai.generation.character.maxOutputTokens': {
         global: managedGlobal,
         chat: managedChat,
     },

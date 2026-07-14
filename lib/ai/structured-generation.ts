@@ -48,7 +48,6 @@ export async function generateStructuredOutput<T>(
         temperature: input.temperature,
         topK: input.topK,
         topP: input.topP,
-        maxOutputTokens: input.policy.maxOutputTokens,
         maxRetries: input.maxRetries,
     };
 

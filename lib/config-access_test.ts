@@ -1,10 +1,10 @@
-import { assert, assertEquals } from '@std/assert';
+import { assert, assertEquals, assertThrows } from '@std/assert';
 import {
     canAccessConfig,
     canReadChatData,
     type ConfigAccessContext,
 } from './config-access.ts';
-import { validateConfigEntryValue } from './config.ts';
+import { ConfigValidationError, validateConfigEntryValue } from './config.ts';
 import type { GlobalRole } from './persistence/user-roles.ts';
 
 function access(
@@ -70,4 +70,18 @@ Deno.test('optional schema leaves are supported config entries', () => {
         'ai.generation.chat.thinking.thinkingLevel',
         'medium',
     );
+});
+
+Deno.test('max output tokens is not a supported config entry', () => {
+    for (
+        const key of [
+            'ai.generation.chat.maxOutputTokens',
+            'ai.generation.character.maxOutputTokens',
+        ]
+    ) {
+        assertThrows(
+            () => validateConfigEntryValue(key, 1000),
+            ConfigValidationError,
+        );
+    }
 });

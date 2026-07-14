@@ -46,8 +46,6 @@ export type ConfigEditor =
 const text = { kind: 'text' } as const;
 const multiline = { kind: 'text', multiline: true } as const;
 const boolean = { kind: 'boolean' } as const;
-const optionalNumber = { kind: 'number', optional: true } as const;
-const optionalBoolean = { kind: 'boolean', optional: true } as const;
 const probability = {
     kind: 'range',
     min: 0,
@@ -95,15 +93,11 @@ const configEditors = {
         options: ['minimal', 'low', 'medium', 'high'],
         optional: true,
     },
-    'ai.generation.chat.thinking.includeThoughts': optionalBoolean,
-    'ai.generation.chat.maxOutputTokens': optionalNumber,
     'ai.generation.character.thinking.thinkingLevel': {
         kind: 'select',
         options: ['minimal', 'low', 'medium', 'high'],
         optional: true,
     },
-    'ai.generation.character.thinking.includeThoughts': optionalBoolean,
-    'ai.generation.character.maxOutputTokens': optionalNumber,
     'startMessage': multiline,
     'names': { kind: 'matcher-list' },
     'tendToReply': { kind: 'matcher-list' },

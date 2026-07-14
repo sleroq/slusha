@@ -14,9 +14,7 @@ export interface GenerationPolicyTelemetry {
     modelRef: string;
     modelId: string;
     task: GenerationTask;
-    maxOutputTokens?: number;
     googleThinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
-    googleIncludeThoughts?: boolean;
     openrouterUsageInclude?: boolean;
     openrouterReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
 }
@@ -25,7 +23,6 @@ export interface ResolvedGenerationPolicy {
     model: LanguageModel;
     provider: ModelProvider;
     providerOptions?: ProviderOptions;
-    maxOutputTokens?: number;
     capabilities: ModelCapabilities;
     telemetry: GenerationPolicyTelemetry;
 }
@@ -110,7 +107,6 @@ function buildGoogleOptions(
         structuredOutputs?: boolean;
         thinkingConfig?: {
             thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
-            includeThoughts?: boolean;
         };
     } = {};
 
@@ -128,9 +124,6 @@ function buildGoogleOptions(
             {};
         if (thinking.thinkingLevel) {
             thinkingConfig.thinkingLevel = thinking.thinkingLevel;
-        }
-        if (thinking.includeThoughts !== undefined) {
-            thinkingConfig.includeThoughts = thinking.includeThoughts;
         }
         if (Object.keys(thinkingConfig).length > 0) {
             googleOptions.thinkingConfig = thinkingConfig;
@@ -199,7 +192,6 @@ export function resolveGenerationPolicy(
     input: GenerationPolicyInput,
 ): ResolvedGenerationPolicy {
     const parsed = parseModelRef(input.modelRef);
-    const taskConfig = input.config.generation[input.task];
 
     if (parsed.provider === 'google') {
         const providerOptions = buildGoogleOptions(
@@ -214,12 +206,10 @@ export function resolveGenerationPolicy(
             modelRef: parsed.raw,
             modelId: parsed.modelId,
             task: input.task,
-            maxOutputTokens: taskConfig.maxOutputTokens,
         };
 
         if (thinking) {
             telemetry.googleThinkingLevel = thinking.thinkingLevel;
-            telemetry.googleIncludeThoughts = thinking.includeThoughts;
         }
 
         return {
@@ -228,7 +218,6 @@ export function resolveGenerationPolicy(
             providerOptions: Object.keys(providerOptions).length > 0
                 ? providerOptions
                 : undefined,
-            maxOutputTokens: taskConfig.maxOutputTokens,
             capabilities: resolveModelCapabilities(
                 parsed.provider,
                 parsed.modelId,
@@ -245,7 +234,6 @@ export function resolveGenerationPolicy(
         return {
             model: createOpencodeModel(parsed.modelId, input.opencodeToken),
             provider: parsed.provider,
-            maxOutputTokens: taskConfig.maxOutputTokens,
             capabilities: resolveModelCapabilities(
                 parsed.provider,
                 parsed.modelId,
@@ -255,7 +243,6 @@ export function resolveGenerationPolicy(
                 modelRef: parsed.raw,
                 modelId: parsed.modelId,
                 task: input.task,
-                maxOutputTokens: taskConfig.maxOutputTokens,
             },
         };
     }
@@ -273,7 +260,6 @@ export function resolveGenerationPolicy(
         modelRef: parsed.raw,
         modelId: parsed.modelId,
         task: input.task,
-        maxOutputTokens: taskConfig.maxOutputTokens,
         openrouterUsageInclude: input.config.openrouter.usageInclude,
         openrouterReasoningEffort: reasoningEffort,
     };
@@ -284,7 +270,6 @@ export function resolveGenerationPolicy(
         providerOptions: Object.keys(providerOptions).length > 0
             ? providerOptions
             : undefined,
-        maxOutputTokens: taskConfig.maxOutputTokens,
         capabilities: resolveModelCapabilities(
             parsed.provider,
             parsed.modelId,

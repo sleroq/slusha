@@ -47,18 +47,8 @@ export function buildGenerationTelemetryMetadata(
 
     assignIfDefined(
         metadata,
-        'llm.max_output_tokens',
-        input.policy.telemetry.maxOutputTokens,
-    );
-    assignIfDefined(
-        metadata,
         'llm.google.thinking_level',
         input.policy.telemetry.googleThinkingLevel,
-    );
-    assignIfDefined(
-        metadata,
-        'llm.google.include_thoughts',
-        input.policy.telemetry.googleIncludeThoughts,
     );
     assignIfDefined(
         metadata,

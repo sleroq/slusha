@@ -31,7 +31,7 @@
         ['Generation', ['ai.temperature', 'ai.topK', 'ai.topP', 'ai.google.structuredOutputs', 'ai.openrouter.usageInclude']],
         ['Prompts', ['ai.prompt', 'ai.prePrompt', 'ai.privateChatPromptAddition', 'ai.groupChatPromptAddition', 'ai.commentsPromptAddition', 'ai.hateModePrompt', 'ai.finalPrompt', 'ai.chatActionsToolDescription', 'startMessage']],
         ['Language and reactions', ['locale', 'blacklistedReactions', 'nepons']],
-        ['Advanced', ['ai.google.safetySettings', 'ai.generation.chat.thinking.thinkingLevel', 'ai.generation.chat.thinking.includeThoughts', 'ai.generation.chat.maxOutputTokens', 'ai.generation.character.thinking.thinkingLevel', 'ai.generation.character.thinking.includeThoughts', 'ai.generation.character.maxOutputTokens']],
+        ['Advanced', ['ai.google.safetySettings', 'ai.generation.chat.thinking.thinkingLevel', 'ai.generation.character.thinking.thinkingLevel']],
     ] as const;
 
     function fieldFor(key: string) {

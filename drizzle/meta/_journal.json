@@ -92,6 +92,13 @@
             "when": 1783857600000,
             "tag": "0012_user_roles",
             "breakpoints": true
+        },
+        {
+            "idx": 13,
+            "version": "7",
+            "when": 1783944000000,
+            "tag": "0013_remove_max_output_tokens",
+            "breakpoints": true
         }
     ]
 }
