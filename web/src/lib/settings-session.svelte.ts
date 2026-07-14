@@ -31,6 +31,7 @@ export function createSettingsSession(dependencies: SettingsSessionDependencies 
     let saving = $state(false);
     let error = $state('');
     let pendingSelection = $state<ConfigSelection>();
+    let loadingSelection = $state<ConfigSelection>();
 
     function isResetPending(key: string) {
         return pendingResets.has(key);
@@ -100,14 +101,17 @@ export function createSettingsSession(dependencies: SettingsSessionDependencies 
 
     async function loadSelection(next: ConfigSelection) {
         error = '';
+        loadingSelection = next;
         loading = true;
         try {
             const response = await load(auth, next);
             install(response);
+            loadingSelection = undefined;
             loading = false;
             return true;
         } catch (cause) {
             setError(cause, 'Could not load settings');
+            loadingSelection = undefined;
             loading = false;
             return false;
         }
@@ -197,6 +201,7 @@ export function createSettingsSession(dependencies: SettingsSessionDependencies 
         get saving() { return saving; },
         get error() { return error; },
         get pendingSelection() { return pendingSelection; },
+        get loadingSelection() { return loadingSelection; },
         get currentChat() { return currentChat; },
         get privateChats() { return privateChats; },
         get groupChats() { return groupChats; },

@@ -24,6 +24,25 @@ function update(session: ReturnType<typeof createSettingsSession>, value: string
 }
 
 describe('settings session', () => {
+    it('exposes the selection currently being loaded', async () => {
+        let finishLoad!: (value: ConfigResponse) => void;
+        const pendingLoad = new Promise<ConfigResponse>((resolve) => { finishLoad = resolve; });
+        const load = vi.fn()
+            .mockResolvedValueOnce(response('personal', 'personal'))
+            .mockReturnValueOnce(pendingLoad);
+        const session = createSettingsSession({ load });
+        await session.initialize('auth');
+
+        const loading = session.requestSelection({ scope: 'global' });
+        expect(session.selection.scope).toBe('personal');
+        expect(session.loadingSelection).toEqual({ scope: 'global' });
+
+        finishLoad(response('global', 'global'));
+        expect(await loading).toBe(true);
+        expect(session.loadingSelection).toBeUndefined();
+        expect(session.selection.scope).toBe('global');
+    });
+
     it('keeps the committed snapshot when a selection load fails', async () => {
         const load = vi.fn()
             .mockResolvedValueOnce(response('personal', 'personal'))

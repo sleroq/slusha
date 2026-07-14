@@ -132,7 +132,7 @@
     </header>
 
     {#if session.loading}
-        <LoadingSkeleton personal={session.selection.scope === 'personal'} />
+        <LoadingSkeleton personal={(session.loadingSelection ?? session.selection).scope === 'personal'} />
     {:else if session.error && session.fields.length === 0}
         <p class="app-error rounded-[22px] p-4">{session.error}</p>
     {:else if expandedEditorField}
