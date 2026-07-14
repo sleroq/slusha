@@ -1,6 +1,7 @@
 {
     "compilerOptions": {
-        "strict": true
+        "strict": true,
+        "lib": ["deno.window", "dom", "dom.iterable", "esnext"]
     },
     "lint": {
         "include": ["*.ts", "lib/"],

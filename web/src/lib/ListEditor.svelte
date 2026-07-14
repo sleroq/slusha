@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Matcher } from './config';
+    import type { Matcher } from './config.ts';
 
     let {
         value,

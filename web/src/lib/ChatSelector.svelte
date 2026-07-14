@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { fade } from 'svelte/transition';
-    import type { ConfigChat } from './config';
+    import type { ConfigChat } from './config.ts';
 
     let {
         title,

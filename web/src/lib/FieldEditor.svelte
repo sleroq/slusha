@@ -1,7 +1,7 @@
 <script lang="ts">
     import ListEditor from './ListEditor.svelte';
     import ObjectListEditor from './ObjectListEditor.svelte';
-    import type { ConfigField, Matcher } from './config';
+    import type { ConfigField, Matcher } from './config.ts';
 
     let {
         field,
