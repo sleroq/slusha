@@ -1,6 +1,7 @@
 <script lang="ts">
     import ListEditor from './ListEditor.svelte';
     import ObjectListEditor from './ObjectListEditor.svelte';
+    import SelectEditor from './SelectEditor.svelte';
     import type { ConfigField, Matcher } from './config.ts';
 
     let {
@@ -25,7 +26,8 @@
 
     function booleanValue(value: boolean | null) {
         if (value === null) return '';
-        return String(value);
+        if (value) return 'Enabled';
+        return 'Disabled';
     }
 
     function rangeProgress(value: number, min: number, max: number) {
@@ -103,23 +105,14 @@
 
 {#if field.kind === 'boolean'}
     {#if field.optional}
-        <select
-            class="w-full rounded-xl border-0 bg-(--tg-theme-secondary-bg-color)"
-            aria-labelledby={labelledby}
+        <SelectEditor
             value={booleanValue(field.value)}
-            onchange={(event) => {
-                const selected = event.currentTarget.value;
-                if (selected === '') {
-                    onreset?.();
-                    return;
-                }
-                onchange({ ...field, value: selected === 'true' });
-            }}
-        >
-            <option value="">Not set</option>
-            <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
-        </select>
+            options={['Enabled', 'Disabled']}
+            optional={true}
+            {labelledby}
+            onreset={onreset}
+            onselect={(value) => onchange({ ...field, value: value === 'Enabled' })}
+        />
     {:else}
         <label class="relative inline-flex min-h-11 cursor-pointer items-center">
             <input
@@ -231,24 +224,14 @@
         })}
     />
 {:else if field.kind === 'select'}
-    <select
-        class="w-full rounded-xl border-0 bg-(--tg-theme-secondary-bg-color)"
-        aria-labelledby={labelledby}
+    <SelectEditor
         value={field.value ?? ''}
-        onchange={(event) => {
-            const value = event.currentTarget.value;
-            if (value === '' && field.optional) {
-                onreset?.();
-                return;
-            }
-            onchange({ ...field, value });
-        }}
-    >
-        {#if field.optional}<option value="">Not set</option>{/if}
-        {#each field.options as option (option)}
-            <option value={option}>{option}</option>
-        {/each}
-    </select>
+        options={field.options}
+        optional={field.optional}
+        {labelledby}
+        onreset={onreset}
+        onselect={(value) => onchange({ ...field, value })}
+    />
 {:else if field.multiline}
     <textarea
         class="min-h-48 w-full resize-y rounded-xl border-0 bg-(--tg-theme-secondary-bg-color) leading-relaxed"
