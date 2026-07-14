@@ -300,6 +300,10 @@ function getStoredDefaults(): StoredUserConfig {
     return toStoredUserConfig(parsedDefaults.data);
 }
 
+export function getDefaultUserConfig(): UserConfig {
+    return fromStoredUserConfig(getStoredDefaults());
+}
+
 export function validateConfigEntryValue(
     key: string,
     value: unknown,

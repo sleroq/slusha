@@ -8,6 +8,7 @@ import {
 import {
     chatScopeKey,
     deserializeConfigEntryValue,
+    getDefaultUserConfig,
     getEffectiveUserConfig,
     getGlobalUserConfig,
     serializeConfigEntryValue,
@@ -135,9 +136,14 @@ export class ConfigurationService {
     ) {}
 
     async listReadable(target: ConfigTarget) {
-        const config = target.scope === 'global'
-            ? await getGlobalUserConfig(this.db)
-            : await getEffectiveUserConfig({ chatId: target.chatId }, this.db);
+        const [config, inheritedConfig] = await Promise.all([
+            target.scope === 'global'
+                ? getGlobalUserConfig(this.db)
+                : getEffectiveUserConfig({ chatId: target.chatId }, this.db),
+            target.scope === 'global'
+                ? Promise.resolve(getDefaultUserConfig())
+                : getGlobalUserConfig(this.db),
+        ]);
         const canReadModels = canAccessConfig(
             'availableModels',
             'global',
@@ -166,6 +172,10 @@ export class ConfigurationService {
                 return {
                     key,
                     value: serializeConfigEntryValue(key, getPath(config, key)),
+                    inheritedValue: serializeConfigEntryValue(
+                        key,
+                        getPath(inheritedConfig, key),
+                    ),
                     ...editor,
                 };
             });

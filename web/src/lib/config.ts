@@ -12,7 +12,17 @@ type ConfigFieldBase = {
     key: string;
     overridden: boolean;
     writable: boolean;
+    inheritedValue?: ConfigValue;
 };
+
+export type ConfigValue =
+    | boolean
+    | number
+    | string
+    | null
+    | Matcher[]
+    | string[]
+    | Array<Record<string, string>>;
 
 export type ConfigField =
     & ConfigFieldBase
