@@ -50,7 +50,9 @@ Smartest girl in telegram.
 1. `cp scripts/env.bash.example scripts/env.bash`
 2. set up environment variables
 
-## Start:
+## Development
+
+Starts the Vite frontend and backend server.
 
 ```bash
 scripts/run.bash
@@ -109,6 +111,10 @@ docker run -d \
   -e BOT_TOKEN=your_bot_token \
   -e AI_TOKEN=your_ai_token \
   slusha-bot
+
+# Push
+docker build -t <registry>/slusha:latest .
+docker push <registry>/slusha:latest
 
 # Using Docker Compose
 docker-compose --profile production up -d slusha-prod
