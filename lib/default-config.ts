@@ -1,3 +1,5 @@
+import { opencodeGoModelRefs } from './ai/model-catalog.ts';
+
 const prePrompt = `
 ### Technical Implementation ###
 - Return actions as JSON array. Each action must have explicit type:
@@ -130,19 +132,7 @@ const defaultConfig = {
     filesMaxAge: 72,
     availableModels: [
         'gemini-3.1-flash-lite-preview',
-        'opencode-go/mimo-v2.5',
-        'opencode-go/minimax-m3',
-        'opencode-go/qwen3.7-plus',
-        'opencode-go/qwen3.6-plus',
-        'opencode-go/kimi-k2.6',
-        'opencode-go/kimi-k2.7-code',
-        'opencode-go/glm-5.2',
-        'opencode-go/glm-5.1',
-        'opencode-go/mimo-v2.5-pro',
-        'opencode-go/minimax-m2.7',
-        'opencode-go/qwen3.7-max',
-        'opencode-go/deepseek-v4-pro',
-        'opencode-go/deepseek-v4-flash',
+        ...opencodeGoModelRefs,
     ],
     maxMessagesToStore: 200,
     responseDelay: 0,

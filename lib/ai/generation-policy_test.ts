@@ -1,9 +1,11 @@
 import { assertEquals } from '@std/assert';
+import { generateText } from 'ai';
 import { getDefaultUserConfig } from '../config.ts';
 import {
     resolveGenerationPolicy,
     resolveModelCapabilities,
 } from './generation-policy.ts';
+import { opencodeGoModels } from './model-catalog.ts';
 
 const googleSafetySettings = [
     {
@@ -66,6 +68,32 @@ Deno.test('resolveModelCapabilities applies opencode model rules', () => {
         reasoningLevel: 'low',
         opencodeRequestFormat: 'anthropic-messages',
     });
+    assertEquals(resolveModelCapabilities('opencode', 'minimax-m2.7'), {
+        historyAttachmentInput: 'none',
+        structuredOutputMode: 'tool',
+        reasoningLevel: 'low',
+        opencodeRequestFormat: 'anthropic-messages',
+    });
+    assertEquals(resolveModelCapabilities('opencode', 'qwen3.7-max'), {
+        historyAttachmentInput: 'none',
+        structuredOutputMode: 'tool',
+        reasoningLevel: 'low',
+        opencodeRequestFormat: 'anthropic-messages',
+    });
+});
+
+Deno.test('OpenCode Go catalog routes all messages models through Anthropic', () => {
+    const anthropicModelIds = Object.entries(opencodeGoModels)
+        .filter(([, config]) => config.requestFormat === 'anthropic-messages')
+        .map(([modelId]) => modelId);
+
+    assertEquals(anthropicModelIds, [
+        'minimax-m3',
+        'qwen3.7-plus',
+        'qwen3.6-plus',
+        'minimax-m2.7',
+        'qwen3.7-max',
+    ]);
 });
 
 Deno.test('resolveGenerationPolicy applies fixed model behavior', () => {
@@ -113,9 +141,44 @@ Deno.test('resolveGenerationPolicy applies fixed model behavior', () => {
         task: 'chat',
         expectsStructuredOutput: false,
     });
-    const anthropicModel = opencodeAnthropicPolicy.model as unknown as {
-        provider: string;
-    };
-    assertEquals(anthropicModel.provider, 'opencode.anthropic');
     assertEquals(opencodeAnthropicPolicy.providerOptions, undefined);
+});
+
+Deno.test('resolveGenerationPolicy routes Anthropic models to /messages', async () => {
+    const originalFetch = globalThis.fetch;
+    let requestUrl: string | undefined;
+    globalThis.fetch = (input) => {
+        requestUrl = input instanceof Request ? input.url : String(input);
+        return Promise.resolve(
+            new Response(
+                JSON.stringify({
+                    id: 'msg_test',
+                    type: 'message',
+                    role: 'assistant',
+                    content: [{ type: 'text', text: 'ok' }],
+                    model: 'qwen3.7-max',
+                    stop_reason: 'end_turn',
+                    stop_sequence: null,
+                    usage: { input_tokens: 1, output_tokens: 1 },
+                }),
+                { headers: { 'content-type': 'application/json' } },
+            ),
+        );
+    };
+
+    try {
+        const policy = resolveGenerationPolicy({
+            modelRef: 'opencode:qwen3.7-max',
+            config: getDefaultUserConfig().ai,
+            opencodeToken: 'test',
+            task: 'chat',
+            expectsStructuredOutput: false,
+        });
+
+        await generateText({ model: policy.model, prompt: 'hello' });
+
+        assertEquals(requestUrl, 'https://opencode.ai/zen/go/v1/messages');
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
 });

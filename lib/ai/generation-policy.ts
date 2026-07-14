@@ -4,11 +4,15 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { generateText, LanguageModel } from 'ai';
 import { UserConfig } from '../config.ts';
 import { ModelProvider, parseModelRef } from './model-ref.ts';
+import {
+    type HistoryAttachmentInput,
+    opencodeGoModels,
+    type OpencodeRequestFormat,
+    type StructuredOutputMode,
+} from './model-catalog.ts';
 
 export type GenerationTask = 'chat' | 'character';
-export type StructuredOutputMode = 'tool' | 'json-text';
-export type HistoryAttachmentInput = 'none' | 'images' | 'all';
-type OpencodeRequestFormat = 'openai-chat-completions' | 'anthropic-messages';
+export type { HistoryAttachmentInput, StructuredOutputMode };
 
 const OPENCODE_BASE_URL = 'https://opencode.ai/zen/go/v1';
 
@@ -92,53 +96,22 @@ const providerCapabilities: Record<ModelProvider, ModelCapabilities> = {
     },
 };
 
-interface ModelCapabilityRule {
-    matches(modelId: string): boolean;
-    capabilities: Partial<ModelCapabilities>;
-}
-
-const providerModelCapabilityRules: Partial<
-    Record<ModelProvider, ModelCapabilityRule[]>
-> = {
-    opencode: [
-        {
-            matches: (modelId) =>
-                [
-                    'mimo-v2.5',
-                    'minimax-m3',
-                    'qwen3.7-plus',
-                    'qwen3.6-plus',
-                    'kimi-k2.6',
-                    'kimi-k2.7-code',
-                ].includes(modelId),
-            capabilities: { historyAttachmentInput: 'images' },
-        },
-        {
-            matches: (modelId) =>
-                [
-                    'minimax-m3',
-                    'qwen3.7-plus',
-                    'qwen3.6-plus',
-                ].includes(modelId),
-            capabilities: { opencodeRequestFormat: 'anthropic-messages' },
-        },
-        {
-            matches: (modelId) => modelId.startsWith('deepseek-v4'),
-            capabilities: { structuredOutputMode: 'json-text' },
-        },
-    ],
-};
-
 export function resolveModelCapabilities(
     provider: ModelProvider,
     modelId: string,
 ): ModelCapabilities {
     const capabilities = { ...providerCapabilities[provider] };
-    const rules = providerModelCapabilityRules[provider] ?? [];
-
-    for (const rule of rules) {
-        if (rule.matches(modelId)) {
-            Object.assign(capabilities, rule.capabilities);
+    if (provider === 'opencode') {
+        const modelConfig = opencodeGoModels[modelId];
+        if (modelConfig) {
+            Object.assign(capabilities, {
+                historyAttachmentInput: modelConfig.historyAttachmentInput,
+                opencodeRequestFormat: modelConfig.requestFormat,
+                structuredOutputMode: modelConfig.structuredOutputMode,
+            });
+        }
+        if (modelId.startsWith('deepseek-v4')) {
+            capabilities.structuredOutputMode = 'json-text';
         }
     }
 
