@@ -28,13 +28,14 @@ export interface ResolvedGenerationPolicy {
 }
 
 /**
- * Model behavior that generation callers need to adapt to. Keep this limited
- * to actual compatibility differences; Telegram and prompt policy stay in
- * their respective layers.
+ * Model behavior and generation policy that callers need to adapt to.
+ * Telegram and prompt policy stay in their respective layers.
  */
 export interface ModelCapabilities {
     binaryHistoryAttachments: boolean;
     structuredOutputMode: StructuredOutputMode;
+    reasoningLevel: 'minimal' | 'low' | 'medium' | 'high';
+    googleSafetySettings?: Array<{ category: string; threshold: string }>;
 }
 
 interface GenerationPolicyInput {
@@ -54,14 +55,35 @@ const providerCapabilities: Record<ModelProvider, ModelCapabilities> = {
     google: {
         binaryHistoryAttachments: true,
         structuredOutputMode: 'tool',
+        reasoningLevel: 'low',
+        googleSafetySettings: [
+            {
+                category: 'HARM_CATEGORY_HARASSMENT',
+                threshold: 'BLOCK_NONE',
+            },
+            {
+                category: 'HARM_CATEGORY_HATE_SPEECH',
+                threshold: 'BLOCK_NONE',
+            },
+            {
+                category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                threshold: 'BLOCK_NONE',
+            },
+            {
+                category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+                threshold: 'BLOCK_NONE',
+            },
+        ],
     },
     openrouter: {
         binaryHistoryAttachments: false,
         structuredOutputMode: 'tool',
+        reasoningLevel: 'low',
     },
     opencode: {
         binaryHistoryAttachments: false,
         structuredOutputMode: 'tool',
+        reasoningLevel: 'low',
     },
 };
 
@@ -99,8 +121,8 @@ export function resolveModelCapabilities(
 
 function buildGoogleOptions(
     config: UserConfig['ai'],
-    task: GenerationTask,
     expectsStructuredOutput: boolean,
+    capabilities: ModelCapabilities,
 ): ProviderOptions {
     const googleOptions: {
         safetySettings?: Array<{ category: string; threshold: string }>;
@@ -110,25 +132,17 @@ function buildGoogleOptions(
         };
     } = {};
 
-    if (config.google.safetySettings.length > 0) {
-        googleOptions.safetySettings = config.google.safetySettings;
+    if (capabilities.googleSafetySettings) {
+        googleOptions.safetySettings = capabilities.googleSafetySettings;
     }
 
     if (expectsStructuredOutput && config.google.structuredOutputs === false) {
         googleOptions.structuredOutputs = false;
     }
 
-    const thinking = config.generation[task].thinking;
-    if (thinking) {
-        const thinkingConfig: NonNullable<typeof googleOptions.thinkingConfig> =
-            {};
-        if (thinking.thinkingLevel) {
-            thinkingConfig.thinkingLevel = thinking.thinkingLevel;
-        }
-        if (Object.keys(thinkingConfig).length > 0) {
-            googleOptions.thinkingConfig = thinkingConfig;
-        }
-    }
+    googleOptions.thinkingConfig = {
+        thinkingLevel: capabilities.reasoningLevel,
+    };
 
     if (Object.keys(googleOptions).length === 0) {
         return {};
@@ -139,7 +153,7 @@ function buildGoogleOptions(
 
 function buildOpenRouterOptions(
     config: UserConfig['ai'],
-    task: GenerationTask,
+    capabilities: ModelCapabilities,
 ): ProviderOptions {
     const openrouterOptions: {
         usage?: { include: boolean };
@@ -150,10 +164,7 @@ function buildOpenRouterOptions(
         openrouterOptions.usage = { include: true };
     }
 
-    const reasoningEffort = config.generation[task].thinking?.thinkingLevel;
-    if (reasoningEffort) {
-        openrouterOptions.reasoning = { effort: reasoningEffort };
-    }
+    openrouterOptions.reasoning = { effort: capabilities.reasoningLevel };
 
     if (Object.keys(openrouterOptions).length === 0) {
         return {};
@@ -192,25 +203,25 @@ export function resolveGenerationPolicy(
     input: GenerationPolicyInput,
 ): ResolvedGenerationPolicy {
     const parsed = parseModelRef(input.modelRef);
+    const capabilities = resolveModelCapabilities(
+        parsed.provider,
+        parsed.modelId,
+    );
 
     if (parsed.provider === 'google') {
         const providerOptions = buildGoogleOptions(
             input.config,
-            input.task,
             input.expectsStructuredOutput,
+            capabilities,
         );
 
-        const thinking = input.config.generation[input.task].thinking;
         const telemetry: GenerationPolicyTelemetry = {
             provider: parsed.provider,
             modelRef: parsed.raw,
             modelId: parsed.modelId,
             task: input.task,
+            googleThinkingLevel: capabilities.reasoningLevel,
         };
-
-        if (thinking) {
-            telemetry.googleThinkingLevel = thinking.thinkingLevel;
-        }
 
         return {
             model: google(parsed.modelId),
@@ -218,10 +229,7 @@ export function resolveGenerationPolicy(
             providerOptions: Object.keys(providerOptions).length > 0
                 ? providerOptions
                 : undefined,
-            capabilities: resolveModelCapabilities(
-                parsed.provider,
-                parsed.modelId,
-            ),
+            capabilities,
             telemetry,
         };
     }
@@ -234,10 +242,12 @@ export function resolveGenerationPolicy(
         return {
             model: createOpencodeModel(parsed.modelId, input.opencodeToken),
             provider: parsed.provider,
-            capabilities: resolveModelCapabilities(
-                parsed.provider,
-                parsed.modelId,
-            ),
+            providerOptions: {
+                opencode: {
+                    reasoningEffort: capabilities.reasoningLevel,
+                },
+            },
+            capabilities,
             telemetry: {
                 provider: parsed.provider,
                 modelRef: parsed.raw,
@@ -251,17 +261,15 @@ export function resolveGenerationPolicy(
         throw new Error('OPENROUTER_API_KEY is required for openrouter models');
     }
 
-    const providerOptions = buildOpenRouterOptions(input.config, input.task);
+    const providerOptions = buildOpenRouterOptions(input.config, capabilities);
 
-    const reasoningEffort = input.config.generation[input.task].thinking
-        ?.thinkingLevel;
     const telemetry: GenerationPolicyTelemetry = {
         provider: parsed.provider,
         modelRef: parsed.raw,
         modelId: parsed.modelId,
         task: input.task,
         openrouterUsageInclude: input.config.openrouter.usageInclude,
-        openrouterReasoningEffort: reasoningEffort,
+        openrouterReasoningEffort: capabilities.reasoningLevel,
     };
 
     return {
@@ -270,10 +278,7 @@ export function resolveGenerationPolicy(
         providerOptions: Object.keys(providerOptions).length > 0
             ? providerOptions
             : undefined,
-        capabilities: resolveModelCapabilities(
-            parsed.provider,
-            parsed.modelId,
-        ),
+        capabilities,
         telemetry,
     };
 }

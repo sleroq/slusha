@@ -24,11 +24,6 @@ export const scopedSettingsSections = [
         title: 'Language and reactions',
         keys: ['locale', 'blacklistedReactions', 'nepons'],
     },
-    {
-        id: 'advanced',
-        title: 'Advanced',
-        keys: ['ai.google.safetySettings', 'ai.generation.chat.thinking.thinkingLevel', 'ai.generation.character.thinking.thinkingLevel'],
-    },
 ] as const;
 
 export type ScopedSettingsSectionId = typeof scopedSettingsSections[number]['id'];

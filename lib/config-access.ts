@@ -48,7 +48,6 @@ const configOptionPolicyDefinitions = {
         global: botAdminOnly,
         chat: managedChat,
     },
-    'ai.google.safetySettings': { global: botAdminOnly },
     'availableModels': { global: botAdminOnly },
     'ai.model': { global: managedGlobal, chat: managedChat },
     'ai.temperature': { global: managedGlobal, chat: managedChat },
@@ -66,14 +65,6 @@ const configOptionPolicyDefinitions = {
         chat: managedChat,
     },
     'ai.openrouter.usageInclude': {
-        global: managedGlobal,
-        chat: managedChat,
-    },
-    'ai.generation.chat.thinking.thinkingLevel': {
-        global: managedGlobal,
-        chat: managedChat,
-    },
-    'ai.generation.character.thinking.thinkingLevel': {
         global: managedGlobal,
         chat: managedChat,
     },

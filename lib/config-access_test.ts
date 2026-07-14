@@ -65,11 +65,19 @@ Deno.test('chat authorization evidence is bound to one chat', () => {
     assertEquals(canReadChatData(context, 200), false);
 });
 
-Deno.test('optional schema leaves are supported config entries', () => {
-    validateConfigEntryValue(
-        'ai.generation.chat.thinking.thinkingLevel',
-        'medium',
-    );
+Deno.test('model behavior policy is not configurable', () => {
+    for (
+        const key of [
+            'ai.google.safetySettings',
+            'ai.generation.chat.thinking.thinkingLevel',
+            'ai.generation.character.thinking.thinkingLevel',
+        ]
+    ) {
+        assertThrows(
+            () => validateConfigEntryValue(key, 'low'),
+            ConfigValidationError,
+        );
+    }
 });
 
 Deno.test('max output tokens is not a supported config entry', () => {

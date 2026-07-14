@@ -21,34 +21,6 @@ const matcherSchema = z.union([
     z.custom<RegExp>(isValidRegex),
 ]);
 
-const thinkingLevelSchema = z.enum(['minimal', 'low', 'medium', 'high']);
-const googleThinkingConfigSchema = z.object({
-    thinkingLevel: thinkingLevelSchema.optional(),
-});
-const generationTaskSchema = z.object({
-    thinking: googleThinkingConfigSchema.optional(),
-});
-const defaultGoogleSafetySettings: Array<
-    { category: string; threshold: string }
-> = [
-    {
-        category: 'HARM_CATEGORY_HARASSMENT',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_HATE_SPEECH',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_NONE',
-    },
-];
-
 export const configSchema = z.object({
     ai: z.object({
         model: z.string().min(1).max(200),
@@ -80,28 +52,14 @@ export const configSchema = z.object({
             20 * 1024 * 1024,
         ),
         google: z.object({
-            safetySettings: z.array(
-                z.object({
-                    category: z.string().min(1).max(120),
-                    threshold: z.string().min(1).max(120),
-                }),
-            ).max(32).default(defaultGoogleSafetySettings),
             structuredOutputs: z.boolean().default(true),
         }).default({
-            safetySettings: defaultGoogleSafetySettings,
             structuredOutputs: true,
         }),
         openrouter: z.object({
             usageInclude: z.boolean().default(false),
         }).default({
             usageInclude: false,
-        }),
-        generation: z.object({
-            chat: generationTaskSchema.default({}),
-            character: generationTaskSchema.default({}),
-        }).default({
-            chat: {},
-            character: {},
         }),
     }),
     startMessage: z.string().max(2000),

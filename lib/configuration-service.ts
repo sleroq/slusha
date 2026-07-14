@@ -63,10 +63,6 @@ const configEditors = {
     'ai.hateModePrompt': { ...multiline, optional: true },
     'ai.finalPrompt': multiline,
     'ai.chatActionsToolDescription': { ...multiline, optional: true },
-    'ai.google.safetySettings': {
-        kind: 'object-list',
-        keys: ['category', 'threshold'],
-    },
     'availableModels': { kind: 'string-list' },
     'ai.model': text,
     'ai.temperature': { kind: 'range', min: 0, max: 2, step: 0.01 },
@@ -88,16 +84,6 @@ const configEditors = {
     },
     'ai.google.structuredOutputs': boolean,
     'ai.openrouter.usageInclude': boolean,
-    'ai.generation.chat.thinking.thinkingLevel': {
-        kind: 'select',
-        options: ['minimal', 'low', 'medium', 'high'],
-        optional: true,
-    },
-    'ai.generation.character.thinking.thinkingLevel': {
-        kind: 'select',
-        options: ['minimal', 'low', 'medium', 'high'],
-        optional: true,
-    },
     'startMessage': multiline,
     'names': { kind: 'matcher-list' },
     'tendToReply': { kind: 'matcher-list' },

@@ -39,25 +39,6 @@ const hateModePrompt = `
 - You are a real hater in this chat
 `;
 
-const googleSafetySettings = [
-    {
-        category: 'HARM_CATEGORY_HARASSMENT',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_HATE_SPEECH',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_NONE',
-    },
-];
-
 const defaultConfig = {
     startMessage: 'Привет! Я Слюша, бот-гений.',
     ai: {
@@ -79,23 +60,10 @@ const defaultConfig = {
         includeAttachmentsInHistory: true,
         bytesLimit: 20971520,
         google: {
-            safetySettings: googleSafetySettings,
             structuredOutputs: true,
         },
         openrouter: {
             usageInclude: false,
-        },
-        generation: {
-            chat: {
-                thinking: {
-                    thinkingLevel: 'low',
-                },
-            },
-            character: {
-                thinking: {
-                    thinkingLevel: 'low',
-                },
-            },
         },
     },
     names: [
