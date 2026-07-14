@@ -119,7 +119,7 @@
 
 <dialog
     bind:this={resetDialog}
-    class="m-auto w-[calc(100%_-_1.5rem)] max-w-[35rem] rounded-[22px] border-0 bg-(--tg-theme-bg-color) p-0 text-(--tg-theme-text-color) backdrop:bg-black/40"
+    class="m-auto w-[calc(100%-1.5rem)] max-w-[35rem] rounded-[22px] border-0 bg-(--tg-theme-bg-color) p-0 text-(--tg-theme-text-color) backdrop:bg-black/40"
     onclose={() => resetPreview = undefined}
 >
     {#if resetPreview}
