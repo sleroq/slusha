@@ -3,7 +3,8 @@ ENV DENO_DIR=/deno-dir
 WORKDIR /app
 
 COPY . .
-RUN deno cache --allow-import main.ts
+RUN deno install --frozen
+RUN deno cache --frozen --allow-import main.ts
 
 FROM denoland/deno:2.9.2
 ENV DENO_DIR=/deno-dir
@@ -14,4 +15,4 @@ RUN mkdir -p ./tmp ./log
 COPY --from=builder /app .
 COPY --from=builder /deno-dir /deno-dir
 
-CMD ["deno", "run", "--allow-env", "--allow-net", "--allow-read=.", "--allow-import", "--allow-write", "--allow-sys", "--allow-ffi", "--unstable-detect-cjs", "main.ts"]
+CMD ["deno", "run", "--cached-only", "--node-modules-dir=manual", "--allow-env", "--allow-net", "--allow-read=.", "--allow-import", "--allow-write", "--allow-sys", "--allow-ffi", "--unstable-detect-cjs", "main.ts"]
