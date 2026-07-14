@@ -19,6 +19,10 @@ import { configEntries } from '../db/schema.ts';
 import { ChatRepository } from '../persistence/chats.ts';
 import { ConfigEntryRepository } from '../persistence/config-entries.ts';
 import { UserRoleRepository } from '../persistence/user-roles.ts';
+import {
+    personalAboutKey,
+    personalScopeKey,
+} from '../persistence/user-profile.ts';
 import { withTelegramAuth } from './telegram-auth.ts';
 
 type UiScope = 'personal' | 'private' | 'group' | 'global';
@@ -27,12 +31,6 @@ type ChatOption = {
     title: string;
     type: 'private' | 'group';
 };
-
-const personalAboutKey = 'profile.about';
-
-function personalScopeKey(userId: number) {
-    return `user:${userId}`;
-}
 
 const operationSchema = z.object({
     key: z.string().min(1).max(200),

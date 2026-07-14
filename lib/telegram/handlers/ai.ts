@@ -27,6 +27,7 @@ import {
 import {
     buildChatInfoBlock,
     buildChatPromptAddition,
+    buildUserProfileContext,
     isTelegramCommentsHistory,
 } from '../../ai/chat-context.ts';
 import { canonicalizeReaction, resolveEnabledReactions } from '../reactions.ts';
@@ -34,6 +35,7 @@ import { isMissingSendTextRightsError } from '../reply-rights.ts';
 import { buildLanguageProtocol } from '../../ai/language-protocol.ts';
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
 import { generateStructuredOutput } from '../../ai/structured-generation.ts';
+import { UserProfileRepository } from '../../persistence/user-profile.ts';
 
 const DEFAULT_CHAT_ACTIONS_TOOL_DESCRIPTION =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
@@ -434,6 +436,14 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             ctx.from?.language_code ??
             await ctx.i18n.getLocale();
         const character = chatState.character;
+        let profileAbout: string | undefined;
+        if (ctx.from) {
+            const userProfile = await new UserProfileRepository(
+                ctx.db,
+                ctx.from.id,
+            ).getProfile();
+            profileAbout = userProfile.about;
+        }
 
         const modelRef = effectiveConfig.ai.model;
 
@@ -550,6 +560,11 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 targetRefs,
             );
             messages.push(...annotatedHistory);
+
+            const profileContext = buildUserProfileContext(profileAbout);
+            if (profileContext) {
+                messages.push(profileContext);
+            }
 
             const finalPrompt = effectiveConfig.ai.finalPrompt +
                 ' Return only actions array using typed entries and target_ref values from Reply Target Map.';

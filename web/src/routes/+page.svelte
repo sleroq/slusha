@@ -4,10 +4,12 @@
     import ExpandedListEditorView from '$lib/ExpandedListEditorView.svelte';
     import LoadingSkeleton from '$lib/LoadingSkeleton.svelte';
     import PersonalSettingsView from '$lib/PersonalSettingsView.svelte';
+    import ScopedSettingsSectionView from '$lib/ScopedSettingsSectionView.svelte';
     import ScopedSettingsView from '$lib/ScopedSettingsView.svelte';
     import UnsavedChangesDialog from '$lib/UnsavedChangesDialog.svelte';
     import type { ConfigSelection } from '$lib/config';
     import { createSettingsNavigation } from '$lib/settings-navigation.svelte';
+    import { scopedSettingsSection } from '$lib/scoped-settings';
     import { createSettingsSession } from '$lib/settings-session.svelte';
     import { settingsFieldTitle } from '$lib/settings-view';
     import { createTelegramSettingsChrome } from '$lib/telegram-settings-chrome.svelte';
@@ -42,6 +44,7 @@
     );
     const pageTitle = $derived.by(() => {
         if (editorField) return settingsFieldTitle(editorField.key);
+        if (navigation.view.kind === 'section') return scopedSettingsSection(navigation.view.sectionId).title;
         if (session.selection.scope === 'personal') return 'Slusha Settings';
         if (session.selection.scope === 'global') return 'Global Settings';
         return session.currentChat?.title ?? 'Chat Settings';
@@ -69,6 +72,12 @@
             return;
         }
         navigation.view = { kind: 'chat-selector', chatType };
+    }
+
+    function openExpandedEditor(fieldKey: string) {
+        const view = navigation.view;
+        if (view.kind !== 'section') return;
+        navigation.view = { kind: 'expanded-editor', fieldKey, sectionId: view.sectionId };
     }
 
     onMount(() => {
@@ -132,6 +141,18 @@
             saving={session.saving}
             onchange={session.updateField}
         />
+    {:else if navigation.view.kind === 'section'}
+        <ScopedSettingsSectionView
+            sectionId={navigation.view.sectionId}
+            fields={session.fields}
+            saving={session.saving}
+            isdirty={session.isDirty}
+            isresetpending={session.isResetPending}
+            onchange={session.updateField}
+            onreset={session.resetField}
+            oncancelreset={session.cancelReset}
+            onopen={openExpandedEditor}
+        />
     {:else if session.selection.scope === 'personal'}
         <PersonalSettingsView
             about={session.about}
@@ -148,12 +169,7 @@
         <ScopedSettingsView
             fields={session.fields}
             saving={session.saving}
-            isdirty={session.isDirty}
-            isresetpending={session.isResetPending}
-            onchange={session.updateField}
-            onreset={session.resetField}
-            oncancelreset={session.cancelReset}
-            onopen={(fieldKey) => navigation.view = { kind: 'expanded-editor', fieldKey }}
+            onopen={(sectionId) => navigation.view = { kind: 'section', sectionId }}
         />
     {/if}
 </main>

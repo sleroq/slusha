@@ -141,11 +141,13 @@ describe('settings navigation', () => {
             cancelPendingSelection: cancel,
             requestSelection: request,
         });
-        navigation.view = { kind: 'expanded-editor', fieldKey: 'value' };
+        navigation.view = { kind: 'expanded-editor', fieldKey: 'value', sectionId: 'prompts' };
 
         navigation.back();
         expect(cancel).toHaveBeenCalledOnce();
         expect(navigation.view.kind).toBe('expanded-editor');
+        navigation.back();
+        expect(navigation.view.kind).toBe('section');
         navigation.back();
         expect(navigation.view.kind).toBe('settings');
         navigation.view = { kind: 'chat-selector', chatType: 'group' };
