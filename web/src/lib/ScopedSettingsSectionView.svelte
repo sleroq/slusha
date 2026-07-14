@@ -119,7 +119,7 @@
 
 <dialog
     bind:this={resetDialog}
-    class="m-auto w-[calc(100%-1.5rem)] max-w-[35rem] rounded-[22px] border-0 bg-(--tg-theme-bg-color) p-0 text-(--tg-theme-text-color) backdrop:bg-black/40"
+    class="m-auto w-[calc(100%-1.5rem)] max-w-140 rounded-[22px] border-0 bg-(--tg-theme-bg-color) p-0 text-(--tg-theme-text-color) backdrop:bg-black/40"
     onclose={() => resetPreview = undefined}
 >
     {#if resetPreview}
@@ -128,7 +128,7 @@
             <p class="mt-1 text-sm text-(--tg-theme-hint-color)">This override will be removed when you save.</p>
         </div>
         <p class="bg-(--tg-theme-secondary-bg-color) px-5 py-2 text-xs uppercase text-(--tg-theme-hint-color)">Default value</p>
-        <div class="max-h-[48vh] overflow-auto whitespace-pre-wrap break-words px-5 py-4 leading-relaxed">{previewValue(resetPreview)}</div>
+        <div class="max-h-[48vh] overflow-auto whitespace-pre-wrap wrap-break-word px-5 py-4 leading-relaxed">{previewValue(resetPreview)}</div>
         <div class="app-separator grid grid-cols-2 border-t">
             <button class="min-h-13 text-(--tg-theme-link-color)" type="button" onclick={() => resetDialog.close()}>Cancel</button>
             <button class="app-separator min-h-13 border-l font-semibold text-(--tg-theme-link-color)" type="button" onclick={confirmReset}>Revert</button>

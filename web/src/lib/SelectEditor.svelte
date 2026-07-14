@@ -103,7 +103,7 @@
                 type="button"
                 onclick={() => select(option)}
             >
-                <span class="min-w-0 flex-1 break-words text-[17px]">{option}</span>
+                <span class="min-w-0 flex-1 wrap-break-word text-[17px]">{option}</span>
                 {#if value === option}
                     <svg class="size-5 shrink-0 text-(--tg-theme-link-color)" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                         <path d="m4.5 10 3.5 3.5 7.5-7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
