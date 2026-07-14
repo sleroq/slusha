@@ -11,12 +11,13 @@ import type { ChatMessage, ReplyTo } from './persistence/types.ts';
 import { Message } from 'grammy_types';
 import { Logger } from '@deno-library/logger';
 import logger from './logger.ts';
+import type { HistoryAttachmentInput } from './ai/generation-policy.ts';
 
 interface HistoryOptions {
     symbolLimit: number;
     messagesLimit: number;
     bytesLimit: number;
-    attachments?: boolean;
+    attachmentInput?: HistoryAttachmentInput;
     includeReactions?: boolean;
     activeMessageId?: number;
 }
@@ -229,7 +230,7 @@ interface JSONInputMessage {
 
 interface ConstructMsgOptions {
     symbolLimit: number;
-    attachments: boolean;
+    attachmentInput: HistoryAttachmentInput;
     characterName?: string;
     includeReactions?: boolean;
 }
@@ -317,7 +318,7 @@ async function constructMsg(
     options: ConstructMsgOptions,
 ): Promise<ModelMessage> {
     const { symbolLimit, characterName } = options;
-    const attachAttachments = options.attachments;
+    const attachmentInput = options.attachmentInput;
     const includeReactions = options.includeReactions ?? false;
 
     const role = msg.isMyself ? 'assistant' : 'user';
@@ -482,10 +483,15 @@ async function constructMsg(
         text: prettyInputMessage,
     });
 
-    if (attachAttachments && role === 'user') {
+    if (attachmentInput !== 'none' && role === 'user') {
         let attachments: Exclude<UserContent, string> = [];
         try {
-            attachments = await getAttachments(api, botInfo.token, msg);
+            attachments = await getAttachments(
+                api,
+                botInfo.token,
+                msg,
+                attachmentInput,
+            );
         } catch (error) {
             const rawMsg = msg.info as unknown as Record<string, unknown>;
             const contentFields = Object.keys(rawMsg).filter((field) =>
@@ -542,12 +548,12 @@ export async function makeHistory(
     for (const candidate of candidates) {
         const msg = candidate.msg;
 
-        let attachAttachments = options.attachments ?? true;
+        let attachmentInput = options.attachmentInput ?? 'all';
         if (
             candidate.rootIndex < history.length - 10 ||
             totalAttachments > 2
         ) {
-            attachAttachments = false;
+            attachmentInput = 'none';
         }
 
         let msgRes;
@@ -558,7 +564,7 @@ export async function makeHistory(
                 msg,
                 {
                     symbolLimit,
-                    attachments: attachAttachments,
+                    attachmentInput,
                     includeReactions: options.includeReactions,
                 },
             );
@@ -611,6 +617,7 @@ async function getAttachments(
     api: Api<RawApi>,
     token: string,
     msg: ChatMessage | ReplyTo,
+    attachmentInput: Exclude<HistoryAttachmentInput, 'none'>,
 ): Promise<Exclude<UserContent, string>> {
     const parts: UserContent = [];
 
@@ -631,7 +638,7 @@ async function getAttachments(
     if (msg.info.sticker) {
         const { sticker } = msg.info;
 
-        if (sticker.is_video) {
+        if (sticker.is_video && attachmentInput === 'all') {
             try {
                 const file = await downloadFile(
                     api,
@@ -681,7 +688,7 @@ async function getAttachments(
         }
 
         let stickerImageId = undefined;
-        if (sticker.is_animated) {
+        if (sticker.is_video || sticker.is_animated) {
             stickerImageId = sticker.thumbnail?.file_id;
         } else {
             stickerImageId = sticker.file_id;
@@ -708,7 +715,7 @@ async function getAttachments(
     // If video < 20mb (non-selfhosted bot api limit)
     // then add whole video to the promt
     // otherwise - just thumbnail
-    if (msg.info.video) {
+    if (msg.info.video && attachmentInput === 'all') {
         const video = msg.info.video;
         if (
             video.file_size && video.mime_type &&
@@ -753,7 +760,28 @@ async function getAttachments(
         }
     }
 
-    if (msg.info.animation) {
+    if (msg.info.video && attachmentInput === 'images') {
+        const thumbnailId = msg.info.video.thumbnail?.file_id;
+        if (thumbnailId) {
+            try {
+                parts.push(
+                    await getImageContent(
+                        api,
+                        token,
+                        thumbnailId,
+                        'image/jpeg',
+                    ),
+                );
+            } catch (error) {
+                logger.error(
+                    'Could not download video thumbnail: ',
+                    error,
+                );
+            }
+        }
+    }
+
+    if (msg.info.animation && attachmentInput === 'all') {
         const { animation } = msg.info;
 
         if (!animation.mime_type) {
@@ -776,7 +804,7 @@ async function getAttachments(
         });
     }
 
-    if (msg.info.video_note) {
+    if (msg.info.video_note && attachmentInput === 'all') {
         const { video_note: viNote } = msg.info;
 
         const file = await downloadFile(
@@ -793,7 +821,7 @@ async function getAttachments(
         });
     }
 
-    if (msg.info.voice) {
+    if (msg.info.voice && attachmentInput === 'all') {
         const { voice } = msg.info;
 
         if (!voice.mime_type) {

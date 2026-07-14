@@ -18,6 +18,7 @@
     "jsr:@std/path@^1.1.5": "1.1.6",
     "jsr:@std/path@^1.1.6": "1.1.6",
     "jsr:@std/streams@^1.1.1": "1.1.1",
+    "npm:@ai-sdk/anthropic@4.0.12": "4.0.12_zod@4.4.3",
     "npm:@ai-sdk/google@^4.0.12": "4.0.12_zod@4.4.3",
     "npm:@ai-sdk/openai-compatible@^3.0.7": "3.0.7_zod@4.4.3",
     "npm:@eslint/js@^10.0.1": "10.0.1_eslint@10.7.0",
@@ -131,6 +132,14 @@
     }
   },
   "npm": {
+    "@ai-sdk/anthropic@4.0.12_zod@4.4.3": {
+      "integrity": "sha512-IquWNkGRSF2ulYJ6YIIUqMsNAIDeZFB3/4W92aSOtCxH1TfuVoq3qw4M4TxTxIw4As9cnkeRLe7b9LDMzPDsnA==",
+      "dependencies": [
+        "@ai-sdk/provider@4.0.3",
+        "@ai-sdk/provider-utils@5.0.7_zod@4.4.3",
+        "zod"
+      ]
+    },
     "@ai-sdk/gateway@4.0.16_zod@4.4.3": {
       "integrity": "sha512-9iYxdOLquoOFk5e+02P9qfBIA+EJU0FNJvyjGxi4iXJabt2+GlbaCg7TX0sTtxOsBVkdabkatqWM6+kvp53tBg==",
       "dependencies": [
@@ -4552,6 +4561,7 @@
       "jsr:@std/assert@^1.0.19",
       "jsr:@std/fs@^1.0.24",
       "jsr:@std/http@^1.1.2",
+      "npm:@ai-sdk/anthropic@4.0.12",
       "npm:@ai-sdk/google@^4.0.12",
       "npm:@ai-sdk/openai-compatible@^3.0.7",
       "npm:@google/genai@^2.11.0",

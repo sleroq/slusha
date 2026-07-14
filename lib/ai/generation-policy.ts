@@ -1,3 +1,4 @@
+import { createAnthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { generateText, LanguageModel } from 'ai';
@@ -6,6 +7,8 @@ import { ModelProvider, parseModelRef } from './model-ref.ts';
 
 export type GenerationTask = 'chat' | 'character';
 export type StructuredOutputMode = 'tool' | 'json-text';
+export type HistoryAttachmentInput = 'none' | 'images' | 'all';
+type OpencodeRequestFormat = 'openai-chat-completions' | 'anthropic-messages';
 
 const OPENCODE_BASE_URL = 'https://opencode.ai/zen/go/v1';
 
@@ -32,9 +35,10 @@ export interface ResolvedGenerationPolicy {
  * Telegram and prompt policy stay in their respective layers.
  */
 export interface ModelCapabilities {
-    binaryHistoryAttachments: boolean;
+    historyAttachmentInput: HistoryAttachmentInput;
     structuredOutputMode: StructuredOutputMode;
     reasoningLevel: 'minimal' | 'low' | 'medium' | 'high';
+    opencodeRequestFormat?: OpencodeRequestFormat;
     googleSafetySettings?: Array<{ category: string; threshold: string }>;
 }
 
@@ -53,7 +57,7 @@ type ProviderOptions = NonNullable<
 
 const providerCapabilities: Record<ModelProvider, ModelCapabilities> = {
     google: {
-        binaryHistoryAttachments: true,
+        historyAttachmentInput: 'all',
         structuredOutputMode: 'tool',
         reasoningLevel: 'low',
         googleSafetySettings: [
@@ -76,14 +80,15 @@ const providerCapabilities: Record<ModelProvider, ModelCapabilities> = {
         ],
     },
     openrouter: {
-        binaryHistoryAttachments: false,
+        historyAttachmentInput: 'none',
         structuredOutputMode: 'tool',
         reasoningLevel: 'low',
     },
     opencode: {
-        binaryHistoryAttachments: false,
+        historyAttachmentInput: 'none',
         structuredOutputMode: 'tool',
         reasoningLevel: 'low',
+        opencodeRequestFormat: 'openai-chat-completions',
     },
 };
 
@@ -96,6 +101,27 @@ const providerModelCapabilityRules: Partial<
     Record<ModelProvider, ModelCapabilityRule[]>
 > = {
     opencode: [
+        {
+            matches: (modelId) =>
+                [
+                    'mimo-v2.5',
+                    'minimax-m3',
+                    'qwen3.7-plus',
+                    'qwen3.6-plus',
+                    'kimi-k2.6',
+                    'kimi-k2.7-code',
+                ].includes(modelId),
+            capabilities: { historyAttachmentInput: 'images' },
+        },
+        {
+            matches: (modelId) =>
+                [
+                    'minimax-m3',
+                    'qwen3.7-plus',
+                    'qwen3.6-plus',
+                ].includes(modelId),
+            capabilities: { opencodeRequestFormat: 'anthropic-messages' },
+        },
         {
             matches: (modelId) => modelId.startsWith('deepseek-v4'),
             capabilities: { structuredOutputMode: 'json-text' },
@@ -199,6 +225,19 @@ function createOpencodeModel(
     return opencodeProvider.chatModel(modelId);
 }
 
+function createOpencodeAnthropicModel(
+    modelId: string,
+    apiKey: string,
+): LanguageModel {
+    const opencodeProvider = createAnthropic({
+        name: 'opencode.anthropic',
+        apiKey,
+        baseURL: OPENCODE_BASE_URL,
+    });
+
+    return opencodeProvider.messages(modelId);
+}
+
 export function resolveGenerationPolicy(
     input: GenerationPolicyInput,
 ): ResolvedGenerationPolicy {
@@ -239,14 +278,28 @@ export function resolveGenerationPolicy(
             throw new Error('OPENCODE_TOKEN is required for opencode models');
         }
 
-        return {
-            model: createOpencodeModel(parsed.modelId, input.opencodeToken),
-            provider: parsed.provider,
-            providerOptions: {
+        const usesAnthropicMessages = capabilities.opencodeRequestFormat ===
+            'anthropic-messages';
+        let model: LanguageModel;
+        let providerOptions: ProviderOptions | undefined;
+        if (usesAnthropicMessages) {
+            model = createOpencodeAnthropicModel(
+                parsed.modelId,
+                input.opencodeToken,
+            );
+        } else {
+            model = createOpencodeModel(parsed.modelId, input.opencodeToken);
+            providerOptions = {
                 opencode: {
                     reasoningEffort: capabilities.reasoningLevel,
                 },
-            },
+            };
+        }
+
+        return {
+            model,
+            provider: parsed.provider,
+            providerOptions,
             capabilities,
             telemetry: {
                 provider: parsed.provider,

@@ -26,7 +26,7 @@ const googleSafetySettings = [
 
 Deno.test('resolveModelCapabilities applies provider defaults', () => {
     assertEquals(resolveModelCapabilities('google', 'gemini-2.5-flash'), {
-        binaryHistoryAttachments: true,
+        historyAttachmentInput: 'all',
         structuredOutputMode: 'tool',
         reasoningLevel: 'low',
         googleSafetySettings,
@@ -34,7 +34,7 @@ Deno.test('resolveModelCapabilities applies provider defaults', () => {
     assertEquals(
         resolveModelCapabilities('openrouter', 'google/gemini-2.5-flash'),
         {
-            binaryHistoryAttachments: false,
+            historyAttachmentInput: 'none',
             structuredOutputMode: 'tool',
             reasoningLevel: 'low',
         },
@@ -43,14 +43,28 @@ Deno.test('resolveModelCapabilities applies provider defaults', () => {
 
 Deno.test('resolveModelCapabilities applies opencode model rules', () => {
     assertEquals(resolveModelCapabilities('opencode', 'deepseek-v4-flash'), {
-        binaryHistoryAttachments: false,
+        historyAttachmentInput: 'none',
         structuredOutputMode: 'json-text',
         reasoningLevel: 'low',
+        opencodeRequestFormat: 'openai-chat-completions',
     });
     assertEquals(resolveModelCapabilities('opencode', 'kimi-k2.5'), {
-        binaryHistoryAttachments: false,
+        historyAttachmentInput: 'none',
         structuredOutputMode: 'tool',
         reasoningLevel: 'low',
+        opencodeRequestFormat: 'openai-chat-completions',
+    });
+    assertEquals(resolveModelCapabilities('opencode', 'mimo-v2.5'), {
+        historyAttachmentInput: 'images',
+        structuredOutputMode: 'tool',
+        reasoningLevel: 'low',
+        opencodeRequestFormat: 'openai-chat-completions',
+    });
+    assertEquals(resolveModelCapabilities('opencode', 'minimax-m3'), {
+        historyAttachmentInput: 'images',
+        structuredOutputMode: 'tool',
+        reasoningLevel: 'low',
+        opencodeRequestFormat: 'anthropic-messages',
     });
 });
 
@@ -91,4 +105,17 @@ Deno.test('resolveGenerationPolicy applies fixed model behavior', () => {
     assertEquals(opencodePolicy.providerOptions, {
         opencode: { reasoningEffort: 'low' },
     });
+
+    const opencodeAnthropicPolicy = resolveGenerationPolicy({
+        modelRef: 'opencode:minimax-m3',
+        config,
+        opencodeToken: 'test',
+        task: 'chat',
+        expectsStructuredOutput: false,
+    });
+    const anthropicModel = opencodeAnthropicPolicy.model as unknown as {
+        provider: string;
+    };
+    assertEquals(anthropicModel.provider, 'opencode.anthropic');
+    assertEquals(opencodeAnthropicPolicy.providerOptions, undefined);
 });

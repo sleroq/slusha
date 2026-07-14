@@ -21,6 +21,7 @@
     "unstable": ["fmt-component"],
     "nodeModulesDir": "auto",
     "imports": {
+        "@ai-sdk/anthropic": "npm:@ai-sdk/anthropic@4.0.12",
         "@google/genai": "npm:@google/genai@^2.11.0",
         "@opentelemetry/auto-instrumentations-node": "npm:@opentelemetry/auto-instrumentations-node@^0.78.0",
         "@opentelemetry/sdk-node": "npm:@opentelemetry/sdk-node@^0.220.0",

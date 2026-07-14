@@ -536,9 +536,11 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             }
             prompt += `\n\n${buildTargetRefsPrompt(targetRefs)}`;
 
-            const includeBinaryAttachments =
-                effectiveConfig.ai.includeAttachmentsInHistory &&
-                generationPolicy.capabilities.binaryHistoryAttachments;
+            let historyAttachmentInput =
+                generationPolicy.capabilities.historyAttachmentInput;
+            if (!effectiveConfig.ai.includeAttachmentsInHistory) {
+                historyAttachmentInput = 'none';
+            }
 
             const history = await makeHistory(
                 { token: bot.token, id: bot.botInfo.id },
@@ -551,7 +553,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                     symbolLimit: effectiveConfig.ai.messageMaxLength,
                     includeReactions: true,
                     activeMessageId: ctx.msg.message_id,
-                    attachments: includeBinaryAttachments,
+                    attachmentInput: historyAttachmentInput,
                 },
             );
 
