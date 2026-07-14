@@ -7,7 +7,7 @@ export const scopedSettingsSections = [
     {
         id: 'model-and-generation',
         title: 'Model and generation',
-        keys: ['ai.model', 'ai.temperature', 'ai.topK', 'ai.topP', 'ai.google.structuredOutputs', 'ai.openrouter.usageInclude'],
+        keys: ['ai.model', 'availableModels', 'ai.temperature', 'ai.topK', 'ai.topP', 'ai.google.structuredOutputs', 'ai.openrouter.usageInclude'],
     },
     {
         id: 'context-and-media',

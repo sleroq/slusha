@@ -3,6 +3,7 @@ export function settingsFieldTitle(key: string) {
         'ai.prompt': 'Character',
         'ai.prePrompt': 'System prompt',
         'ai.model': 'Model',
+        availableModels: 'Available models',
         names: 'Names',
         tendToReply: 'Reply when matched',
         tendToIgnore: 'Ignore when matched',

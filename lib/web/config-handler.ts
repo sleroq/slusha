@@ -318,18 +318,17 @@ export function createConfigHandler(botToken: string) {
         if (target.scope === 'chat') targetChatId = target.chatId;
 
         return json({
-            fields: readable.filter((field) => field.key !== 'availableModels')
-                .map((field) => ({
-                    ...field,
-                    overridden: overridden.has(field.key),
-                    writable: canAccessConfig(
-                        field.key,
-                        target.scope,
-                        'write',
-                        selection.access,
-                        targetChatId,
-                    ),
-                })),
+            fields: readable.map((field) => ({
+                ...field,
+                overridden: overridden.has(field.key),
+                writable: canAccessConfig(
+                    field.key,
+                    target.scope,
+                    'write',
+                    selection.access,
+                    targetChatId,
+                ),
+            })),
             scopes,
             chats,
             scope,

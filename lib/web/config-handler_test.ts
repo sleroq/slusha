@@ -111,6 +111,11 @@ Deno.test('config handler validates, serializes, and commits atomically', async 
             (field: { key?: string }) => field.key === 'ai.model',
         );
         assertEquals(model.kind, 'select');
+        const availableModels = body.fields.find(
+            (field: { key?: string }) => field.key === 'availableModels',
+        );
+        assertEquals(availableModels.kind, 'string-list');
+        assertEquals(availableModels.writable, true);
 
         const trustedResponse = await handler(
             new Request('http://localhost/api/config?scope=global', {
@@ -129,6 +134,12 @@ Deno.test('config handler validates, serializes, and commits atomically', async 
         assertEquals(
             trusted.fields.some((field: { key?: string }) =>
                 field.key === 'ai.prePrompt'
+            ),
+            false,
+        );
+        assertEquals(
+            trusted.fields.some((field: { key?: string }) =>
+                field.key === 'availableModels'
             ),
             false,
         );
