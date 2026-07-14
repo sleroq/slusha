@@ -1,15 +1,20 @@
 import {
     canAccessConfig,
     type ConfigAccessContext,
+    type ConfigKey,
     configOptionPolicies,
+    isConfigKey,
 } from './config-access.ts';
 import {
+    chatScopeKey,
+    deserializeConfigEntryValue,
     getEffectiveUserConfig,
     getGlobalUserConfig,
+    serializeConfigEntryValue,
     type UserConfig,
+    validateConfigEntryValue,
 } from './config.ts';
 import type { DbClient } from './db/client.ts';
-import { ChatConfigRepository } from './persistence/chat-config.ts';
 import { ConfigEntryRepository } from './persistence/config-entries.ts';
 
 export class ConfigPermissionError extends Error {
@@ -22,6 +27,96 @@ export class ConfigPermissionError extends Error {
 export type ConfigTarget =
     | { scope: 'global' }
     | { scope: 'chat'; chatId: number };
+
+export type ConfigOperation =
+    | { key: string; value: unknown; reset?: false }
+    | { key: string; reset: true };
+
+export type ConfigEditor =
+    | { kind: 'boolean'; optional?: boolean }
+    | { kind: 'number'; optional?: boolean }
+    | { kind: 'range'; min: number; max: number; step: number; unit?: string }
+    | { kind: 'text'; multiline?: boolean; optional?: boolean }
+    | { kind: 'select'; options: string[]; optional?: boolean }
+    | { kind: 'matcher-list' }
+    | { kind: 'string-list' }
+    | { kind: 'object-list'; keys: string[] };
+
+const text = { kind: 'text' } as const;
+const multiline = { kind: 'text', multiline: true } as const;
+const boolean = { kind: 'boolean' } as const;
+const optionalNumber = { kind: 'number', optional: true } as const;
+const optionalBoolean = { kind: 'boolean', optional: true } as const;
+const probability = {
+    kind: 'range',
+    min: 0,
+    max: 100,
+    step: 1,
+    unit: '%',
+} as const;
+
+const configEditors = {
+    'ai.prePrompt': multiline,
+    'ai.prompt': multiline,
+    'ai.privateChatPromptAddition': { ...multiline, optional: true },
+    'ai.groupChatPromptAddition': { ...multiline, optional: true },
+    'ai.commentsPromptAddition': { ...multiline, optional: true },
+    'ai.hateModePrompt': { ...multiline, optional: true },
+    'ai.finalPrompt': multiline,
+    'ai.chatActionsToolDescription': { ...multiline, optional: true },
+    'ai.google.safetySettings': {
+        kind: 'object-list',
+        keys: ['category', 'threshold'],
+    },
+    'availableModels': { kind: 'string-list' },
+    'ai.model': text,
+    'ai.temperature': { kind: 'range', min: 0, max: 2, step: 0.01 },
+    'ai.topK': { kind: 'range', min: 1, max: 200, step: 1 },
+    'ai.topP': { kind: 'range', min: 0, max: 1, step: 0.01 },
+    'ai.messagesToPass': { kind: 'range', min: 1, max: 100, step: 1 },
+    'ai.messageMaxLength': {
+        kind: 'range',
+        min: 200,
+        max: 20000,
+        step: 1,
+    },
+    'ai.includeAttachmentsInHistory': boolean,
+    'ai.bytesLimit': {
+        kind: 'range',
+        min: 1024,
+        max: 100 * 1024 * 1024,
+        step: 1024,
+    },
+    'ai.google.structuredOutputs': boolean,
+    'ai.openrouter.usageInclude': boolean,
+    'ai.generation.chat.thinking.thinkingLevel': {
+        kind: 'select',
+        options: ['minimal', 'low', 'medium', 'high'],
+        optional: true,
+    },
+    'ai.generation.chat.thinking.includeThoughts': optionalBoolean,
+    'ai.generation.chat.maxOutputTokens': optionalNumber,
+    'ai.generation.character.thinking.thinkingLevel': {
+        kind: 'select',
+        options: ['minimal', 'low', 'medium', 'high'],
+        optional: true,
+    },
+    'ai.generation.character.thinking.includeThoughts': optionalBoolean,
+    'ai.generation.character.maxOutputTokens': optionalNumber,
+    'startMessage': multiline,
+    'names': { kind: 'matcher-list' },
+    'tendToReply': { kind: 'matcher-list' },
+    'tendToReplyProbability': probability,
+    'tendToIgnore': { kind: 'matcher-list' },
+    'tendToIgnoreProbability': probability,
+    'randomReplyProbability': probability,
+    'locale': text,
+    'blacklistedReactions': { kind: 'string-list' },
+    'nepons': { kind: 'string-list' },
+    'filesMaxAge': { kind: 'range', min: 1, max: 720, step: 1, unit: 'h' },
+    'maxMessagesToStore': { kind: 'range', min: 1, max: 10000, step: 1 },
+    'responseDelay': { kind: 'range', min: 0, max: 120, step: 0.1, unit: 's' },
+} satisfies Record<ConfigKey, ConfigEditor>;
 
 function getPath(value: UserConfig, path: string): unknown {
     let current: unknown = value;
@@ -43,7 +138,14 @@ export class ConfigurationService {
         const config = target.scope === 'global'
             ? await getGlobalUserConfig(this.db)
             : await getEffectiveUserConfig({ chatId: target.chatId }, this.db);
+        const canReadModels = canAccessConfig(
+            'availableModels',
+            'global',
+            'read',
+            this.access,
+        );
         return Object.keys(configOptionPolicies)
+            .filter(isConfigKey)
             .filter((key) =>
                 canAccessConfig(
                     key,
@@ -53,22 +155,40 @@ export class ConfigurationService {
                     target.scope === 'chat' ? target.chatId : undefined,
                 )
             )
-            .map((key) => ({ key, value: getPath(config, key) }));
+            .map((key) => {
+                let editor: ConfigEditor = configEditors[key];
+                if (key === 'ai.model' && canReadModels) {
+                    editor = {
+                        kind: 'select',
+                        options: config.availableModels,
+                    };
+                }
+                return {
+                    key,
+                    value: serializeConfigEntryValue(key, getPath(config, key)),
+                    ...editor,
+                };
+            });
     }
 
     async setValue(target: ConfigTarget, key: string, value: unknown) {
         this.assertAllowed(key, target, 'write');
+        const runtimeValue = deserializeConfigEntryValue(key, value);
         if (target.scope === 'global') {
             await new ConfigEntryRepository(this.db, 'global', 'global')
                 .setValue(
                     key,
-                    value,
+                    runtimeValue,
                     this.actorId,
                 );
         } else {
-            await new ChatConfigRepository(this.db, target.chatId).setValue(
+            await new ConfigEntryRepository(
+                this.db,
+                chatScopeKey(target.chatId),
+                'chat',
+            ).setValue(
                 key,
-                value,
+                runtimeValue,
                 this.actorId,
             );
         }
@@ -83,11 +203,64 @@ export class ConfigurationService {
                     this.actorId,
                 );
         } else {
-            await new ChatConfigRepository(this.db, target.chatId).resetValue(
+            await new ConfigEntryRepository(
+                this.db,
+                chatScopeKey(target.chatId),
+                'chat',
+            ).resetValue(
                 key,
                 this.actorId,
             );
         }
+    }
+
+    async applyOperations(
+        target: ConfigTarget,
+        operations: ConfigOperation[],
+    ) {
+        const runtimeOperations = operations.map((operation) => {
+            this.assertAllowed(operation.key, target, 'write');
+            if (operation.reset) {
+                return operation;
+            }
+            const value = deserializeConfigEntryValue(
+                operation.key,
+                operation.value,
+            );
+            validateConfigEntryValue(operation.key, value, target.scope);
+            return { ...operation, value };
+        });
+
+        let scopeKey = 'global';
+        if (target.scope === 'chat') {
+            scopeKey = chatScopeKey(target.chatId);
+        }
+        const entries = new ConfigEntryRepository(
+            this.db,
+            scopeKey,
+            target.scope,
+        );
+        await this.db.transaction(async (tx) => {
+            for (const operation of runtimeOperations) {
+                if (operation.reset) {
+                    await entries.resetRawValueInTx(
+                        tx,
+                        operation.key,
+                        this.actorId,
+                    );
+                } else {
+                    await entries.setRawValueInTx(
+                        tx,
+                        operation.key,
+                        serializeConfigEntryValue(
+                            operation.key,
+                            operation.value,
+                        ),
+                        this.actorId,
+                    );
+                }
+            }
+        });
     }
 
     private assertAllowed(

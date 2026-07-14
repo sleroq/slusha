@@ -1,2 +1,100 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
+
+:root {
+    color-scheme: light;
+    --app-bg-color: var(--tg-theme-secondary-bg-color, #f2f3f5);
+    --app-surface-color: var(
+        --tg-theme-section-bg-color,
+        var(--tg-theme-bg-color, #ffffff)
+    );
+    --app-bottom-bar-color: var(
+        --tg-theme-bottom-bar-bg-color,
+        var(--tg-theme-bg-color, #ffffff)
+    );
+    --app-destructive-color: var(--tg-theme-destructive-text-color, #d14e4e);
+    --app-destructive-bg-color: color-mix(in srgb, var(--app-destructive-color) 12%, transparent);
+    --app-pressed-color: color-mix(in srgb, var(--tg-theme-text-color, #111827) 7%, transparent);
+    --app-separator-color: var(
+        --tg-theme-section-separator-color,
+        color-mix(in srgb, var(--tg-theme-hint-color, #707579) 22%, transparent)
+    );
+    --app-safe-area-top: var(--tg-viewport-safe-area-inset-top, 0px);
+    --app-safe-area-right: var(--tg-viewport-safe-area-inset-right, 0px);
+    --app-safe-area-bottom: var(--tg-viewport-safe-area-inset-bottom, 0px);
+    --app-safe-area-left: var(--tg-viewport-safe-area-inset-left, 0px);
+    --app-content-safe-area-top: var(--tg-viewport-content-safe-area-inset-top, 0px);
+    --app-content-safe-area-right: var(--tg-viewport-content-safe-area-inset-right, 0px);
+    --app-content-safe-area-bottom: var(--tg-viewport-content-safe-area-inset-bottom, 0px);
+    --app-content-safe-area-left: var(--tg-viewport-content-safe-area-inset-left, 0px);
+    --app-safe-bottom: max(
+        0.75rem,
+        var(--app-safe-area-bottom),
+        var(--app-content-safe-area-bottom)
+    );
+    --app-safe-top: max(
+        0.25rem,
+        var(--app-safe-area-top),
+        var(--app-content-safe-area-top)
+    );
+    --app-safe-right: max(var(--app-safe-area-right), var(--app-content-safe-area-right));
+    --app-safe-left: max(var(--app-safe-area-left), var(--app-content-safe-area-left));
+    --app-viewport-height: var(--tg-viewport-stable-height, 100dvh);
+    --app-section-header-color: var(
+        --tg-theme-section-header-text-color,
+        var(--tg-theme-accent-text-color, #3390ec)
+    );
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--tg-theme-text-color, #111827);
+    background: var(--app-bg-color);
+}
+
+body {
+    margin: 0;
+}
+.settings-paper {
+    background-color: var(--app-surface-color);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--tg-theme-text-color, #111827) 8%, transparent);
+}
+.selector-sheet {
+    background-color: var(--tg-theme-bg-color, #ffffff);
+}
+.selector-search {
+    background-color: var(
+        --tg-theme-secondary-bg-color,
+        #f2f3f5
+    );
+}
+.telegram-action-button {
+    color: var(--tg-theme-button-text-color, #ffffff);
+    background-color: var(--tg-theme-button-color, #3390ec);
+}
+button, input, textarea, select {
+    font: inherit;
+}
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: 2px solid var(--tg-theme-link-color, #3390ec);
+    outline-offset: 2px;
+}
+.app-separator {
+    border-color: var(--app-separator-color);
+}
+.app-pressed:active {
+    background-color: var(--app-pressed-color);
+}
+.app-error {
+    color: var(--app-destructive-color);
+    background-color: var(--app-destructive-bg-color);
+}
+.dirty {
+    box-shadow: inset 3px 0 var(--tg-theme-accent-text-color, #3390ec);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}

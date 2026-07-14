@@ -128,6 +128,13 @@ export const configSchema = z.object({
 });
 
 export type UserConfig = z.infer<typeof configSchema>;
+
+export class ConfigValidationError extends Error {
+    constructor(message: string, options?: ErrorOptions) {
+        super(message, options);
+        this.name = 'ConfigValidationError';
+    }
+}
 const config = configSchema.extend({
     botToken: z.string(),
     aiToken: z.string().optional(),
@@ -156,9 +163,68 @@ function serializeMatcher(item: string | RegExp): SerializedMatcher {
     return { __regex: item.source, flags: item.flags };
 }
 
+export function serializeConfigEntryValue(
+    key: string,
+    value: unknown,
+): unknown {
+    if (
+        key === 'names' || key === 'tendToReply' || key === 'tendToIgnore'
+    ) {
+        if (!Array.isArray(value)) {
+            throw new Error(`Invalid matcher config value for ${key}`);
+        }
+        return value.map((item: unknown) => {
+            if (typeof item === 'string' || item instanceof RegExp) {
+                return serializeMatcher(item);
+            }
+            throw new Error(`Invalid matcher config value for ${key}`);
+        });
+    }
+    if (value === undefined) return null;
+    return value;
+}
+
 function deserializeMatcher(item: SerializedMatcher): string | RegExp {
     if (typeof item === 'string') return item;
     return new RegExp(item.__regex, item.flags ?? '');
+}
+
+export function deserializeConfigEntryValue(
+    key: string,
+    value: unknown,
+): unknown {
+    if (
+        key !== 'names' && key !== 'tendToReply' && key !== 'tendToIgnore'
+    ) {
+        return value;
+    }
+    if (!Array.isArray(value)) {
+        throw new ConfigValidationError(`Invalid config value for ${key}`);
+    }
+
+    try {
+        return value.map((item: unknown) => {
+            if (typeof item === 'string' || item instanceof RegExp) {
+                return item;
+            }
+            if (
+                isPlainObject(item) && typeof item.__regex === 'string' &&
+                (item.flags === undefined || typeof item.flags === 'string')
+            ) {
+                return deserializeMatcher({
+                    __regex: item.__regex,
+                    flags: item.flags,
+                });
+            }
+            throw new ConfigValidationError(`Invalid config value for ${key}`);
+        });
+    } catch (error) {
+        if (error instanceof ConfigValidationError) throw error;
+        throw new ConfigValidationError(
+            `Invalid config value for ${key}`,
+            { cause: error },
+        );
+    }
 }
 
 export function toStoredUserConfig(input: UserConfig): StoredUserConfig {
@@ -242,14 +308,14 @@ export function validateConfigEntryValue(
     const defaults = getStoredDefaults();
     const policy = getConfigOptionPolicy(key);
     if (!policy || (scope !== undefined && !policy[scope])) {
-        throw new Error(`Unsupported config key: ${key}`);
+        throw new ConfigValidationError(`Unsupported config key: ${key}`);
     }
 
-    const next = cloneStoredConfig(defaults);
+    const next = fromStoredUserConfig(defaults);
     setPath(next as unknown as PlainObject, key, value);
-    const parsed = configSchema.safeParse(fromStoredUserConfig(next));
+    const parsed = configSchema.safeParse(next);
     if (!parsed.success) {
-        throw new Error(
+        throw new ConfigValidationError(
             `Invalid config value for ${key}`,
             { cause: parsed.error },
         );

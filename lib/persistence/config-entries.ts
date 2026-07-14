@@ -1,6 +1,9 @@
 import { and, eq } from 'drizzle-orm';
 import type { ConfigScope } from '../config-access.ts';
-import { validateConfigEntryValue } from '../config.ts';
+import {
+    serializeConfigEntryValue,
+    validateConfigEntryValue,
+} from '../config.ts';
 import type { DbClient } from '../db/client.ts';
 import { configEntries, configEntryHistory } from '../db/schema.ts';
 
@@ -15,8 +18,9 @@ export class ConfigEntryRepository {
 
     setValue(key: string, value: unknown, updatedBy?: number) {
         validateConfigEntryValue(key, value, this.scope);
+        const storedValue = serializeConfigEntryValue(key, value);
         return this.db.transaction((tx: ConfigTx) =>
-            this.setRawValueInTx(tx, key, value, updatedBy)
+            this.setRawValueInTx(tx, key, storedValue, updatedBy)
         );
     }
 

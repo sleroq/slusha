@@ -30,6 +30,7 @@
         "@std/http/unstable-route": "jsr:@std/http@^1.1.2/unstable-route",
         "@std/http/file-server": "jsr:@std/http@^1.1.2/file-server",
         "@tma.js/init-data-node": "npm:@tma.js/init-data-node@^2.0.8",
+        "@tma.js/sdk-svelte": "npm:@tma.js/sdk-svelte@^1.0.22",
         "ai": "npm:ai@^7.0.22",
         "@ai-sdk/google": "npm:@ai-sdk/google@^4.0.12",
         "@ai-sdk/openai-compatible": "npm:@ai-sdk/openai-compatible@^3.0.7",
@@ -52,7 +53,14 @@
         "zod": "npm:zod@^4.4.3"
     },
     "allowScripts": {
-        "allow": ["npm:@google/genai@2.11.0", "npm:esbuild@0.18.20", "npm:esbuild@0.25.12", "npm:esbuild@0.28.1", "npm:fsevents@2.3.3", "npm:protobufjs@7.6.5"]
+        "allow": [
+            "npm:@google/genai@2.11.0",
+            "npm:esbuild@0.18.20",
+            "npm:esbuild@0.25.12",
+            "npm:esbuild@0.28.1",
+            "npm:fsevents@2.3.3",
+            "npm:protobufjs@7.6.5"
+        ]
     },
     "workspace": ["./web/"]
 }

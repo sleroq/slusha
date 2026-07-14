@@ -19,13 +19,15 @@ export function withTelegramAuth(
             return new Response('Unauthorized', { status: 401 });
         }
 
+        let parsed: ReturnType<typeof parse>;
         try {
             await validate(initData, botToken, {
                 expiresIn: initDataLifetimeSeconds,
             });
-            return await handler(request, parse(initData));
+            parsed = parse(initData);
         } catch {
             return new Response('Unauthorized', { status: 401 });
         }
+        return await handler(request, parsed);
     };
 }

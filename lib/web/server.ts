@@ -4,18 +4,36 @@ import {
 } from '../app/metrics.ts';
 import type { Config } from '../config.ts';
 import logger from '../logger.ts';
-import { withTelegramAuth } from './telegram-auth.ts';
 import { type Route, route } from '@std/http/unstable-route';
 import { serveDir } from '@std/http/file-server';
+import { createConfigHandler } from './config-handler.ts';
 
-function json(body: unknown, status = 200) {
-    return new Response(JSON.stringify(body), {
-        status,
-        headers: { 'content-type': 'application/json' },
-    });
-}
+function createRoutes(botToken: string, devServerUrl?: string): Route[] {
+    const configHandler = createConfigHandler(botToken);
+    const frontendHandler = (req: Request) => {
+        if (devServerUrl) {
+            const requestUrl = new URL(req.url);
+            const targetUrl = new URL(
+                `${requestUrl.pathname}${requestUrl.search}`,
+                devServerUrl,
+            );
+            const headers = new Headers(req.headers);
 
-function createRoutes(botToken: string): Route[] {
+            headers.delete('host');
+            headers.delete('connection');
+
+            return fetch(
+                new Request(targetUrl, {
+                    method: req.method,
+                    headers,
+                    body: req.body,
+                }),
+            );
+        }
+
+        return serveDir(req, { fsRoot: './web/build' });
+    };
+
     return [
         {
             pattern: new URLPattern({ pathname: '/healthz' }),
@@ -33,18 +51,22 @@ function createRoutes(botToken: string): Route[] {
                 }),
         },
         {
-            pattern: new URLPattern({ pathname: '/api/auth/telegram' }),
-            method: 'POST',
-            handler: withTelegramAuth(botToken, (_request, initData) => {
-                if (!initData.user) {
-                    return new Response('Unauthorized', { status: 401 });
-                }
-                return json({ user: initData.user });
-            }),
+            pattern: new URLPattern({ pathname: '/api/config' }),
+            method: 'GET',
+            handler: configHandler,
+        },
+        {
+            pattern: new URLPattern({ pathname: '/api/config' }),
+            method: 'PUT',
+            handler: configHandler,
         },
         {
             pattern: new URLPattern({ pathname: '/' }),
-            handler: (req) => serveDir(req, { fsRoot: './web/build' }),
+            handler: frontendHandler,
+        },
+        {
+            pattern: new URLPattern({ pathname: '/:path*' }),
+            handler: frontendHandler,
         },
     ];
 }
@@ -52,11 +74,12 @@ function createRoutes(botToken: string): Route[] {
 export function startWebServer(config: Config) {
     const port = Number(Deno.env.get('WEB_PORT') ?? '8080');
     const hostname = Deno.env.get('WEB_HOST') ?? '0.0.0.0';
+    const devServerUrl = Deno.env.get('WEB_DEV_SERVER_URL');
 
     const server = Deno.serve(
         { port, hostname },
         route(
-            createRoutes(config.botToken),
+            createRoutes(config.botToken, devServerUrl),
             () => new Response('Not found', { status: 404 }),
         ),
     );

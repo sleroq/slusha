@@ -37,6 +37,7 @@
     "npm:@tailwindcss/forms@~0.5.11": "0.5.11_tailwindcss@4.3.2",
     "npm:@tailwindcss/vite@^4.3.2": "4.3.2_vite@8.1.4__@types+node@24.13.3",
     "npm:@tma.js/init-data-node@^2.0.8": "2.0.8_typescript@6.0.3",
+    "npm:@tma.js/sdk-svelte@^1.0.22": "1.0.22_svelte@5.56.4",
     "npm:@types/node@^24.13.3": "24.13.3",
     "npm:ai@^7.0.22": "7.0.22_zod@4.4.3",
     "npm:drizzle-kit@~0.31.10": "0.31.10",
@@ -53,7 +54,6 @@
     "npm:svelte-check@^4.7.2": "4.7.2_svelte@5.56.4_typescript@6.0.3",
     "npm:svelte@^5.56.4": "5.56.4",
     "npm:tailwindcss@^4.3.2": "4.3.2",
-    "npm:telegram-webapps@^9.6.0": "9.6.0",
     "npm:typescript-eslint@^8.63.0": "8.63.0_eslint@10.7.0_typescript@6.0.3",
     "npm:typescript@^6.0.3": "6.0.3",
     "npm:unified@^11.0.5": "11.0.5",
@@ -2004,6 +2004,20 @@
         "vite"
       ]
     },
+    "@tma.js/bridge@2.3.3": {
+      "integrity": "sha512-R2o/bJY/mc8Kg4F3sF515DawCEUOVpHaOnW/zGq95Tell/ptb/7XPzCa7Ko5iq8KrlmHjpiK/0xnnF423lJ4Vw==",
+      "dependencies": [
+        "@tma.js/signals",
+        "@tma.js/toolkit",
+        "@tma.js/transformers",
+        "@tma.js/types",
+        "better-promises",
+        "error-kid@2.0.0",
+        "fp-ts",
+        "mitt",
+        "valibot"
+      ]
+    },
     "@tma.js/init-data-node@2.0.8_typescript@6.0.3": {
       "integrity": "sha512-OK4uLAXOg/uMnmdS0ngcPVJCh3FJLQfk/BpBpxyk5mYBV7cHSidXzyC7AtygfoNgAoadlbDLh1aQANVRUbgjQg==",
       "dependencies": [
@@ -2014,6 +2028,30 @@
         "error-kid@2.0.0",
         "fp-ts"
       ]
+    },
+    "@tma.js/sdk-svelte@1.0.22_svelte@5.56.4": {
+      "integrity": "sha512-9HSgR3D92dA+n3ZlFNblbus07xh+OEsHv2evgHakhSLjnUOifbOSmAODErFAC7/droaDs6pURRlpGlS4jKQlrA==",
+      "dependencies": [
+        "@tma.js/sdk",
+        "svelte"
+      ]
+    },
+    "@tma.js/sdk@3.2.3": {
+      "integrity": "sha512-h9Djl0FqDrsc+sxRQ7c6DmpE5Yx+jw1oVDwlDTmgUbOByW9zrVEjvcggWR1ClK4CPQPUXkj0gaUkOWndPOgKeA==",
+      "dependencies": [
+        "@tma.js/bridge",
+        "@tma.js/signals",
+        "@tma.js/toolkit",
+        "@tma.js/transformers",
+        "@tma.js/types",
+        "better-promises",
+        "error-kid@2.0.0",
+        "fp-ts",
+        "valibot"
+      ]
+    },
+    "@tma.js/signals@1.0.1": {
+      "integrity": "sha512-i2HUuwGqL4BmM5KAklAUhMhlEgUOF+F4nMHHS/zxrmD0upHE/0CiXCEdQxVeeOGN6e2RrKlonA40sDtR6OUDCw=="
     },
     "@tma.js/toolkit@1.0.4": {
       "integrity": "sha512-6CDlkgc+43WD2jy6jog3B50yt9t+/wRwrN25zOa4iSw4IzfqoFjaQcJzTupBYaRxz19C3Rrir7p0/qStS/Z8vw==",
@@ -3414,6 +3452,9 @@
         "brace-expansion"
       ]
     },
+    "mitt@3.0.1": {
+      "integrity": "sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw=="
+    },
     "module-details-from-path@1.0.4": {
       "integrity": "sha512-EGWKgxALGMgzvxYF1UyGTy0HXX/2vHLkw6+NvDKW2jypWbHpjQuj4UMcqQWXHERJhVGKikolT06G3bcKe4fi7w=="
     },
@@ -3820,9 +3861,6 @@
         "bintrees"
       ]
     },
-    "telegram-webapps@9.6.0": {
-      "integrity": "sha512-1Tb7H+YiPe2XNq2ANRw6VWyIb4aXEir/Ra1uuxpfBGLRDYq6lD7CRFnF6YX6QBD+8j7d0d6wHW8f7Qm55uQKyQ=="
-    },
     "tinyglobby@0.2.17": {
       "integrity": "sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==",
       "dependencies": [
@@ -4151,6 +4189,7 @@
       "npm:@opentelemetry/auto-instrumentations-node@0.78",
       "npm:@opentelemetry/sdk-node@0.220",
       "npm:@tma.js/init-data-node@^2.0.8",
+      "npm:@tma.js/sdk-svelte@^1.0.22",
       "npm:ai@^7.0.22",
       "npm:drizzle-kit@~0.31.10",
       "npm:drizzle-orm@~0.45.2",
@@ -4173,6 +4212,7 @@
             "npm:@sveltejs/vite-plugin-svelte@^7.2.0",
             "npm:@tailwindcss/forms@~0.5.11",
             "npm:@tailwindcss/vite@^4.3.2",
+            "npm:@tma.js/sdk-svelte@^1.0.22",
             "npm:@types/node@^24.13.3",
             "npm:eslint-plugin-svelte@^3.20.0",
             "npm:eslint@^10.7.0",
@@ -4180,7 +4220,6 @@
             "npm:svelte-check@^4.7.2",
             "npm:svelte@^5.56.4",
             "npm:tailwindcss@^4.3.2",
-            "npm:telegram-webapps@^9.6.0",
             "npm:typescript-eslint@^8.63.0",
             "npm:typescript@^6.0.3",
             "npm:vite@^8.1.4"
