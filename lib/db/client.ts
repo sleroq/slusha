@@ -6,7 +6,7 @@ import logger from '../logger.ts';
 const defaultDbUrl = 'file:./slusha.sqlite';
 let singletonDb: ReturnType<typeof createDb>['db'] | undefined;
 let singletonClient: ReturnType<typeof createDb>['client'] | undefined;
-let sqlitePragmasPromise: Promise<void> | undefined;
+let initializeDbPromise: Promise<void> | undefined;
 
 export function resolveDbUrl(): string {
     return Deno.env.get('DATABASE_URL') ?? defaultDbUrl;
@@ -15,6 +15,7 @@ export function resolveDbUrl(): string {
 export function createDb() {
     const client = createClient({
         url: resolveDbUrl(),
+        timeout: 5000,
     });
 
     const db = drizzle({ client, schema });
@@ -22,56 +23,36 @@ export function createDb() {
     return { db, client };
 }
 
-export async function ensureSqlitePragmas() {
-    if (!sqlitePragmasPromise) {
-        if (!singletonClient) {
-            const created = createDb();
-            singletonDb = created.db;
-            singletonClient = created.client;
-        }
-
-        sqlitePragmasPromise = (async () => {
-            try {
-                await singletonClient!.execute('PRAGMA journal_mode = WAL;');
-                await singletonClient!.execute('PRAGMA busy_timeout = 5000;');
-            } catch (error) {
-                logger.warn(
-                    'Could not apply SQLite pragmas: ',
-                    error,
-                );
-            }
-        })();
-    }
-
-    await sqlitePragmasPromise;
-}
-
-export async function ensureDatabaseWritable() {
+function ensureDbCreated() {
     if (!singletonClient) {
         const created = createDb();
         singletonDb = created.db;
         singletonClient = created.client;
     }
+}
 
-    try {
-        await singletonClient!.execute('BEGIN IMMEDIATE;');
-        await singletonClient!.execute('ROLLBACK;');
-    } catch (error) {
-        throw new Error(
-            `Database is not writable (${resolveDbUrl()}). Check file and directory permissions.`,
-            { cause: error },
-        );
+export async function initializeDb() {
+    if (!initializeDbPromise) {
+        initializeDbPromise = (async () => {
+            ensureDbCreated();
+
+            try {
+                await singletonClient!.execute('PRAGMA foreign_keys = ON;');
+                await singletonClient!.execute('PRAGMA journal_mode = WAL;');
+                await singletonClient!.execute('PRAGMA busy_timeout = 5000;');
+            } catch (error) {
+                logger.warn('Could not apply SQLite pragmas: ', error);
+            }
+        })();
     }
+
+    await initializeDbPromise;
 }
 
 export function getDb() {
-    if (!singletonDb) {
-        const created = createDb();
-        singletonDb = created.db;
-        singletonClient = created.client;
-    }
+    ensureDbCreated();
 
-    return singletonDb;
+    return singletonDb!;
 }
 
 export type DbClient = ReturnType<typeof createDb>['db'];

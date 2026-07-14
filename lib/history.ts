@@ -7,19 +7,18 @@ import {
     removeFieldsWithSuffixes,
     sliceMessage,
 } from './helpers.ts';
-import { ChatMessage, ReplyTo } from './memory.ts';
+import type { ChatMessage, ReplyTo } from './persistence/types.ts';
 import { Message } from 'grammy_types';
 import { Logger } from '@deno-library/logger';
 import logger from './logger.ts';
+import type { HistoryAttachmentInput } from './ai/model-catalog.ts';
 
 interface HistoryOptions {
     symbolLimit: number;
     messagesLimit: number;
     bytesLimit: number;
-    attachments?: boolean;
-    resolveReplyThread?: boolean;
+    attachmentInput?: HistoryAttachmentInput;
     includeReactions?: boolean;
-    historyVersion?: 'v2' | 'v3';
     activeMessageId?: number;
 }
 
@@ -37,80 +36,6 @@ function buildHistoryMetadataBlock(metadata: Record<string, unknown>): string {
     }\n${HISTORY_META_CLOSE}`;
 }
 
-function collectReplyThread(
-    history: ChatMessage[],
-    msg: ChatMessage,
-    thread: ChatMessage[] = [],
-): ChatMessage[] {
-    thread.push(msg);
-
-    const replyTo = msg.replyTo;
-    if (!replyTo) {
-        return thread;
-    }
-
-    const replyToMsg = history.find((m) => m.id === replyTo.id);
-    if (replyToMsg) {
-        return collectReplyThread(history, replyToMsg, thread);
-    } else {
-        // For bot relies and stuff not saved in history
-        thread.push({
-            id: replyTo.id,
-            text: replyTo.text ?? replyTo.info.caption ?? '',
-            replyTo: replyTo,
-            isMyself: false,
-            info: replyTo.info,
-        });
-    }
-
-    return thread;
-}
-
-export function selectHistoryCandidates(
-    history: ChatMessage[],
-    options: {
-        resolveReplyThread: boolean;
-        maxRootMessages?: number;
-    },
-): HistoryCandidate[] {
-    const selected: HistoryCandidate[] = [];
-    const seen = new Set<number>();
-    let rootMessagesProcessed = 0;
-
-    for (let i = history.length - 1; i >= 0; i--) {
-        if (
-            typeof options.maxRootMessages === 'number' &&
-            rootMessagesProcessed >= options.maxRootMessages
-        ) {
-            break;
-        }
-        rootMessagesProcessed += 1;
-
-        const rootMsg = history[i];
-        if (seen.has(rootMsg.id)) {
-            continue;
-        }
-
-        const thread = options.resolveReplyThread
-            ? collectReplyThread(history, rootMsg)
-            : [rootMsg];
-
-        for (const threadMsg of thread) {
-            if (seen.has(threadMsg.id)) {
-                continue;
-            }
-
-            selected.push({
-                msg: threadMsg,
-                rootIndex: i,
-            });
-            seen.add(threadMsg.id);
-        }
-    }
-
-    return selected;
-}
-
 function sameThread(left: ChatMessage, right: ChatMessage): boolean {
     if (left.threadId && right.threadId) {
         return left.threadId === right.threadId;
@@ -123,26 +48,13 @@ function sameThread(left: ChatMessage, right: ChatMessage): boolean {
     return false;
 }
 
-function hasThreadMetadata(history: ChatMessage[]): boolean {
-    return history.some((msg) =>
-        Boolean(msg.threadId) || typeof msg.threadRootMessageId === 'number'
-    );
-}
-
-export function selectHistoryCandidatesV3(
+export function selectHistoryCandidates(
     history: ChatMessage[],
     options: {
         maxRootMessages?: number;
         activeMessageId?: number;
     },
 ): HistoryCandidate[] {
-    if (!hasThreadMetadata(history)) {
-        return selectHistoryCandidates(history, {
-            resolveReplyThread: true,
-            maxRootMessages: options.maxRootMessages,
-        });
-    }
-
     const selected: HistoryCandidate[] = [];
     const seen = new Set<number>();
 
@@ -318,7 +230,7 @@ interface JSONInputMessage {
 
 interface ConstructMsgOptions {
     symbolLimit: number;
-    attachments: boolean;
+    attachmentInput: HistoryAttachmentInput;
     characterName?: string;
     includeReactions?: boolean;
 }
@@ -352,32 +264,30 @@ const messageMetadataFields = new Set<string>([
     'reply_markup',
 ]);
 
-const supportedTextContentTypes = new Set<string>([
-    ...Array.from(supportedTypesMap.keys()).map(String),
-    ...jsonTypes.map(String),
-]);
-
-function getPresentMessageFields(msgInfo: Message): string[] {
-    const rawMsg = msgInfo as unknown as Record<string, unknown>;
-
-    return Object.keys(rawMsg).filter((key) => rawMsg[key] !== undefined);
-}
-
-function getPresentContentFields(msgInfo: Message): string[] {
-    return getPresentMessageFields(msgInfo).filter((field) =>
-        !messageMetadataFields.has(field)
+function throwUnsupportedMessageError(msg: ChatMessage): never {
+    const contentFields = Object.entries(msg.info)
+        .filter(([field, value]) =>
+            value !== undefined && !messageMetadataFields.has(field)
+        )
+        .map(([field]) => field);
+    const supportedMessageFields = new Set<string>(
+        supportedTypesMap.keys(),
     );
-}
-
-function getSupportedContentFields(msgInfo: Message): string[] {
-    return getPresentContentFields(msgInfo).filter((field) =>
-        supportedTextContentTypes.has(field)
+    const jsonMessageFields = new Set<string>(jsonTypes);
+    const supportedFields = contentFields.filter((field) =>
+        supportedMessageFields.has(field) || jsonMessageFields.has(field)
     );
-}
-
-function getUnsupportedContentFields(msgInfo: Message): string[] {
-    return getPresentContentFields(msgInfo).filter((field) =>
-        !supportedTextContentTypes.has(field)
+    const unsupportedFields = contentFields.filter((field) =>
+        !supportedMessageFields.has(field) && !jsonMessageFields.has(field)
+    );
+    throw new Error(
+        [
+            'Message is not supported',
+            `(message_id=${msg.id})`,
+            `(has_text=${Boolean(msg.text)})`,
+            `(supported_fields=${supportedFields.join(',') || 'none'})`,
+            `(unsupported_fields=${unsupportedFields.join(',') || 'none'})`,
+        ].join(' '),
     );
 }
 
@@ -408,7 +318,7 @@ async function constructMsg(
     options: ConstructMsgOptions,
 ): Promise<ModelMessage> {
     const { symbolLimit, characterName } = options;
-    const attachAttachments = options.attachments;
+    const attachmentInput = options.attachmentInput;
     const includeReactions = options.includeReactions ?? false;
 
     const role = msg.isMyself ? 'assistant' : 'user';
@@ -441,17 +351,7 @@ async function constructMsg(
     }
 
     if (!text) {
-        const supportedFields = getSupportedContentFields(msg.info);
-        const unsupportedFields = getUnsupportedContentFields(msg.info);
-        throw new Error(
-            [
-                'Message is not supported',
-                `(message_id=${msg.id})`,
-                `(has_text=${Boolean(msg.text)})`,
-                `(supported_fields=${supportedFields.join(',') || 'none'})`,
-                `(unsupported_fields=${unsupportedFields.join(',') || 'none'})`,
-            ].join(' '),
-        );
+        throwUnsupportedMessageError(msg);
     }
 
     const parts: UserContent = [];
@@ -583,19 +483,35 @@ async function constructMsg(
         text: prettyInputMessage,
     });
 
-    if (attachAttachments && role === 'user') {
+    if (attachmentInput !== 'none' && role === 'user') {
         let attachments: Exclude<UserContent, string> = [];
         try {
-            attachments = await getAttachments(api, botInfo.token, msg);
+            attachments = await getAttachments(
+                api,
+                botInfo.token,
+                msg,
+                attachmentInput,
+            );
         } catch (error) {
+            const rawMsg = msg.info as unknown as Record<string, unknown>;
+            const contentFields = Object.keys(rawMsg).filter((field) =>
+                rawMsg[field] !== undefined &&
+                !messageMetadataFields.has(field)
+            );
             logger.error('Could not download message attachments', {
                 error,
                 messageId: msg.id,
                 isMyself: msg.isMyself,
                 hasText: Boolean(msg.text),
                 textLength: msg.text?.length ?? 0,
-                supportedFields: getSupportedContentFields(msg.info),
-                unsupportedFields: getUnsupportedContentFields(msg.info),
+                supportedFields: contentFields.filter((field) =>
+                    supportedTypesMap.has(field as keyof Message) ||
+                    jsonTypes.includes(field as keyof Message)
+                ),
+                unsupportedFields: contentFields.filter((field) =>
+                    !supportedTypesMap.has(field as keyof Message) &&
+                    !jsonTypes.includes(field as keyof Message)
+                ),
             });
         }
 
@@ -611,58 +527,33 @@ async function constructMsg(
     } as ModelMessage;
 }
 
-interface BuildHistoryContextOptions {
-    mode: 'chat';
-    symbolLimit: number;
-    messagesLimit: number;
-    bytesLimit: number;
-    attachments?: boolean;
-    resolveReplyThread?: boolean;
-    includeReactions?: boolean;
-    characterName?: string;
-    historyVersion?: 'v2' | 'v3';
-    activeMessageId?: number;
-}
-
-export async function buildHistoryContext(
+export async function makeHistory(
     botInfo: { token: string; id: number },
     api: Api<RawApi>,
     logger: Logger,
     history: ChatMessage[],
-    options: BuildHistoryContextOptions,
+    options: HistoryOptions,
 ): Promise<ModelMessage[]> {
-    const { mode, messagesLimit, bytesLimit, symbolLimit } = options;
-    const resolveReplies = mode === 'chat'
-        ? (options.resolveReplyThread ?? true)
-        : false;
+    const { messagesLimit, bytesLimit, symbolLimit } = options;
 
     let totalBytes = 0;
     let totalAttachments = 0;
     const prompt: ModelMessage[] = [];
-    let textPart = '';
 
-    const candidates = mode === 'chat' && options.historyVersion === 'v3'
-        ? selectHistoryCandidatesV3(history, {
-            maxRootMessages: undefined,
-            activeMessageId: options.activeMessageId,
-        })
-        : selectHistoryCandidates(history, {
-            resolveReplyThread: resolveReplies,
-            maxRootMessages: undefined,
-        });
+    const candidates = selectHistoryCandidates(history, {
+        maxRootMessages: undefined,
+        activeMessageId: options.activeMessageId,
+    });
 
     for (const candidate of candidates) {
         const msg = candidate.msg;
 
-        let attachAttachments = false;
-        if (mode === 'chat') {
-            attachAttachments = options.attachments ?? true;
-            if (
-                candidate.rootIndex < history.length - 10 ||
-                totalAttachments > 2
-            ) {
-                attachAttachments = false;
-            }
+        let attachmentInput = options.attachmentInput ?? 'all';
+        if (
+            candidate.rootIndex < history.length - 10 ||
+            totalAttachments > 2
+        ) {
+            attachmentInput = 'none';
         }
 
         let msgRes;
@@ -673,69 +564,47 @@ export async function buildHistoryContext(
                 msg,
                 {
                     symbolLimit,
-                    attachments: attachAttachments,
+                    attachmentInput,
                     includeReactions: options.includeReactions,
-                    characterName: options.characterName,
                 },
             );
         } catch (error) {
-            logger.error(
-                mode === 'chat'
-                    ? 'Could not construct replied message'
-                    : 'Could not construct message',
-                {
-                    error,
-                    messageId: msg.id,
-                    isMyself: msg.isMyself,
-                    hasText: Boolean(msg.text),
-                    textLength: msg.text?.length ?? 0,
-                    supportedFields: getSupportedContentFields(msg.info),
-                    unsupportedFields: getUnsupportedContentFields(msg.info),
-                },
+            const rawMsg = msg.info as unknown as Record<string, unknown>;
+            const contentFields = Object.keys(rawMsg).filter((field) =>
+                rawMsg[field] !== undefined &&
+                !messageMetadataFields.has(field)
             );
+            logger.error('Could not construct replied message', {
+                error,
+                messageId: msg.id,
+                isMyself: msg.isMyself,
+                hasText: Boolean(msg.text),
+                textLength: msg.text?.length ?? 0,
+                supportedFields: contentFields.filter((field) =>
+                    supportedTypesMap.has(field as keyof Message) ||
+                    jsonTypes.includes(field as keyof Message)
+                ),
+                unsupportedFields: contentFields.filter((field) =>
+                    !supportedTypesMap.has(field as keyof Message) &&
+                    !jsonTypes.includes(field as keyof Message)
+                ),
+            });
             continue;
         }
 
-        if (mode === 'chat') {
-            if (Array.isArray(msgRes.content)) {
-                const attachmentsPart = msgRes.content.find((m) =>
-                    m.type === 'file' || m.type === 'image'
-                );
-                totalAttachments += attachmentsPart ? 1 : 0;
-            }
-
-            const size = JSON.stringify(msgRes).length;
-            if (totalBytes + size >= bytesLimit) {
-                break;
-            }
-
-            prompt.push(msgRes);
-            totalBytes += size;
-            continue;
+        if (Array.isArray(msgRes.content)) {
+            const attachmentsPart = msgRes.content.find((m) =>
+                m.type === 'file' || m.type === 'image'
+            );
+            totalAttachments += attachmentsPart ? 1 : 0;
         }
 
-        let content = msgRes.content;
-        if (Array.isArray(content) && 'text' in content[0]) {
-            content = content[0].text;
-        }
-
-        if (!content) {
-            logger.warn('Message content is empty: ', msgRes);
-            continue;
-        }
-
-        const size = JSON.stringify(content).length;
+        const size = JSON.stringify(msgRes).length;
         if (totalBytes + size >= bytesLimit) {
-            logger.info(
-                `Skipping old messages because prompt is too big ${size} (${
-                    totalBytes + size
-                } > ${bytesLimit})`,
-            );
             break;
         }
 
-        textPart += content;
-        textPart += '\n--- ---\n';
+        prompt.push(msgRes);
         totalBytes += size;
     }
 
@@ -744,62 +613,11 @@ export async function buildHistoryContext(
     return prompt;
 }
 
-export function makeHistoryV2(
-    botInfo: { token: string; id: number },
-    api: Api<RawApi>,
-    logger: Logger,
-    history: ChatMessage[],
-    options: HistoryOptions,
-): Promise<ModelMessage[]> {
-    return buildHistoryContext(
-        botInfo,
-        api,
-        logger,
-        history,
-        {
-            mode: 'chat',
-            symbolLimit: options.symbolLimit,
-            messagesLimit: options.messagesLimit,
-            bytesLimit: options.bytesLimit,
-            attachments: options.attachments,
-            resolveReplyThread: options.resolveReplyThread,
-            includeReactions: options.includeReactions,
-            historyVersion: 'v2',
-            activeMessageId: options.activeMessageId,
-        },
-    );
-}
-
-export function makeHistoryV3(
-    botInfo: { token: string; id: number },
-    api: Api<RawApi>,
-    logger: Logger,
-    history: ChatMessage[],
-    options: HistoryOptions,
-): Promise<ModelMessage[]> {
-    return buildHistoryContext(
-        botInfo,
-        api,
-        logger,
-        history,
-        {
-            mode: 'chat',
-            symbolLimit: options.symbolLimit,
-            messagesLimit: options.messagesLimit,
-            bytesLimit: options.bytesLimit,
-            attachments: options.attachments,
-            resolveReplyThread: options.resolveReplyThread,
-            includeReactions: options.includeReactions,
-            historyVersion: 'v3',
-            activeMessageId: options.activeMessageId,
-        },
-    );
-}
-
 async function getAttachments(
     api: Api<RawApi>,
     token: string,
     msg: ChatMessage | ReplyTo,
+    attachmentInput: Exclude<HistoryAttachmentInput, 'none'>,
 ): Promise<Exclude<UserContent, string>> {
     const parts: UserContent = [];
 
@@ -820,7 +638,7 @@ async function getAttachments(
     if (msg.info.sticker) {
         const { sticker } = msg.info;
 
-        if (sticker.is_video) {
+        if (sticker.is_video && attachmentInput === 'all') {
             try {
                 const file = await downloadFile(
                     api,
@@ -870,7 +688,7 @@ async function getAttachments(
         }
 
         let stickerImageId = undefined;
-        if (sticker.is_animated) {
+        if (sticker.is_video || sticker.is_animated) {
             stickerImageId = sticker.thumbnail?.file_id;
         } else {
             stickerImageId = sticker.file_id;
@@ -897,7 +715,7 @@ async function getAttachments(
     // If video < 20mb (non-selfhosted bot api limit)
     // then add whole video to the promt
     // otherwise - just thumbnail
-    if (msg.info.video) {
+    if (msg.info.video && attachmentInput === 'all') {
         const video = msg.info.video;
         if (
             video.file_size && video.mime_type &&
@@ -942,7 +760,28 @@ async function getAttachments(
         }
     }
 
-    if (msg.info.animation) {
+    if (msg.info.video && attachmentInput === 'images') {
+        const thumbnailId = msg.info.video.thumbnail?.file_id;
+        if (thumbnailId) {
+            try {
+                parts.push(
+                    await getImageContent(
+                        api,
+                        token,
+                        thumbnailId,
+                        'image/jpeg',
+                    ),
+                );
+            } catch (error) {
+                logger.error(
+                    'Could not download video thumbnail: ',
+                    error,
+                );
+            }
+        }
+    }
+
+    if (msg.info.animation && attachmentInput === 'all') {
         const { animation } = msg.info;
 
         if (!animation.mime_type) {
@@ -965,7 +804,7 @@ async function getAttachments(
         });
     }
 
-    if (msg.info.video_note) {
+    if (msg.info.video_note && attachmentInput === 'all') {
         const { video_note: viNote } = msg.info;
 
         const file = await downloadFile(
@@ -982,7 +821,7 @@ async function getAttachments(
         });
     }
 
-    if (msg.info.voice) {
+    if (msg.info.voice && attachmentInput === 'all') {
         const { voice } = msg.info;
 
         if (!voice.mime_type) {

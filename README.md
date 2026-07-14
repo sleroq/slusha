@@ -50,23 +50,13 @@ Dumbest girl in telegram.
 1. `cp scripts/env.bash.example scripts/env.bash`
 2. set up environment variables
 
-## Start:
+## Development
+
+Starts the Vite frontend and backend server.
 
 ```bash
 scripts/run.bash
 ```
-
-## Config web widget (Telegram Mini App)
-
-- Set `WIDGET_BASE_URL` to your public bot URL (example: `https://example.com`)
-- Optional web server env vars: `WEB_HOST` (default `0.0.0.0`), `WEB_PORT` (default `8080`)
-- Build widget assets (Deno-first):
-
-```bash
-scripts/build-widget.bash
-```
-
-- Use `/config` in chat (`/config global` for global config)
 
 ## Metrics (Prometheus + Grafana)
 
@@ -80,7 +70,6 @@ scripts/build-widget.bash
 - `slusha_ai_finish_reason_total`
 - `slusha_ai_tokens_total`
 - `slusha_rate_limit_exceeded_total`
-- `slusha_usage_downgraded_total`
 - `slusha_process_uptime_seconds`
 - `slusha_process_resident_memory_bytes`
 
@@ -122,6 +111,10 @@ docker run -d \
   -e BOT_TOKEN=your_bot_token \
   -e AI_TOKEN=your_ai_token \
   slusha-bot
+
+# Push
+docker build -t <registry>/slusha:latest .
+docker push <registry>/slusha:latest
 
 # Using Docker Compose
 docker-compose --profile production up -d slusha-prod

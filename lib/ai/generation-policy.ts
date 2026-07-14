@@ -1,103 +1,147 @@
+import { createAnthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import type { LanguageModel } from 'ai';
+import type { generateText, LanguageModel } from 'ai';
 import { UserConfig } from '../config.ts';
 import { ModelProvider, parseModelRef } from './model-ref.ts';
+import {
+    type HistoryAttachmentInput,
+    opencodeGoModels,
+    type OpencodeRequestFormat,
+    type StructuredOutputMode,
+} from './model-catalog.ts';
 
 export type GenerationTask = 'chat' | 'character';
+export type { HistoryAttachmentInput, StructuredOutputMode };
+
+const OPENCODE_BASE_URL = 'https://opencode.ai/zen/go/v1';
 
 export interface GenerationPolicyTelemetry {
     provider: ModelProvider;
     modelRef: string;
     modelId: string;
     task: GenerationTask;
-    maxOutputTokens?: number;
     googleThinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
-    googleThinkingBudget?: number;
-    googleIncludeThoughts?: boolean;
     openrouterUsageInclude?: boolean;
-    openrouterReasoningMaxTokens?: number;
+    openrouterReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
 }
 
 export interface ResolvedGenerationPolicy {
     model: LanguageModel;
     provider: ModelProvider;
     providerOptions?: ProviderOptions;
-    maxOutputTokens?: number;
+    capabilities: ModelCapabilities;
     telemetry: GenerationPolicyTelemetry;
+}
+
+/**
+ * Model behavior and generation policy that callers need to adapt to.
+ * Telegram and prompt policy stay in their respective layers.
+ */
+export interface ModelCapabilities {
+    historyAttachmentInput: HistoryAttachmentInput;
+    structuredOutputMode: StructuredOutputMode;
+    reasoningLevel: 'minimal' | 'low' | 'medium' | 'high';
+    opencodeRequestFormat?: OpencodeRequestFormat;
+    googleSafetySettings?: Array<{ category: string; threshold: string }>;
 }
 
 interface GenerationPolicyInput {
     modelRef: string;
     config: UserConfig['ai'];
+    openrouterApiKey?: string;
+    opencodeToken?: string;
     task: GenerationTask;
     expectsStructuredOutput: boolean;
 }
 
-type ProviderOptions = Record<string, unknown>;
+type ProviderOptions = NonNullable<
+    Parameters<typeof generateText>[0]['providerOptions']
+>;
 
-function isGemini3Model(modelId: string): boolean {
-    return modelId.startsWith('gemini-3');
-}
+const providerCapabilities: Record<ModelProvider, ModelCapabilities> = {
+    google: {
+        historyAttachmentInput: 'all',
+        structuredOutputMode: 'tool',
+        reasoningLevel: 'low',
+        googleSafetySettings: [
+            {
+                category: 'HARM_CATEGORY_HARASSMENT',
+                threshold: 'BLOCK_NONE',
+            },
+            {
+                category: 'HARM_CATEGORY_HATE_SPEECH',
+                threshold: 'BLOCK_NONE',
+            },
+            {
+                category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                threshold: 'BLOCK_NONE',
+            },
+            {
+                category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+                threshold: 'BLOCK_NONE',
+            },
+        ],
+    },
+    openrouter: {
+        historyAttachmentInput: 'none',
+        structuredOutputMode: 'tool',
+        reasoningLevel: 'low',
+    },
+    opencode: {
+        historyAttachmentInput: 'none',
+        structuredOutputMode: 'tool',
+        reasoningLevel: 'low',
+        opencodeRequestFormat: 'openai-chat-completions',
+    },
+};
 
-function isGemini25Model(modelId: string): boolean {
-    return modelId.startsWith('gemini-2.5');
+export function resolveModelCapabilities(
+    provider: ModelProvider,
+    modelId: string,
+): ModelCapabilities {
+    const capabilities = { ...providerCapabilities[provider] };
+    if (provider === 'opencode') {
+        const modelConfig = opencodeGoModels[modelId];
+        if (modelConfig) {
+            Object.assign(capabilities, {
+                historyAttachmentInput: modelConfig.historyAttachmentInput,
+                opencodeRequestFormat: modelConfig.requestFormat,
+                structuredOutputMode: modelConfig.structuredOutputMode,
+            });
+        }
+        if (modelId.startsWith('deepseek-v4')) {
+            capabilities.structuredOutputMode = 'json-text';
+        }
+    }
+
+    return capabilities;
 }
 
 function buildGoogleOptions(
-    modelId: string,
     config: UserConfig['ai'],
-    task: GenerationTask,
     expectsStructuredOutput: boolean,
+    capabilities: ModelCapabilities,
 ): ProviderOptions {
     const googleOptions: {
         safetySettings?: Array<{ category: string; threshold: string }>;
         structuredOutputs?: boolean;
         thinkingConfig?: {
             thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
-            thinkingBudget?: number;
-            includeThoughts?: boolean;
         };
     } = {};
 
-    if (config.google.safetySettings.length > 0) {
-        googleOptions.safetySettings = config.google.safetySettings;
+    if (capabilities.googleSafetySettings) {
+        googleOptions.safetySettings = capabilities.googleSafetySettings;
     }
 
     if (expectsStructuredOutput && config.google.structuredOutputs === false) {
         googleOptions.structuredOutputs = false;
     }
 
-    const thinking = config.generation[task].thinking;
-    if (thinking) {
-        if (isGemini3Model(modelId)) {
-            const thinkingConfig: NonNullable<
-                typeof googleOptions.thinkingConfig
-            > = {};
-            if (thinking.thinkingLevel) {
-                thinkingConfig.thinkingLevel = thinking.thinkingLevel;
-            }
-            if (thinking.includeThoughts !== undefined) {
-                thinkingConfig.includeThoughts = thinking.includeThoughts;
-            }
-            if (Object.keys(thinkingConfig).length > 0) {
-                googleOptions.thinkingConfig = thinkingConfig;
-            }
-        } else if (isGemini25Model(modelId)) {
-            const thinkingConfig: NonNullable<
-                typeof googleOptions.thinkingConfig
-            > = {};
-            if (thinking.thinkingBudget !== undefined) {
-                thinkingConfig.thinkingBudget = thinking.thinkingBudget;
-            }
-            if (thinking.includeThoughts !== undefined) {
-                thinkingConfig.includeThoughts = thinking.includeThoughts;
-            }
-            if (Object.keys(thinkingConfig).length > 0) {
-                googleOptions.thinkingConfig = thinkingConfig;
-            }
-        }
-    }
+    googleOptions.thinkingConfig = {
+        thinkingLevel: capabilities.reasoningLevel,
+    };
 
     if (Object.keys(googleOptions).length === 0) {
         return {};
@@ -108,21 +152,18 @@ function buildGoogleOptions(
 
 function buildOpenRouterOptions(
     config: UserConfig['ai'],
-    task: GenerationTask,
+    capabilities: ModelCapabilities,
 ): ProviderOptions {
     const openrouterOptions: {
         usage?: { include: boolean };
-        reasoning?: { max_tokens: number };
+        reasoning?: { effort: 'minimal' | 'low' | 'medium' | 'high' };
     } = {};
 
     if (config.openrouter.usageInclude) {
         openrouterOptions.usage = { include: true };
     }
 
-    const reasoning = config.generation[task].openrouterReasoning;
-    if (reasoning?.maxTokens !== undefined) {
-        openrouterOptions.reasoning = { max_tokens: reasoning.maxTokens };
-    }
+    openrouterOptions.reasoning = { effort: capabilities.reasoningLevel };
 
     if (Object.keys(openrouterOptions).length === 0) {
         return {};
@@ -131,52 +172,68 @@ function buildOpenRouterOptions(
     return { openrouter: openrouterOptions };
 }
 
-function createOpenRouterModel(modelId: string): LanguageModel {
+function createOpenRouterModel(
+    modelId: string,
+    apiKey: string | undefined,
+): LanguageModel {
     const openrouterProvider = createOpenAICompatible({
         name: 'openrouter',
-        apiKey: Deno.env.get('OPENROUTER_API_KEY'),
+        apiKey,
         baseURL: 'https://openrouter.ai/api/v1',
     });
 
     return openrouterProvider.chatModel(modelId);
 }
 
-export function resolveGenerationPolicy(input: GenerationPolicyInput): {
-    model: LanguageModel;
-    provider: ModelProvider;
-    providerOptions?: ProviderOptions;
-    maxOutputTokens?: number;
-    telemetry: GenerationPolicyTelemetry;
-} {
+function createOpencodeModel(
+    modelId: string,
+    apiKey: string | undefined,
+): LanguageModel {
+    const opencodeProvider = createOpenAICompatible({
+        name: 'opencode',
+        apiKey,
+        baseURL: OPENCODE_BASE_URL,
+    });
+
+    return opencodeProvider.chatModel(modelId);
+}
+
+function createOpencodeAnthropicModel(
+    modelId: string,
+    apiKey: string,
+): LanguageModel {
+    const opencodeProvider = createAnthropic({
+        name: 'opencode.anthropic',
+        apiKey,
+        baseURL: OPENCODE_BASE_URL,
+    });
+
+    return opencodeProvider.messages(modelId);
+}
+
+export function resolveGenerationPolicy(
+    input: GenerationPolicyInput,
+): ResolvedGenerationPolicy {
     const parsed = parseModelRef(input.modelRef);
-    const taskConfig = input.config.generation[input.task];
+    const capabilities = resolveModelCapabilities(
+        parsed.provider,
+        parsed.modelId,
+    );
 
     if (parsed.provider === 'google') {
         const providerOptions = buildGoogleOptions(
-            parsed.modelId,
             input.config,
-            input.task,
             input.expectsStructuredOutput,
+            capabilities,
         );
 
-        const thinking = input.config.generation[input.task].thinking;
         const telemetry: GenerationPolicyTelemetry = {
             provider: parsed.provider,
             modelRef: parsed.raw,
             modelId: parsed.modelId,
             task: input.task,
-            maxOutputTokens: taskConfig.maxOutputTokens,
+            googleThinkingLevel: capabilities.reasoningLevel,
         };
-
-        if (thinking) {
-            if (isGemini3Model(parsed.modelId)) {
-                telemetry.googleThinkingLevel = thinking.thinkingLevel;
-                telemetry.googleIncludeThoughts = thinking.includeThoughts;
-            } else if (isGemini25Model(parsed.modelId)) {
-                telemetry.googleThinkingBudget = thinking.thinkingBudget;
-                telemetry.googleIncludeThoughts = thinking.includeThoughts;
-            }
-        }
 
         return {
             model: google(parsed.modelId),
@@ -184,31 +241,70 @@ export function resolveGenerationPolicy(input: GenerationPolicyInput): {
             providerOptions: Object.keys(providerOptions).length > 0
                 ? providerOptions
                 : undefined,
-            maxOutputTokens: taskConfig.maxOutputTokens,
+            capabilities,
             telemetry,
         };
     }
 
-    const providerOptions = buildOpenRouterOptions(input.config, input.task);
+    if (parsed.provider === 'opencode') {
+        if (!input.opencodeToken) {
+            throw new Error('OPENCODE_TOKEN is required for opencode models');
+        }
 
-    const reasoning = input.config.generation[input.task].openrouterReasoning;
+        const usesAnthropicMessages = capabilities.opencodeRequestFormat ===
+            'anthropic-messages';
+        let model: LanguageModel;
+        let providerOptions: ProviderOptions | undefined;
+        if (usesAnthropicMessages) {
+            model = createOpencodeAnthropicModel(
+                parsed.modelId,
+                input.opencodeToken,
+            );
+        } else {
+            model = createOpencodeModel(parsed.modelId, input.opencodeToken);
+            providerOptions = {
+                opencode: {
+                    reasoningEffort: capabilities.reasoningLevel,
+                },
+            };
+        }
+
+        return {
+            model,
+            provider: parsed.provider,
+            providerOptions,
+            capabilities,
+            telemetry: {
+                provider: parsed.provider,
+                modelRef: parsed.raw,
+                modelId: parsed.modelId,
+                task: input.task,
+            },
+        };
+    }
+
+    if (!input.openrouterApiKey) {
+        throw new Error('OPENROUTER_API_KEY is required for openrouter models');
+    }
+
+    const providerOptions = buildOpenRouterOptions(input.config, capabilities);
+
     const telemetry: GenerationPolicyTelemetry = {
         provider: parsed.provider,
         modelRef: parsed.raw,
         modelId: parsed.modelId,
         task: input.task,
-        maxOutputTokens: taskConfig.maxOutputTokens,
         openrouterUsageInclude: input.config.openrouter.usageInclude,
-        openrouterReasoningMaxTokens: reasoning?.maxTokens,
+        openrouterReasoningEffort: capabilities.reasoningLevel,
     };
 
     return {
-        model: createOpenRouterModel(parsed.modelId),
+        model: createOpenRouterModel(parsed.modelId, input.openrouterApiKey),
         provider: parsed.provider,
         providerOptions: Object.keys(providerOptions).length > 0
             ? providerOptions
             : undefined,
-        maxOutputTokens: taskConfig.maxOutputTokens,
+        capabilities,
         telemetry,
     };
 }

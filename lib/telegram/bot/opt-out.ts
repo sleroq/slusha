@@ -1,5 +1,5 @@
 import { SlushaContext } from '../setup-bot.ts';
-import { OptOutUser } from '../../memory.ts';
+import type { OptOutUser } from '../../persistence/types.ts';
 import { replyWithHTML } from '../helpers.ts';
 import logger from '../../logger.ts';
 import { Composer, InlineKeyboard } from 'grammy';
@@ -30,18 +30,17 @@ bot.command('optout', (ctx) => {
     const run = async () => {
         const from = ctx.from;
         if (!from) return;
-        const chat = await ctx.m.getChat();
-        const optOutUsers = chat.optOutUsers;
+        const optOutUsers = await ctx.optOuts.list();
 
         if (!optOutUsers.find((u) => u.id === from.id)) {
-            await ctx.m.addOptOutUser({
+            await ctx.optOuts.addOptOutUser({
                 id: from.id,
                 first_name: from.first_name,
                 username: from.username,
             });
         }
 
-        const nextUsers = (await ctx.m.getChat()).optOutUsers;
+        const nextUsers = await ctx.optOuts.list();
         if (nextUsers.length > 1) {
             message += formatOptOutUsers(nextUsers, ctx);
         }
@@ -78,16 +77,14 @@ bot.command('optin', (ctx) => {
 });
 
 async function optIn(ctx: SlushaContext, id: number, reply: boolean) {
-    const wasOptedIn = (await ctx.m.getChat()).optOutUsers.some((u) =>
-        u.id === id
-    );
+    const wasOptedIn = (await ctx.optOuts.list()).some((u) => u.id === id);
     let message = ctx.t('opt-out-status', {
         verb: wasOptedIn ? ctx.t('again') : ctx.t('already'),
     });
 
-    await ctx.m.removeOptOutUser(id);
+    await ctx.optOuts.removeOptOutUser(id);
 
-    const nextUsers = (await ctx.m.getChat()).optOutUsers;
+    const nextUsers = await ctx.optOuts.list();
     if (nextUsers.length > 1) {
         message += formatOptOutUsers(nextUsers, ctx);
     }

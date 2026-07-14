@@ -1,5 +1,3 @@
-export type ReplyMethod = 'json_actions' | 'plain_text_reactions';
-
 export type GenerationFallbackLevel =
     | 'full'
     | 'short_history'
@@ -9,26 +7,6 @@ export type GenerationAttemptPlan = {
     level: GenerationFallbackLevel;
     historyLimit: number;
 };
-
-export function resolveReplyMethod(
-    configuredMethod: string | undefined,
-): ReplyMethod {
-    if (configuredMethod === 'json_actions') {
-        return 'json_actions';
-    }
-    if (configuredMethod === 'plain_text_reactions') {
-        return 'plain_text_reactions';
-    }
-
-    return 'json_actions';
-}
-
-export function splitTextByTwoLines(text: string): string[] {
-    return text
-        .split(/\r?\n\s*\r?\n+/)
-        .map((chunk) => chunk.trim())
-        .filter((chunk) => chunk.length > 0);
-}
 
 export function getGenerationFallbackPlans(
     messagesToPass: number,

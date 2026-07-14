@@ -1,14 +1,100 @@
 import { Bot, Composer } from 'grammy';
-import { SlushaContext } from './setup-bot.ts';
-import { Config } from '../config.ts';
-import { applyLocaleFromMemory, createI18n } from '../i18n/index.ts';
+import type { SlushaContext } from './setup-bot.ts';
+import { applyLocaleFromPersistence, createI18n } from '../i18n/index.ts';
 import optOut from './bot/opt-out.ts';
 import language from './bot/language.ts';
 import msgDelay from './bot/msg-delay.ts';
 import { shouldReply } from './middlewares/should-reply.ts';
 import { rollingLimiter, shortBurstLimiter } from './middlewares/rate-limit.ts';
+import start from './commands/start.ts';
+import forget from './commands/forget.ts';
+import lobotomy from './commands/lobotomy.ts';
+import changelog from './commands/changelog.ts';
 
 type SlushaMiddleware = Parameters<Composer<SlushaContext>['use']>[0];
+
+type LazyCommandDescriptor = {
+    names: readonly string[];
+    load: () => Promise<SlushaMiddleware>;
+};
+
+const eagerCommandNames = [
+    'start',
+    'forget',
+    'lobotomy',
+    'changelog',
+    'optout',
+    'optin',
+    'language',
+] as const;
+
+function createCommandMiddleware(
+    register: (composer: Composer<SlushaContext>) => void,
+): SlushaMiddleware {
+    const composer = new Composer<SlushaContext>();
+    register(composer);
+    return composer.middleware();
+}
+
+const lazyCommands = [
+    {
+        names: ['character'],
+        load: async () => {
+            const { default: character } = await import('./bot/character.ts');
+            return character.middleware();
+        },
+    },
+    {
+        names: ['model'],
+        load: async () => {
+            const { registerModel } = await import('./commands/model.ts');
+            return createCommandMiddleware(registerModel);
+        },
+    },
+    {
+        names: ['random'],
+        load: async () => {
+            const { registerRandom } = await import('./commands/random.ts');
+            return createCommandMiddleware(registerRandom);
+        },
+    },
+    {
+        names: ['summary'],
+        load: async () => {
+            const { registerSummary } = await import('./commands/summary.ts');
+            return createCommandMiddleware(registerSummary);
+        },
+    },
+    {
+        names: ['hatemode'],
+        load: async () => {
+            const { default: registerHateMode } = await import(
+                './commands/hatemode.ts'
+            );
+            return createCommandMiddleware(registerHateMode);
+        },
+    },
+] as const satisfies readonly LazyCommandDescriptor[];
+
+export const registeredCommandNames = [
+    ...eagerCommandNames,
+    ...lazyCommands.flatMap((command) => command.names),
+] as readonly string[];
+
+export function getMessageCommand(text: string): string | undefined {
+    const command = text.split(/\s+/, 1)[0];
+    if (!command?.startsWith('/')) {
+        return undefined;
+    }
+
+    return command.slice(1).split('@', 1)[0];
+}
+
+export function isRegisteredCommand(text: string | undefined): boolean {
+    if (text === undefined) return false;
+    const command = getMessageCommand(text);
+    return command !== undefined && registeredCommandNames.includes(command);
+}
 
 function toMiddlewareFn(middleware: SlushaMiddleware) {
     return typeof middleware === 'function'
@@ -48,50 +134,36 @@ function shouldLoadCharacter(ctx: SlushaContext): boolean {
     return ctx.msg?.text?.startsWith('/character') ?? false;
 }
 
-function shouldLoadCommandHandlers(ctx: SlushaContext): boolean {
-    return ctx.msg?.text?.startsWith('/') ?? false;
-}
-
-export default function registerAll(bot: Bot<SlushaContext>, _config: Config) {
-    const i18n = createI18n();
-    let commandHandlersPromise:
-        | Promise<typeof import('./register-commands.ts')>
-        | undefined;
-
-    const loadCommandHandlers = () => {
-        if (!commandHandlersPromise) {
-            commandHandlersPromise = import('./register-commands.ts');
+function shouldLoadCommand(...commands: string[]) {
+    return (ctx: SlushaContext): boolean => {
+        if (!ctx.msg?.text) {
+            return false;
         }
 
-        return commandHandlersPromise;
+        const commandName = getMessageCommand(ctx.msg.text);
+        return commandName !== undefined && commands.includes(commandName);
     };
+}
+
+export default function registerAll(bot: Bot<SlushaContext>) {
+    const i18n = createI18n();
 
     bot.use(i18n);
-    bot.use(applyLocaleFromMemory());
+    bot.use(applyLocaleFromPersistence());
 
-    bot.use(createLazyMiddleware(async () => {
-        const { registerEarlyCommands } = await loadCommandHandlers();
-        const composer = new Composer<SlushaContext>();
-        registerEarlyCommands(composer);
-        return composer.middleware();
-    }, shouldLoadCommandHandlers));
+    bot.use(start);
+    bot.use(forget);
+    bot.use(lobotomy);
+    bot.use(changelog);
 
     bot.use(optOut);
     bot.use(language);
-    bot.use(createLazyMiddleware(
-        async () => {
-            const { default: character } = await import('./bot/character.ts');
-            return character.middleware();
-        },
-        shouldLoadCharacter,
-    ));
-
-    bot.use(createLazyMiddleware(async () => {
-        const { registerLateCommands } = await loadCommandHandlers();
-        const composer = new Composer<SlushaContext>();
-        registerLateCommands(composer);
-        return composer.middleware();
-    }, shouldLoadCommandHandlers));
+    for (const command of lazyCommands) {
+        const shouldLoad = command.names.some((name) => name === 'character')
+            ? shouldLoadCharacter
+            : shouldLoadCommand(...command.names);
+        bot.use(createLazyMiddleware(command.load, shouldLoad));
+    }
 
     bot.on(
         'message',

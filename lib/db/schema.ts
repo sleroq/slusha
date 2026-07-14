@@ -1,7 +1,8 @@
 import {
+    foreignKey,
+    index,
     integer,
     primaryKey,
-    real,
     sqliteTable,
     text,
 } from 'drizzle-orm/sqlite-core';
@@ -10,28 +11,60 @@ export const chats = sqliteTable('chats', {
     id: integer('id', { mode: 'number' }).primaryKey(),
     info: text('info').notNull(),
     lastUse: integer('last_use', { mode: 'number' }).notNull().default(0),
-    chatModel: text('chat_model'),
-    messagesToPass: integer('messages_to_pass', { mode: 'number' }),
-    randomReplyProbability: real('random_reply_probability'),
     hateMode: integer('hate_mode', { mode: 'boolean' }),
-    locale: text('locale'),
 });
 
-export const globalConfig = sqliteTable('global_config', {
+export const configEntries = sqliteTable('config_entries', {
+    scopeKey: text('scope_key').notNull(),
+    key: text('key').notNull(),
+    value: text('value').notNull(),
+    updatedBy: integer('updated_by', { mode: 'number' }),
+    updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(0),
+}, (table) => [
+    primaryKey({ columns: [table.scopeKey, table.key] }),
+]);
+
+export const configEntryHistory = sqliteTable('config_entry_history', {
+    id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+    scopeKey: text('scope_key').notNull(),
+    key: text('key').notNull(),
+    oldValue: text('old_value'),
+    newValue: text('new_value'),
+    action: text('action', { enum: ['set', 'reset'] }).notNull(),
+    updatedBy: integer('updated_by', { mode: 'number' }),
+    updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(0),
+});
+
+export const userRoles = sqliteTable('user_roles', {
+    userId: integer('user_id', { mode: 'number' }).notNull(),
+    role: text('role', {
+        enum: ['bot_admin', 'trusted_user', 'paid_user'],
+    }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'number' }),
+    grantedBy: integer('granted_by', { mode: 'number' }),
+    grantedAt: integer('granted_at', { mode: 'number' }).notNull(),
+}, (table) => [
+    primaryKey({ columns: [table.userId, table.role] }),
+]);
+
+export const userRoleHistory = sqliteTable('user_role_history', {
+    id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+    userId: integer('user_id', { mode: 'number' }).notNull(),
+    role: text('role', {
+        enum: ['bot_admin', 'trusted_user', 'paid_user'],
+    }).notNull(),
+    action: text('action', { enum: ['grant', 'revoke'] }).notNull(),
+    changedBy: integer('changed_by', { mode: 'number' }),
+    changedAt: integer('changed_at', { mode: 'number' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'number' }),
+});
+
+export const telegramUsers = sqliteTable('telegram_users', {
     id: integer('id', { mode: 'number' }).primaryKey(),
-    payload: text('payload').notNull(),
-    updatedBy: integer('updated_by', { mode: 'number' }),
-    updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(0),
-});
-
-export const chatConfigOverrides = sqliteTable('chat_config_overrides', {
-    chatId: integer('chat_id', { mode: 'number' }).primaryKey().references(
-        () => chats.id,
-        { onDelete: 'cascade' },
-    ),
-    payload: text('payload').notNull(),
-    updatedBy: integer('updated_by', { mode: 'number' }),
-    updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(0),
+    username: text('username'),
+    firstName: text('first_name').notNull(),
+    info: text('info').notNull(),
+    lastSeen: integer('last_seen', { mode: 'number' }).notNull().default(0),
 });
 
 export const chatMembers = sqliteTable('chat_members', {
@@ -39,15 +72,15 @@ export const chatMembers = sqliteTable('chat_members', {
         () => chats.id,
         { onDelete: 'cascade' },
     ),
-    userId: integer('user_id', { mode: 'number' }).notNull(),
-    username: text('username'),
-    firstName: text('first_name').notNull(),
-    description: text('description').notNull().default(''),
-    info: text('info').notNull(),
+    userId: integer('user_id', { mode: 'number' }).notNull().references(
+        () => telegramUsers.id,
+    ),
     lastUse: integer('last_use', { mode: 'number' }).notNull().default(0),
-}, (table) => ({
-    pk: primaryKey({ columns: [table.chatId, table.userId] }),
-}));
+}, (table) => [
+    primaryKey({ columns: [table.chatId, table.userId] }),
+    index('chat_members_chat_activity_idx').on(table.chatId, table.lastUse),
+    index('chat_members_user_activity_idx').on(table.userId, table.lastUse),
+]);
 
 export const chatOptOutUsers = sqliteTable('chat_opt_out_users', {
     chatId: integer('chat_id', { mode: 'number' }).notNull().references(
@@ -57,9 +90,9 @@ export const chatOptOutUsers = sqliteTable('chat_opt_out_users', {
     userId: integer('user_id', { mode: 'number' }).notNull(),
     username: text('username'),
     firstName: text('first_name').notNull(),
-}, (table) => ({
-    pk: primaryKey({ columns: [table.chatId, table.userId] }),
-}));
+}, (table) => [
+    primaryKey({ columns: [table.chatId, table.userId] }),
+]);
 
 export const chatMessages = sqliteTable('chat_messages', {
     chatId: integer('chat_id', { mode: 'number' }).notNull().references(
@@ -80,26 +113,27 @@ export const chatMessages = sqliteTable('chat_messages', {
     }),
     threadSource: text('thread_source'),
     info: text('info').notNull(),
-}, (table) => ({
-    pk: primaryKey({ columns: [table.chatId, table.messageId] }),
-}));
+}, (table) => [
+    primaryKey({ columns: [table.chatId, table.messageId] }),
+]);
 
 export const messageReactions = sqliteTable('message_reactions', {
-    chatId: integer('chat_id', { mode: 'number' }).notNull().references(
-        () => chats.id,
-        { onDelete: 'cascade' },
-    ),
+    chatId: integer('chat_id', { mode: 'number' }).notNull(),
     messageId: integer('message_id', { mode: 'number' }).notNull(),
     reactionKey: text('reaction_key').notNull(),
     type: text('type', { enum: ['emoji', 'custom'] }).notNull(),
     emoji: text('emoji'),
     customEmojiId: text('custom_emoji_id'),
     count: integer('count', { mode: 'number' }).notNull().default(0),
-}, (table) => ({
-    pk: primaryKey({
+}, (table) => [
+    primaryKey({
         columns: [table.chatId, table.messageId, table.reactionKey],
     }),
-}));
+    foreignKey({
+        columns: [table.chatId, table.messageId],
+        foreignColumns: [chatMessages.chatId, chatMessages.messageId],
+    }).onDelete('cascade'),
+]);
 
 export const messageReactionUsers = sqliteTable('message_reaction_users', {
     chatId: integer('chat_id', { mode: 'number' }).notNull(),
@@ -108,8 +142,8 @@ export const messageReactionUsers = sqliteTable('message_reaction_users', {
     userId: integer('user_id', { mode: 'number' }).notNull(),
     username: text('username'),
     name: text('name').notNull(),
-}, (table) => ({
-    pk: primaryKey({
+}, (table) => [
+    primaryKey({
         columns: [
             table.chatId,
             table.messageId,
@@ -117,7 +151,15 @@ export const messageReactionUsers = sqliteTable('message_reaction_users', {
             table.userId,
         ],
     }),
-}));
+    foreignKey({
+        columns: [table.chatId, table.messageId, table.reactionKey],
+        foreignColumns: [
+            messageReactions.chatId,
+            messageReactions.messageId,
+            messageReactions.reactionKey,
+        ],
+    }).onDelete('cascade'),
+]);
 
 export const chatCharacters = sqliteTable('chat_characters', {
     chatId: integer('chat_id', { mode: 'number' }).primaryKey().references(
@@ -126,11 +168,4 @@ export const chatCharacters = sqliteTable('chat_characters', {
     ),
     payload: text('payload').notNull(),
     names: text('names').notNull(),
-});
-
-export const requestWindowEvents = sqliteTable('request_window_events', {
-    id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
-    chatId: integer('chat_id', { mode: 'number' }).notNull(),
-    userId: integer('user_id', { mode: 'number' }),
-    createdAt: integer('created_at', { mode: 'number' }).notNull(),
 });

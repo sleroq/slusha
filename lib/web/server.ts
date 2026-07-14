@@ -1,147 +1,88 @@
-import { extname, join, normalize } from 'node:path';
 import {
     prometheusContentType,
     renderPrometheusMetrics,
 } from '../app/metrics.ts';
+import type { Config } from '../config.ts';
 import logger from '../logger.ts';
-import { jsonResponse } from './http.ts';
-import { handleBootstrapRequest } from './handlers/bootstrap.ts';
-import { handlePutChatConfigRequest } from './handlers/chat-config.ts';
-import { handlePutGlobalConfigRequest } from './handlers/global-config.ts';
-import { resolveRequestContext } from './request-context.ts';
-import { parseChatConfigChatId } from './routes.ts';
-import { StartWebServerOptions } from './types.ts';
+import { type Route, route } from '@std/http/unstable-route';
+import { serveDir } from '@std/http/file-server';
+import { createConfigHandler } from './config-handler.ts';
 
-function contentType(filePath: string): string {
-    const ext = extname(filePath).toLowerCase();
-    if (ext === '.html') return 'text/html; charset=utf-8';
-    if (ext === '.js') return 'application/javascript; charset=utf-8';
-    if (ext === '.css') return 'text/css; charset=utf-8';
-    if (ext === '.json') return 'application/json; charset=utf-8';
-    if (ext === '.svg') return 'image/svg+xml';
-    if (ext === '.png') return 'image/png';
-    if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
-    if (ext === '.ico') return 'image/x-icon';
-    return 'application/octet-stream';
-}
+function createRoutes(botToken: string, devServerUrl?: string): Route[] {
+    const configHandler = createConfigHandler(botToken);
+    const frontendHandler = (req: Request) => {
+        if (devServerUrl) {
+            const requestUrl = new URL(req.url);
+            const targetUrl = new URL(
+                `${requestUrl.pathname}${requestUrl.search}`,
+                devServerUrl,
+            );
+            const headers = new Headers(req.headers);
 
-async function serveWidgetAsset(
-    pathname: string,
-): Promise<Response | undefined> {
-    if (!pathname.startsWith('/widget')) return undefined;
+            headers.delete('host');
+            headers.delete('connection');
 
-    const baseDir = normalize(join(Deno.cwd(), 'widget', 'dist'));
-    const relPath = pathname.replace(/^\/widget\/?/, '');
-    const requested = relPath.length > 0 ? relPath : 'index.html';
-    const target = normalize(join(baseDir, requested));
-
-    if (!target.startsWith(baseDir)) {
-        return new Response('Forbidden', { status: 403 });
-    }
-
-    try {
-        const data = await Deno.readFile(target);
-        return new Response(data, {
-            status: 200,
-            headers: { 'content-type': contentType(target) },
-        });
-    } catch {
-        if (pathname.startsWith('/widget/')) {
-            try {
-                const indexPath = join(baseDir, 'index.html');
-                const html = await Deno.readFile(indexPath);
-                return new Response(html, {
-                    status: 200,
-                    headers: { 'content-type': 'text/html; charset=utf-8' },
-                });
-            } catch {
-                return new Response('Widget is not built', { status: 503 });
-            }
+            return fetch(
+                new Request(targetUrl, {
+                    method: req.method,
+                    headers,
+                    body: req.body,
+                }),
+            );
         }
 
-        return new Response('Not found', { status: 404 });
-    }
+        return serveDir(req, { fsRoot: './web/build' });
+    };
+
+    return [
+        {
+            pattern: new URLPattern({ pathname: '/healthz' }),
+            handler: () => new Response('ok'),
+        },
+        {
+            pattern: new URLPattern({ pathname: '/metrics' }),
+            handler: async () =>
+                new Response(await renderPrometheusMetrics(), {
+                    status: 200,
+                    headers: {
+                        'content-type': prometheusContentType,
+                        'cache-control': 'no-store',
+                    },
+                }),
+        },
+        {
+            pattern: new URLPattern({ pathname: '/api/config' }),
+            method: 'GET',
+            handler: configHandler,
+        },
+        {
+            pattern: new URLPattern({ pathname: '/api/config' }),
+            method: 'PUT',
+            handler: configHandler,
+        },
+        {
+            pattern: new URLPattern({ pathname: '/' }),
+            handler: frontendHandler,
+        },
+        {
+            pattern: new URLPattern({ pathname: '/:path*' }),
+            handler: frontendHandler,
+        },
+    ];
 }
 
-async function dispatchApiConfigRoute(
-    req: Request,
-    url: URL,
-    options: StartWebServerOptions,
-): Promise<Response> {
-    const { pathname } = url;
-    const context = await resolveRequestContext(req, options);
-
-    if (pathname === '/api/config/bootstrap') {
-        return await handleBootstrapRequest(req, url, options, context);
-    }
-
-    if (pathname === '/api/config/global' && req.method === 'PUT') {
-        return await handlePutGlobalConfigRequest(req, options, context);
-    }
-
-    const chatConfigId = parseChatConfigChatId(pathname);
-    if (chatConfigId !== undefined && req.method === 'PUT') {
-        return await handlePutChatConfigRequest(
-            req,
-            options,
-            context,
-            chatConfigId,
-        );
-    }
-
-    return new Response('Not found', { status: 404 });
-}
-
-export function startWebServer(options: StartWebServerOptions) {
+export function startWebServer(config: Config) {
     const port = Number(Deno.env.get('WEB_PORT') ?? '8080');
     const hostname = Deno.env.get('WEB_HOST') ?? '0.0.0.0';
+    const devServerUrl = Deno.env.get('WEB_DEV_SERVER_URL');
 
-    const server = Deno.serve({ port, hostname }, async (req) => {
-        const url = new URL(req.url);
-
-        let response: Response;
-        try {
-            response = await (async () => {
-                if (req.method === 'GET') {
-                    const staticResponse = await serveWidgetAsset(url.pathname);
-                    if (staticResponse) return staticResponse;
-                }
-
-                if (url.pathname === '/healthz') {
-                    return new Response('ok');
-                }
-
-                if (url.pathname === '/metrics') {
-                    return new Response(await renderPrometheusMetrics(), {
-                        status: 200,
-                        headers: {
-                            'content-type': prometheusContentType,
-                            'cache-control': 'no-store',
-                        },
-                    });
-                }
-
-                if (!url.pathname.startsWith('/api/config/')) {
-                    return new Response('Not found', { status: 404 });
-                }
-
-                try {
-                    return await dispatchApiConfigRoute(req, url, options);
-                } catch (error) {
-                    logger.error('Web API error: ', error);
-                    const message = error instanceof Error
-                        ? error.message
-                        : 'Unknown error';
-                    return jsonResponse({ error: message }, 400);
-                }
-            })();
-        } catch (error) {
-            logger.error('Unhandled web server error: ', error);
-            response = jsonResponse({ error: 'Internal server error' }, 500);
-        }
-
-        return response;
-    });
+    const server = Deno.serve(
+        { port, hostname },
+        route(
+            createRoutes(config.botToken, devServerUrl),
+            () => new Response('Not found', { status: 404 }),
+        ),
+    );
 
     logger.info(`Web server started on ${hostname}:${port}`);
 

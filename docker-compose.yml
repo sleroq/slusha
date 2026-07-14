@@ -14,7 +14,6 @@ services:
       DATABASE_URL: ${DATABASE_URL:-file:./data/slusha.sqlite}
       WEB_HOST: ${WEB_HOST:-0.0.0.0}
       WEB_PORT: ${WEB_PORT:-8080}
-      WIDGET_BASE_URL: ${WIDGET_BASE_URL:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
     volumes:
       - ./data:/home/nonroot/app/data:Z

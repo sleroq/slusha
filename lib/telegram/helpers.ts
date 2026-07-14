@@ -125,36 +125,30 @@ export function replyWithMarkdownId<Other>(
 }
 
 export function doTyping(ctx: SlushaContext, logger: Logger) {
-    const controller = new AbortController();
     let errorCount = 0;
 
     let isTyping = true;
+
+    void type();
 
     const typingInterval = setInterval(() => void type(), 1000);
 
     function stop() {
         clearInterval(typingInterval);
-        controller.abort();
         isTyping = false;
     }
 
     async function type() {
         try {
-            await ctx.replyWithChatAction(
-                'typing',
-                undefined,
-                controller.signal,
-            );
-        } catch (_) {
+            await ctx.replyWithChatAction('typing');
+        } catch (error) {
             errorCount++;
             if (errorCount > 5) {
                 stop();
             }
-            logger.debug('Could not send typing signal');
+            logger.warn('Could not send typing signal: ', error);
         }
     }
-
-    void type();
 
     // Stop after 1 minute
     setTimeout(() => {

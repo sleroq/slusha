@@ -47,28 +47,13 @@ export function buildGenerationTelemetryMetadata(
 
     assignIfDefined(
         metadata,
-        'llm.max_output_tokens',
-        input.policy.telemetry.maxOutputTokens,
-    );
-    assignIfDefined(
-        metadata,
         'llm.google.thinking_level',
         input.policy.telemetry.googleThinkingLevel,
     );
     assignIfDefined(
         metadata,
-        'llm.google.thinking_budget',
-        input.policy.telemetry.googleThinkingBudget,
-    );
-    assignIfDefined(
-        metadata,
-        'llm.google.include_thoughts',
-        input.policy.telemetry.googleIncludeThoughts,
-    );
-    assignIfDefined(
-        metadata,
-        'llm.openrouter.reasoning_max_tokens',
-        input.policy.telemetry.openrouterReasoningMaxTokens,
+        'llm.openrouter.reasoning_effort',
+        input.policy.telemetry.openrouterReasoningEffort,
     );
     assignIfDefined(
         metadata,

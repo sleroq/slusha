@@ -6,8 +6,6 @@ on:
             - 'Dockerfile'
             - 'deno.json'
             - 'deno.lock'
-            - 'widget/deno.json'
-            - 'widget/deno.lock'
             - '.github/workflows/**'
     push:
         branches:

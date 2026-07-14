@@ -1,5 +1,5 @@
 import { ModelMessage } from 'ai';
-import { ChatMessage } from '../memory.ts';
+import type { ChatMessage } from '../persistence/types.ts';
 
 const HISTORY_META_OPEN = '<slusha_meta>';
 const HISTORY_META_CLOSE = '</slusha_meta>';

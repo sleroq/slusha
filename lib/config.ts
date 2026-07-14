@@ -1,12 +1,10 @@
 import { z } from 'zod';
 import defaultConfig from './default-config.ts';
-import { DbClient, ensureSqlitePragmas, getDb } from './db/client.ts';
-import { globalConfig } from './db/schema.ts';
+import { DbClient, getDb } from './db/client.ts';
+import { configEntries } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
-import {
-    ALLOWED_REACTIONS,
-    normalizeReactionBlacklist,
-} from './telegram/reactions.ts';
+import { ALLOWED_REACTIONS } from './telegram/reactions.ts';
+import { getConfigOptionPolicy } from './config-access.ts';
 
 function isValidRegex(val: unknown): val is RegExp {
     if (val instanceof RegExp) return true;
@@ -23,64 +21,6 @@ const matcherSchema = z.union([
     z.custom<RegExp>(isValidRegex),
 ]);
 
-const thinkingLevelSchema = z.enum(['minimal', 'low', 'medium', 'high']);
-const replyMethodSchema = z.enum([
-    'json_actions',
-    'plain_text_reactions',
-]);
-const historyVersionSchema = z.enum(['v2', 'v3']);
-const reservedMessageTokenSchema = z.string().min(1).max(128);
-const googleThinkingConfigSchema = z.object({
-    thinkingLevel: thinkingLevelSchema.optional(),
-    thinkingBudget: z.number().int().min(0).max(65536).optional(),
-    includeThoughts: z.boolean().optional(),
-});
-const openrouterReasoningSchema = z.object({
-    maxTokens: z.number().int().min(0).max(65536).optional(),
-});
-const generationTaskSchema = z.object({
-    thinking: googleThinkingConfigSchema.optional(),
-    openrouterReasoning: openrouterReasoningSchema.optional(),
-    maxOutputTokens: z.number().int().min(1).max(65536).optional(),
-});
-const requestWindowLimitSchema = z.object({
-    maxRequests: boundedPositiveInt(1, 100000),
-    windowMinutes: boundedPositiveInt(1, 7 * 24 * 60),
-});
-const requestWindowLimitOverrideSchema = z.object({
-    maxRequests: boundedPositiveInt(1, 100000).optional(),
-    windowMinutes: boundedPositiveInt(1, 7 * 24 * 60).optional(),
-});
-const requestWindowTierSchema = z.object({
-    perUser: requestWindowLimitSchema,
-    perChat: requestWindowLimitSchema,
-});
-const requestWindowPerChatOverrideSchema = z.object({
-    free: requestWindowLimitOverrideSchema.optional(),
-    trusted: requestWindowLimitOverrideSchema.optional(),
-});
-
-const defaultGoogleSafetySettings: Array<
-    { category: string; threshold: string }
-> = [
-    {
-        category: 'HARM_CATEGORY_HARASSMENT',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_HATE_SPEECH',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_NONE',
-    },
-];
-
 export const configSchema = z.object({
     ai: z.object({
         model: z.string().min(1).max(200),
@@ -89,16 +29,6 @@ export const configSchema = z.object({
         topP: z.number().min(0).max(1),
         prePrompt: z.string().max(20000),
         prompt: z.string().max(20000),
-        dumbPrompt: z.string().max(10000).optional(),
-        /**
-         * Selects chat reply strategy for message generation and tool usage.
-         */
-        replyMethod: replyMethodSchema.optional(),
-        historyVersion: historyVersionSchema.default('v2'),
-        /**
-         * Optional alternative pre-prompt for dumb models that don't output JSON
-         */
-        dumbPrePrompt: z.string().max(10000).optional(),
         privateChatPromptAddition: z.string().max(10000).optional(),
         groupChatPromptAddition: z.string().max(10000).optional(),
         commentsPromptAddition: z.string().max(10000).optional(),
@@ -111,21 +41,8 @@ export const configSchema = z.object({
          * Optional override for send_chat_actions tool description.
          */
         chatActionsToolDescription: z.string().max(20000).optional(),
-        /**
-         * Optional override for send_chat_reactions tool description in plain_text_reactions mode.
-         */
-        chatReactionsToolDescription: z.string().max(20000).optional(),
-        /**
-         * Optional alternative final prompt for dumb models (plain text)
-         */
-        dumbFinalPrompt: z.string().max(10000).optional(),
         messagesToPass: boundedPositiveInt(1, 100).default(5),
         messageMaxLength: boundedPositiveInt(200, 20000).default(4096),
-        reservedMessageTokens: z.array(reservedMessageTokenSchema).max(64)
-            .default([
-                'slusha_meta',
-                'target_ref',
-            ]),
         /**
          * Whether to include attachments (images, videos, voice, etc.)
          * from user messages when constructing model history
@@ -135,28 +52,14 @@ export const configSchema = z.object({
             20 * 1024 * 1024,
         ),
         google: z.object({
-            safetySettings: z.array(
-                z.object({
-                    category: z.string().min(1).max(120),
-                    threshold: z.string().min(1).max(120),
-                }),
-            ).max(32).default(defaultGoogleSafetySettings),
             structuredOutputs: z.boolean().default(true),
         }).default({
-            safetySettings: defaultGoogleSafetySettings,
             structuredOutputs: true,
         }),
         openrouter: z.object({
             usageInclude: z.boolean().default(false),
         }).default({
             usageInclude: false,
-        }),
-        generation: z.object({
-            chat: generationTaskSchema.default({}),
-            character: generationTaskSchema.default({}),
-        }).default({
-            chat: {},
-            character: {},
         }),
     }),
     startMessage: z.string().max(2000),
@@ -166,79 +69,33 @@ export const configSchema = z.object({
     tendToIgnore: z.array(matcherSchema).max(256),
     tendToIgnoreProbability: boundedProbability.default(90),
     randomReplyProbability: boundedProbability.default(1),
+    locale: z.string().min(2).max(32).default('ru'),
     blacklistedReactions: z.array(allowedReactionSchema).max(
         ALLOWED_REACTIONS.length,
     ).default([]),
     nepons: z.array(z.string().max(500)).max(256),
     filesMaxAge: boundedPositiveInt(1, 720).default(72),
-    adminIds: z.array(z.number().int()).max(256).optional(),
-    trustedIds: z.array(z.number().int()).max(10000).default([]),
     availableModels: z.array(z.string().min(1).max(200)).min(1).max(256)
         .default([
             'gemini-3.1-flash-lite-preview',
         ]),
     maxMessagesToStore: boundedPositiveInt(1, 10000).default(100),
-    responseDelay: z.number().min(0).max(120).default(1),
-    requestWindow: z.object({
-        free: requestWindowTierSchema,
-        trusted: requestWindowTierSchema,
-        downgradeModel: z.string().min(1).max(200),
-        disableLongContext: z.boolean().default(true),
-        downgradeMessagesToPass: boundedPositiveInt(1, 100).default(4),
-        downgradeBytesLimit: boundedPositiveInt(1024, 100 * 1024 * 1024)
-            .default(1024 * 1024),
-        disableAttachments: z.boolean().default(true),
-    }).default(defaultConfig.requestWindow),
+    responseDelay: z.number().min(0).max(120).default(0),
 });
-
-const chatOverrideAiSchema = z.object({
-    model: z.string().min(1).max(200).optional(),
-    temperature: z.number().min(0).max(2).optional(),
-    topK: z.number().min(1).max(200).optional(),
-    topP: z.number().min(0).max(1).optional(),
-    prompt: z.string().max(20000).optional(),
-    dumbPrompt: z.string().max(10000).optional(),
-    privateChatPromptAddition: z.string().max(10000).optional(),
-    groupChatPromptAddition: z.string().max(10000).optional(),
-    commentsPromptAddition: z.string().max(10000).optional(),
-    hateModePrompt: z.string().max(10000).optional(),
-    replyMethod: replyMethodSchema.optional(),
-    historyVersion: historyVersionSchema.optional(),
-    messagesToPass: boundedPositiveInt(1, 100).optional(),
-    messageMaxLength: boundedPositiveInt(200, 20000).optional(),
-    includeAttachmentsInHistory: z.boolean().optional(),
-    bytesLimit: boundedPositiveInt(1024, 100 * 1024 * 1024).optional(),
-});
-
-export const chatConfigOverrideSchema = z.object({
-    ai: chatOverrideAiSchema.optional(),
-    names: z.array(matcherSchema).max(256).optional(),
-    tendToReply: z.array(matcherSchema).max(256).optional(),
-    tendToReplyProbability: boundedProbability.optional(),
-    tendToIgnore: z.array(matcherSchema).max(256).optional(),
-    tendToIgnoreProbability: boundedProbability.optional(),
-    randomReplyProbability: boundedProbability.optional(),
-    blacklistedReactions: z.array(allowedReactionSchema).max(
-        ALLOWED_REACTIONS.length,
-    ).optional(),
-    nepons: z.array(z.string().max(500)).max(256).optional(),
-    responseDelay: z.number().min(0).max(120).optional(),
-    disableRepliesDueToRights: z.boolean().optional(),
-    disabledReplyRightsLastProbeAt: z.number().int().min(0).optional(),
-    requestWindowPerChat: requestWindowPerChatOverrideSchema.optional(),
-});
-
-export const safetySettings: Array<{ category: string; threshold: string }> = [
-    ...defaultGoogleSafetySettings,
-];
 
 export type UserConfig = z.infer<typeof configSchema>;
-export type ChatConfigOverride = z.infer<typeof chatConfigOverrideSchema>;
 
+export class ConfigValidationError extends Error {
+    constructor(message: string, options?: ErrorOptions) {
+        super(message, options);
+        this.name = 'ConfigValidationError';
+    }
+}
 const config = configSchema.extend({
     botToken: z.string(),
     aiToken: z.string().optional(),
     openrouterApiKey: z.string().optional(),
+    opencodeToken: z.string().optional(),
 });
 
 export type Config = z.infer<typeof config>;
@@ -257,16 +114,30 @@ interface StoredUserConfig
     tendToIgnore: SerializedMatcher[];
 }
 
-interface StoredChatConfigOverride
-    extends Omit<ChatConfigOverride, 'names' | 'tendToReply' | 'tendToIgnore'> {
-    names?: SerializedMatcher[];
-    tendToReply?: SerializedMatcher[];
-    tendToIgnore?: SerializedMatcher[];
-}
-
 function serializeMatcher(item: string | RegExp): SerializedMatcher {
     if (typeof item === 'string') return item;
     return { __regex: item.source, flags: item.flags };
+}
+
+export function serializeConfigEntryValue(
+    key: string,
+    value: unknown,
+): unknown {
+    if (
+        key === 'names' || key === 'tendToReply' || key === 'tendToIgnore'
+    ) {
+        if (!Array.isArray(value)) {
+            throw new Error(`Invalid matcher config value for ${key}`);
+        }
+        return value.map((item: unknown) => {
+            if (typeof item === 'string' || item instanceof RegExp) {
+                return serializeMatcher(item);
+            }
+            throw new Error(`Invalid matcher config value for ${key}`);
+        });
+    }
+    if (value === undefined) return null;
+    return value;
 }
 
 function deserializeMatcher(item: SerializedMatcher): string | RegExp {
@@ -274,7 +145,45 @@ function deserializeMatcher(item: SerializedMatcher): string | RegExp {
     return new RegExp(item.__regex, item.flags ?? '');
 }
 
-function toStoredUserConfig(input: UserConfig): StoredUserConfig {
+export function deserializeConfigEntryValue(
+    key: string,
+    value: unknown,
+): unknown {
+    if (
+        key !== 'names' && key !== 'tendToReply' && key !== 'tendToIgnore'
+    ) {
+        return value;
+    }
+    if (!Array.isArray(value)) {
+        throw new ConfigValidationError(`Invalid config value for ${key}`);
+    }
+
+    try {
+        return value.map((item: unknown) => {
+            if (typeof item === 'string' || item instanceof RegExp) {
+                return item;
+            }
+            if (
+                isPlainObject(item) && typeof item.__regex === 'string' &&
+                (item.flags === undefined || typeof item.flags === 'string')
+            ) {
+                return deserializeMatcher({
+                    __regex: item.__regex,
+                    flags: item.flags,
+                });
+            }
+            throw new ConfigValidationError(`Invalid config value for ${key}`);
+        });
+    } catch (error) {
+        if (error instanceof ConfigValidationError) throw error;
+        throw new ConfigValidationError(
+            `Invalid config value for ${key}`,
+            { cause: error },
+        );
+    }
+}
+
+export function toStoredUserConfig(input: UserConfig): StoredUserConfig {
     return {
         ...input,
         names: input.names.map(serializeMatcher),
@@ -292,189 +201,126 @@ function fromStoredUserConfig(input: StoredUserConfig): UserConfig {
     };
 }
 
-function toStoredChatOverride(
-    input: ChatConfigOverride,
-): StoredChatConfigOverride {
-    return {
-        ...input,
-        names: input.names?.map(serializeMatcher),
-        tendToReply: input.tendToReply?.map(serializeMatcher),
-        tendToIgnore: input.tendToIgnore?.map(serializeMatcher),
-    };
+type PlainObject = Record<string, unknown>;
+
+function isPlainObject(value: unknown): value is PlainObject {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function fromStoredChatOverride(
-    input: StoredChatConfigOverride,
-): ChatConfigOverride {
-    return {
-        ...input,
-        names: input.names?.map(deserializeMatcher),
-        tendToReply: input.tendToReply?.map(deserializeMatcher),
-        tendToIgnore: input.tendToIgnore?.map(deserializeMatcher),
-    };
-}
-
-export function serializeUserConfig(config: UserConfig): string {
-    return JSON.stringify(toStoredUserConfig(config));
-}
-
-export function parseUserConfigPayload(payload: string): UserConfig {
-    const raw = JSON.parse(payload) as StoredUserConfig;
-    const parsed = configSchema.safeParse(fromStoredUserConfig(raw));
-    if (!parsed.success) {
-        throw new Error('Invalid global config in DB: ' + parsed.error.message);
+function setPath(target: PlainObject, path: string, value: unknown) {
+    const parts = path.split('.');
+    let node = target;
+    for (const part of parts.slice(0, -1)) {
+        const next = node[part];
+        if (!isPlainObject(next)) {
+            node[part] = {};
+        }
+        node = node[part] as PlainObject;
     }
-    return parsed.data;
+    node[parts[parts.length - 1]] = value;
 }
 
-export function serializeChatOverride(override: ChatConfigOverride): string {
-    return JSON.stringify(toStoredChatOverride(override));
+function cloneStoredConfig(input: StoredUserConfig): StoredUserConfig {
+    return JSON.parse(JSON.stringify(input)) as StoredUserConfig;
 }
 
-export function parseChatOverridePayload(payload: string): ChatConfigOverride {
-    const raw = JSON.parse(payload) as StoredChatConfigOverride;
-    const parsed = chatConfigOverrideSchema.safeParse(
-        fromStoredChatOverride(raw),
-    );
-    if (!parsed.success) {
+function mergeStoredRows(
+    base: StoredUserConfig,
+    rows: Array<{ key: string; value: string }>,
+    scope: 'global' | 'chat',
+): StoredUserConfig {
+    const next = cloneStoredConfig(base);
+
+    for (const row of rows) {
+        if (!getConfigOptionPolicy(row.key)?.[scope]) {
+            continue;
+        }
+        setPath(next as unknown as PlainObject, row.key, JSON.parse(row.value));
+    }
+
+    return next;
+}
+
+export function chatScopeKey(chatId: number) {
+    return `chat:${chatId}`;
+}
+
+function getStoredDefaults(): StoredUserConfig {
+    const parsedDefaults = configSchema.safeParse(defaultConfig);
+    if (!parsedDefaults.success) {
         throw new Error(
-            'Invalid chat config override in DB: ' + parsed.error.message,
+            'Invalid built-in default config',
+            { cause: parsedDefaults.error },
         );
     }
-    return parsed.data;
+    return toStoredUserConfig(parsedDefaults.data);
+}
+
+export function getDefaultUserConfig(): UserConfig {
+    return fromStoredUserConfig(getStoredDefaults());
+}
+
+export function validateConfigEntryValue(
+    key: string,
+    value: unknown,
+    scope?: 'global' | 'chat',
+): void {
+    const defaults = getStoredDefaults();
+    const policy = getConfigOptionPolicy(key);
+    if (!policy || (scope !== undefined && !policy[scope])) {
+        throw new ConfigValidationError(`Unsupported config key: ${key}`);
+    }
+
+    const next = fromStoredUserConfig(defaults);
+    setPath(next as unknown as PlainObject, key, value);
+    const parsed = configSchema.safeParse(next);
+    if (!parsed.success) {
+        throw new ConfigValidationError(
+            `Invalid config value for ${key}`,
+            { cause: parsed.error },
+        );
+    }
 }
 
 export async function getGlobalUserConfig(
     db: DbClient = getDb(),
 ): Promise<UserConfig> {
-    await ensureSqlitePragmas();
+    const defaults = getStoredDefaults();
 
-    let row = await db.query.globalConfig.findFirst({
-        where: eq(globalConfig.id, 1),
+    const rows = await db.query.configEntries.findMany({
+        where: eq(configEntries.scopeKey, 'global'),
     });
-
-    if (!row) {
-        const parsedDefaults = configSchema.safeParse(defaultConfig);
-        if (!parsedDefaults.success) {
-            throw new Error(
-                'Invalid built-in default config: ' +
-                    parsedDefaults.error.message,
-            );
-        }
-
-        const now = Date.now();
-        await db.insert(globalConfig).values({
-            id: 1,
-            payload: serializeUserConfig(parsedDefaults.data),
-            updatedAt: now,
-        });
-
-        row = await db.query.globalConfig.findFirst({
-            where: eq(globalConfig.id, 1),
-        });
-    }
-
-    if (!row) {
-        throw new Error('Could not initialize global config');
-    }
-
-    return parseUserConfigPayload(row.payload);
-}
-
-export async function setGlobalUserConfig(
-    value: UserConfig,
-    updatedBy?: number,
-    db: DbClient = getDb(),
-): Promise<UserConfig> {
-    await ensureSqlitePragmas();
-
-    const parsed = configSchema.safeParse(value);
+    const stored = mergeStoredRows(defaults, rows, 'global');
+    const parsed = configSchema.safeParse(fromStoredUserConfig(stored));
     if (!parsed.success) {
         throw new Error(
-            'Invalid global config payload: ' + parsed.error.message,
+            'Invalid global config entries in DB',
+            { cause: parsed.error },
         );
     }
 
-    const normalizedModels = Array.from(
-        new Set(parsed.data.availableModels.map((m) => m.trim())),
-    )
-        .filter((m) => m.length > 0);
-    if (normalizedModels.length === 0) {
-        throw new Error('availableModels must contain at least one model');
-    }
-
-    const modelsToCheck = [parsed.data.ai.model].filter((item): item is string =>
-        typeof item === 'string' && item.length > 0
-    );
-
-    for (const model of modelsToCheck) {
-        if (!normalizedModels.includes(model)) {
-            throw new Error(
-                `Model "${model}" is not listed in availableModels`,
-            );
-        }
-    }
-
-    const nextValue: UserConfig = {
-        ...parsed.data,
-        availableModels: normalizedModels,
-        blacklistedReactions: normalizeReactionBlacklist(
-            parsed.data.blacklistedReactions,
-        ),
-    };
-
-    const now = Date.now();
-
-    await db
-        .insert(globalConfig)
-        .values({
-            id: 1,
-            payload: serializeUserConfig(nextValue),
-            updatedBy,
-            updatedAt: now,
-        })
-        .onConflictDoUpdate({
-            target: [globalConfig.id],
-            set: {
-                payload: serializeUserConfig(nextValue),
-                updatedBy,
-                updatedAt: now,
-            },
-        });
-
-    return nextValue;
+    return parsed.data;
 }
 
-export function mergeWithChatOverride(
-    base: UserConfig,
-    override?: ChatConfigOverride,
-): UserConfig {
-    if (!override) return base;
+export async function getEffectiveUserConfig(
+    options: { chatId?: number } = {},
+    db: DbClient = getDb(),
+): Promise<UserConfig> {
+    const global = await getGlobalUserConfig(db);
+    if (options.chatId === undefined) return global;
 
-    const merged: UserConfig = {
-        ...base,
-        ai: {
-            ...base.ai,
-            ...(override.ai ?? {}),
-        },
-    };
-
-    const entries = Object.entries(override).filter(([k]) =>
-        k !== 'ai' && k !== 'requestWindowPerChat'
-    ) as Array<[
-        keyof Omit<ChatConfigOverride, 'ai' | 'requestWindowPerChat'>,
-        ChatConfigOverride[
-            keyof Omit<ChatConfigOverride, 'ai' | 'requestWindowPerChat'>
-        ],
-    ]>;
-
-    for (const [key, value] of entries) {
-        if (value !== undefined) {
-            (merged as Record<string, unknown>)[key] = value;
-        }
+    const rows = await db.query.configEntries.findMany({
+        where: eq(configEntries.scopeKey, chatScopeKey(options.chatId)),
+    });
+    const stored = mergeStoredRows(toStoredUserConfig(global), rows, 'chat');
+    const parsed = configSchema.safeParse(fromStoredUserConfig(stored));
+    if (!parsed.success) {
+        throw new Error(
+            'Invalid effective chat config entries in DB',
+            { cause: parsed.error },
+        );
     }
-
-    return merged;
+    return parsed.data;
 }
 
 function resolveEnv() {
@@ -483,10 +329,11 @@ function resolveEnv() {
 
     const aiToken = Deno.env.get('AI_TOKEN');
     const openrouterApiKey = Deno.env.get('OPENROUTER_API_KEY');
+    const opencodeToken = Deno.env.get('OPENCODE_TOKEN');
 
-    if (!aiToken && !openrouterApiKey) {
+    if (!aiToken && !openrouterApiKey && !opencodeToken) {
         throw new Error(
-            'At least one provider token is required: AI_TOKEN or OPENROUTER_API_KEY',
+            'At least one provider token is required: AI_TOKEN, OPENROUTER_API_KEY, or OPENCODE_TOKEN',
         );
     }
 
@@ -498,7 +345,12 @@ function resolveEnv() {
         Deno.env.set('OPENROUTER_API_KEY', openrouterApiKey);
     }
 
-    return { botToken, aiToken, openrouterApiKey };
+    return {
+        botToken,
+        aiToken,
+        openrouterApiKey,
+        opencodeToken,
+    };
 }
 
 /**
@@ -516,5 +368,6 @@ export default async function resolveConfig(db?: DbClient): Promise<Config> {
         botToken: env.botToken,
         aiToken: env.aiToken,
         openrouterApiKey: env.openrouterApiKey,
+        opencodeToken: env.opencodeToken,
     };
 }

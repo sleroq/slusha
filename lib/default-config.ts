@@ -1,3 +1,5 @@
+import { opencodeGoModelRefs } from './ai/model-catalog.ts';
+
 const prePrompt = `
 ### Technical Implementation ###
 - Return actions as JSON array. Each action must have explicit type:
@@ -31,9 +33,6 @@ const finalPrompt =
 const chatActionsToolDescription =
     'Submit Telegram actions once per turn. Return entries where each item is either {"type":"reply","text":"...","target_ref":"tN"} or {"type":"react","react":"❤","target_ref":"tN"}. Use target_ref values from Reply Target Map. If target_ref is omitted, action applies to the triggering message.';
 
-const chatReactionsToolDescription =
-    'Submit Telegram reactions once per turn. Return entries containing only {"type":"react","react":"❤","target_ref":"tN"}. Do not include reply text.';
-
 const commentsPromptAddition = `
 - You're in a comments section of telegram channel with multiple users discussing channel posts and topics
 `.trim() + '\n\n';
@@ -42,80 +41,31 @@ const hateModePrompt = `
 - You are a real hater in this chat
 `;
 
-const googleSafetySettings = [
-    {
-        category: 'HARM_CATEGORY_HARASSMENT',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_HATE_SPEECH',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-        threshold: 'BLOCK_NONE',
-    },
-    {
-        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_NONE',
-    },
-];
-
 const defaultConfig = {
     startMessage: 'Привет! Я Слюша, бот-гений.',
     ai: {
-        model: 'gemini-3.1-flash-lite-preview',
-        replyMethod: 'json_actions',
-        historyVersion: 'v2',
+        // model: 'gemini-3.1-flash-lite-preview',
+        model: 'opencode-go/deepseek-v4-flash',
         prePrompt,
-        dumbPrePrompt: `
-Коротко отвечай простым текстом одним сообщением. Не используй JSON.
-Не ставь реакции и не описывай действия. Используй Telegram markdown без заголовков.
-Пиши на языке чата по умолчанию. Будь лаконичной и естественной.
-`.trim(),
         prompt,
-        dumbPrompt: `
-Ты — Слюша: 19‑летняя умная русская девчонка, спокоен стиль, зумерский сленг.
-Пиши коротко, по делу, без лишней вежливости. Можно сарказм.
-`.trim() + '\n\n',
         privateChatPromptAddition,
         groupChatPromptAddition,
         commentsPromptAddition,
         hateModePrompt,
         finalPrompt,
         chatActionsToolDescription,
-        chatReactionsToolDescription,
-        dumbFinalPrompt: 'Ответь одним коротким сообщением простым текстом.',
         temperature: 0.55,
         topK: 32,
         topP: 0.85,
         messagesToPass: 10,
         messageMaxLength: 4096,
-        reservedMessageTokens: [
-            'slusha_meta',
-            'target_ref',
-        ],
         includeAttachmentsInHistory: true,
         bytesLimit: 20971520,
         google: {
-            safetySettings: googleSafetySettings,
             structuredOutputs: true,
         },
         openrouter: {
             usageInclude: false,
-        },
-        generation: {
-            chat: {
-                maxOutputTokens: 512,
-                thinking: {
-                    thinkingLevel: 'low',
-                },
-            },
-            character: {
-                thinking: {
-                    thinkingLevel: 'low',
-                },
-            },
         },
     },
     names: [
@@ -148,6 +98,7 @@ const defaultConfig = {
         'откисаю, попробуй позже',
     ],
     randomReplyProbability: 1,
+    locale: 'ru',
     tendToIgnore: [
         /^ор+/i,
         /^ору+/i,
@@ -179,47 +130,12 @@ const defaultConfig = {
     tendToIgnoreProbability: 90,
     blacklistedReactions: [],
     filesMaxAge: 72,
-    adminIds: [
-        308552322,
-        855109381,
-        783255786,
-        585847096,
-        5371117573,
-        210860903,
-    ],
-    trustedIds: [],
     availableModels: [
         'gemini-3.1-flash-lite-preview',
+        ...opencodeGoModelRefs,
     ],
     maxMessagesToStore: 200,
-    responseDelay: 1,
-    requestWindow: {
-        free: {
-            perUser: {
-                maxRequests: 30,
-                windowMinutes: 180,
-            },
-            perChat: {
-                maxRequests: 120,
-                windowMinutes: 180,
-            },
-        },
-        trusted: {
-            perUser: {
-                maxRequests: 300,
-                windowMinutes: 180,
-            },
-            perChat: {
-                maxRequests: 1200,
-                windowMinutes: 180,
-            },
-        },
-        downgradeModel: 'gemini-3.1-flash-lite-preview',
-        disableLongContext: false,
-        downgradeMessagesToPass: 4,
-        downgradeBytesLimit: 20 * 1024 * 1024,
-        disableAttachments: false,
-    },
+    responseDelay: 0,
 };
 
 export default defaultConfig;

@@ -1,11 +1,8 @@
 import { assertEquals } from '@std/assert';
 import { Message } from 'grammy_types';
 import { ReplyMessage } from './telegram/helpers.ts';
-import { ChatMessage, ReplyTo } from './memory.ts';
-import {
-    selectHistoryCandidates,
-    selectHistoryCandidatesV3,
-} from './history.ts';
+import type { ChatMessage, ReplyTo } from './persistence/types.ts';
+import { selectHistoryCandidates } from './history.ts';
 
 function createReplyTo(id: number): ReplyTo {
     return {
@@ -48,37 +45,7 @@ function createMessage(
     };
 }
 
-Deno.test('selectHistoryCandidates includes reply threads and deduplicates', () => {
-    const history: ChatMessage[] = [
-        createMessage(1),
-        createMessage(2, 1),
-        createMessage(3),
-        createMessage(4, 2),
-    ];
-
-    const selected = selectHistoryCandidates(history, {
-        resolveReplyThread: true,
-    });
-
-    assertEquals(selected.map((m) => m.msg.id), [4, 2, 1, 3]);
-});
-
-Deno.test('selectHistoryCandidates respects maxRootMessages', () => {
-    const history: ChatMessage[] = [
-        createMessage(1),
-        createMessage(2),
-        createMessage(3),
-    ];
-
-    const selected = selectHistoryCandidates(history, {
-        resolveReplyThread: false,
-        maxRootMessages: 2,
-    });
-
-    assertEquals(selected.map((m) => m.msg.id), [3, 2]);
-});
-
-Deno.test('selectHistoryCandidatesV3 prioritizes active thread', () => {
+Deno.test('selectHistoryCandidates prioritizes active thread', () => {
     const history: ChatMessage[] = [
         createMessage(1, undefined, {
             threadId: 'thread:1',
@@ -107,25 +74,13 @@ Deno.test('selectHistoryCandidatesV3 prioritizes active thread', () => {
         }),
     ];
 
-    const selected = selectHistoryCandidatesV3(history, {});
+    const selected = selectHistoryCandidates(history, {});
 
     assertEquals(selected.map((m) => m.msg.id), [5, 3, 1, 4, 2]);
 });
 
-Deno.test('selectHistoryCandidatesV3 falls back to V2 without metadata', () => {
-    const history: ChatMessage[] = [
-        createMessage(1),
-        createMessage(2, 1),
-        createMessage(3),
-        createMessage(4, 2),
-    ];
-
-    const selected = selectHistoryCandidatesV3(history, {});
-    assertEquals(selected.map((m) => m.msg.id), [4, 2, 1, 3]);
-});
-
 Deno.test(
-    'selectHistoryCandidatesV3 keeps continuation thread with interleaving chatter',
+    'selectHistoryCandidates keeps continuation thread with interleaving chatter',
     () => {
         const history: ChatMessage[] = [
             createMessage(10, undefined, {
@@ -160,7 +115,7 @@ Deno.test(
             }),
         ];
 
-        const selected = selectHistoryCandidatesV3(history, {
+        const selected = selectHistoryCandidates(history, {
             maxRootMessages: 5,
         });
 
@@ -169,7 +124,7 @@ Deno.test(
 );
 
 Deno.test(
-    'selectHistoryCandidatesV3 groups difficult group reply thread over meme noise',
+    'selectHistoryCandidates groups difficult group reply thread over meme noise',
     () => {
         const history: ChatMessage[] = [
             // userA root thread
@@ -220,7 +175,7 @@ Deno.test(
             }),
         ];
 
-        const selected = selectHistoryCandidatesV3(history, {});
+        const selected = selectHistoryCandidates(history, {});
 
         assertEquals(selected.map((m) => m.msg.id), [
             108,
@@ -236,7 +191,7 @@ Deno.test(
 );
 
 Deno.test(
-    'selectHistoryCandidatesV3 keeps most recent hard thread context under budget',
+    'selectHistoryCandidates keeps most recent hard thread context under budget',
     () => {
         const history: ChatMessage[] = [
             createMessage(201, undefined, {
@@ -281,7 +236,7 @@ Deno.test(
             }),
         ];
 
-        const selected = selectHistoryCandidatesV3(history, {
+        const selected = selectHistoryCandidates(history, {
             maxRootMessages: 6,
         });
 
@@ -297,7 +252,7 @@ Deno.test(
 );
 
 Deno.test(
-    'selectHistoryCandidatesV3 scopes to active telegram topic when anchor provided',
+    'selectHistoryCandidates scopes to active telegram topic when anchor provided',
     () => {
         const history: ChatMessage[] = [
             createMessage(300, undefined, {
@@ -332,7 +287,7 @@ Deno.test(
             }),
         ];
 
-        const selected = selectHistoryCandidatesV3(history, {
+        const selected = selectHistoryCandidates(history, {
             activeMessageId: 304,
         });
 
@@ -341,7 +296,7 @@ Deno.test(
 );
 
 Deno.test(
-    'selectHistoryCandidatesV3 falls back to latest non-bot anchor when active message is missing',
+    'selectHistoryCandidates falls back to latest non-bot anchor when active message is missing',
     () => {
         const history: ChatMessage[] = [
             createMessage(401, undefined, {
@@ -361,7 +316,7 @@ Deno.test(
             }),
         ];
 
-        const selected = selectHistoryCandidatesV3(history, {
+        const selected = selectHistoryCandidates(history, {
             activeMessageId: 999999,
         });
 

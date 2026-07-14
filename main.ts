@@ -1,62 +1,40 @@
-import _Werror from './lib/werror.ts';
 import logger from './lib/logger.ts';
 import resolveConfig, { Config } from './lib/config.ts';
 import setupBot from './lib/telegram/setup-bot.ts';
 import { run } from '@grammyjs/runner';
-import { loadMemory } from './lib/memory.ts';
 import { migrateDb } from './lib/db/migrate.ts';
-
-// AI runtime details moved to handler module
+import { getDb } from './lib/db/client.ts';
 
 // reply helpers used inside handler module
-// rate limiter helpers moved to middlewares
 import registerAll from './lib/telegram/register-all.ts';
 import { startTelemetry } from './lib/app/observability.ts';
 import { startSchedulers } from './lib/app/scheduler.ts';
 import { wireShutdown } from './lib/app/shutdown.ts';
-import { logMemoryUsage } from './lib/app/memory-debug.ts';
 import { startWebServer } from './lib/web/server.ts';
 
-logMemoryUsage('startup');
-
 const sdk = await startTelemetry();
-logMemoryUsage('after telemetry');
-
-// (schemas and reaction utilities moved to dedicated modules)
-
-let config: Config;
 
 await migrateDb();
 
-const memory = await loadMemory();
-logger.info('Memory loaded');
-logMemoryUsage('after memory load');
+const db = getDb();
+logger.info('Database ready');
 
+let config: Config;
 try {
-    config = await resolveConfig(memory.db);
+    config = await resolveConfig(db);
 } catch (error) {
     logger.error('Config error: ', error);
     Deno.exit(1);
 }
 
-const runtimeConfig = {
-    getBotToken: () => config.botToken,
-};
+const bot = await setupBot(config, db);
 
-const bot = await setupBot(config, memory);
-logMemoryUsage('after bot setup');
-
-startWebServer({
-    bot,
-    memory,
-    runtimeConfig,
-});
+const webServer = startWebServer(config);
 
 // Register everything in correct order
-registerAll(bot, config);
-logMemoryUsage('after middleware registration');
+registerAll(bot);
 
-run(bot, {
+const runner = run(bot, {
     runner: {
         // @ts-expect-error drop_pending_updates is supported by grammY runner
         drop_pending_updates: true,
@@ -75,9 +53,11 @@ run(bot, {
                 'callback_query',
                 'shipping_query',
                 'pre_checkout_query',
+                'purchased_paid_media',
                 'poll',
                 'poll_answer',
                 'my_chat_member',
+                'chat_member',
                 'chat_join_request',
                 'chat_boost',
                 'removed_chat_boost',
@@ -87,12 +67,18 @@ run(bot, {
         },
     },
 });
+
+// The runner polls Telegram in a detached task; observe failures so Deno does
+// not terminate with an unhelpful "Uncaught null" message.
+void runner.task()?.catch((error) => {
+    logger.error('Telegram polling runner stopped unexpectedly:', error);
+    Deno.exit(1);
+});
+
 logger.info('Bot started');
-logMemoryUsage('bot started');
 
 // TODO: Remind users about bot existence
 
-const _stopSchedulers = startSchedulers({ db: memory.db, logger });
+const stopSchedulers = startSchedulers({ db, logger });
 
-// Save memory on exit
-wireShutdown(bot, sdk);
+wireShutdown({ runner, webServer, stopSchedulers, sdk });

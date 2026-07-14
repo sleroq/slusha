@@ -1,25 +1,18 @@
-FROM --platform=$BUILDPLATFORM denoland/deno:2.7.4 AS widget-builder
-
+FROM denoland/deno:2.9.2 AS builder
+ENV DENO_DIR=/deno-dir
 WORKDIR /app
 
-COPY widget ./widget
-COPY lib/config-contract.ts ./lib/config-contract.ts
+COPY . .
+RUN deno install --frozen
+RUN deno cache --frozen --allow-import main.ts
 
-RUN deno task --config ./widget/deno.json build
-
-FROM denoland/deno:2.7.4
-
-ENV DENO_NO_UPDATE_CHECK=1
-ENV DENO_NO_PROMPT=1
-
+FROM denoland/deno:2.9.2
+ENV DENO_DIR=/deno-dir
 WORKDIR /app
-
-COPY deno.json deno.lock main.ts ./
-COPY lib ./lib
-COPY locales ./locales
-COPY drizzle ./drizzle
-COPY --from=widget-builder /app/widget/dist ./widget/dist
 
 RUN mkdir -p ./tmp ./log
 
-CMD ["deno", "run", "--allow-env", "--allow-net", "--allow-read=.", "--allow-import", "--allow-write", "--allow-sys", "--allow-ffi", "--unstable-detect-cjs", "main.ts"]
+COPY --from=builder /app .
+COPY --from=builder /deno-dir /deno-dir
+
+CMD ["deno", "run", "--cached-only", "--node-modules-dir=manual", "--allow-env", "--allow-net", "--allow-read=.", "--allow-import", "--allow-write", "--allow-sys", "--allow-ffi", "--unstable-detect-cjs", "main.ts"]
