@@ -62,6 +62,18 @@ Deno.test('configuration editor returns authorized JSON-safe metadata', async ()
             field.key === 'ai.model'
         );
         assertEquals(adminModel?.kind, 'select');
+        const imageFallbackModel = adminFields.find((field) =>
+            field.key === 'ai.imageAttachmentFallbackModel'
+        );
+        assertEquals(imageFallbackModel?.kind, 'select');
+        if (imageFallbackModel?.kind === 'select') {
+            assertEquals(
+                imageFallbackModel.options.includes(
+                    'opencode-go/deepseek-v4-flash',
+                ),
+                false,
+            );
+        }
         const temperature = adminFields.find((field) =>
             field.key === 'ai.temperature'
         );
@@ -89,6 +101,13 @@ Deno.test('configuration editor returns authorized JSON-safe metadata', async ()
         assertEquals(trustedModel?.kind, 'text');
         assertEquals(
             trustedFields.some((field) => field.key === 'availableModels'),
+            false,
+        );
+        assertEquals(
+            trustedFields.some((field) =>
+                field.key === 'ai.autoRerouteImageAttachments' ||
+                field.key === 'ai.imageAttachmentFallbackModel'
+            ),
             false,
         );
     } finally {

@@ -17,6 +17,7 @@ import {
 } from './config.ts';
 import type { DbClient } from './db/client.ts';
 import { ConfigEntryRepository } from './persistence/config-entries.ts';
+import { modelSupportsImageInput } from './ai/model-catalog.ts';
 
 export class ConfigPermissionError extends Error {
     constructor() {
@@ -76,6 +77,8 @@ const configEditors = {
         step: 1,
     },
     'ai.includeAttachmentsInHistory': boolean,
+    'ai.autoRerouteImageAttachments': boolean,
+    'ai.imageAttachmentFallbackModel': text,
     'ai.bytesLimit': {
         kind: 'range',
         min: 1024,
@@ -83,7 +86,6 @@ const configEditors = {
         step: 1024,
     },
     'ai.google.structuredOutputs': boolean,
-    'ai.openrouter.usageInclude': boolean,
     'startMessage': multiline,
     'names': { kind: 'matcher-list' },
     'tendToReply': { kind: 'matcher-list' },
@@ -147,6 +149,16 @@ export class ConfigurationService {
                     editor = {
                         kind: 'select',
                         options: config.availableModels,
+                    };
+                }
+                if (
+                    key === 'ai.imageAttachmentFallbackModel' && canReadModels
+                ) {
+                    editor = {
+                        kind: 'select',
+                        options: config.availableModels.filter(
+                            modelSupportsImageInput,
+                        ),
                     };
                 }
                 return {

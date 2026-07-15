@@ -40,13 +40,40 @@ Deno.test('paid users cannot write global or shared chat config', () => {
     );
 });
 
-Deno.test('chat admins can manage chat keys but not global keys', () => {
+Deno.test('chat admins can only manage regular-user chat keys', () => {
     const context = access([], { member: true, admin: true });
-    assert(canAccessConfig('ai.model', 'chat', 'write', context, 100));
+    assertEquals(
+        canAccessConfig('ai.model', 'chat', 'write', context, 100),
+        false,
+    );
+    assert(
+        canAccessConfig(
+            'ai.includeAttachmentsInHistory',
+            'chat',
+            'write',
+            context,
+            100,
+        ),
+    );
+    assert(
+        canAccessConfig(
+            'maxMessagesToStore',
+            'chat',
+            'write',
+            context,
+            100,
+        ),
+    );
     assertEquals(
         canAccessConfig('ai.model', 'global', 'write', context),
         false,
     );
+});
+
+Deno.test('trusted users can manage restricted chat keys as members', () => {
+    const context = access(['trusted_user'], { member: true });
+    assert(canAccessConfig('ai.model', 'chat', 'write', context, 100));
+    assert(canAccessConfig('ai.prompt', 'chat', 'read', context, 100));
 });
 
 Deno.test('bot admins bypass chat membership without implied role hierarchy', () => {
@@ -92,4 +119,19 @@ Deno.test('max output tokens is not a supported config entry', () => {
             ConfigValidationError,
         );
     }
+});
+
+Deno.test('image fallback model must support image input', () => {
+    assertThrows(
+        () =>
+            validateConfigEntryValue(
+                'ai.imageAttachmentFallbackModel',
+                'opencode-go/deepseek-v4-flash',
+            ),
+        ConfigValidationError,
+    );
+    validateConfigEntryValue(
+        'ai.imageAttachmentFallbackModel',
+        'opencode-go/mimo-v2.5',
+    );
 });

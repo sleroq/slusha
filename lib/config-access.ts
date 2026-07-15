@@ -14,73 +14,71 @@ export type ConfigOptionPolicy = {
     chat?: ScopePolicy;
 };
 
-const botAdminOnly: ScopePolicy = {
-    read: ['bot_admin'],
-    write: ['bot_admin'],
-};
 const managedGlobal: ScopePolicy = {
     read: ['bot_admin', 'trusted_user'],
     write: ['bot_admin', 'trusted_user'],
 };
+const restrictedChat: ScopePolicy = {
+    read: ['bot_admin', 'trusted_user'],
+    write: ['bot_admin', 'trusted_user'],
+};
 const managedChat: ScopePolicy = {
-    read: ['bot_admin', 'chat_member'],
-    write: ['bot_admin', 'chat_admin'],
+    read: ['bot_admin', 'trusted_user', 'chat_member'],
+    write: ['bot_admin', 'trusted_user', 'chat_admin'],
 };
 
 const configOptionPolicyDefinitions = {
-    'ai.prePrompt': { global: botAdminOnly, chat: managedChat },
-    'ai.prompt': { global: botAdminOnly, chat: managedChat },
+    'ai.prePrompt': { global: managedGlobal, chat: restrictedChat },
+    'ai.prompt': { global: managedGlobal, chat: restrictedChat },
     'ai.privateChatPromptAddition': {
-        global: botAdminOnly,
-        chat: managedChat,
+        global: managedGlobal,
+        chat: restrictedChat,
     },
     'ai.groupChatPromptAddition': {
-        global: botAdminOnly,
-        chat: managedChat,
+        global: managedGlobal,
+        chat: restrictedChat,
     },
     'ai.commentsPromptAddition': {
-        global: botAdminOnly,
-        chat: managedChat,
+        global: managedGlobal,
+        chat: restrictedChat,
     },
-    'ai.hateModePrompt': { global: botAdminOnly, chat: managedChat },
-    'ai.finalPrompt': { global: botAdminOnly, chat: managedChat },
+    'ai.hateModePrompt': { global: managedGlobal, chat: restrictedChat },
+    'ai.finalPrompt': { global: managedGlobal, chat: restrictedChat },
     'ai.chatActionsToolDescription': {
-        global: botAdminOnly,
-        chat: managedChat,
+        global: managedGlobal,
+        chat: restrictedChat,
     },
-    'availableModels': { global: botAdminOnly },
-    'ai.model': { global: managedGlobal, chat: managedChat },
-    'ai.temperature': { global: managedGlobal, chat: managedChat },
-    'ai.topK': { global: managedGlobal, chat: managedChat },
-    'ai.topP': { global: managedGlobal, chat: managedChat },
-    'ai.messagesToPass': { global: managedGlobal, chat: managedChat },
-    'ai.messageMaxLength': { global: managedGlobal, chat: managedChat },
+    'availableModels': { global: managedGlobal },
+    'ai.model': { global: managedGlobal, chat: restrictedChat },
+    'ai.temperature': { global: managedGlobal, chat: restrictedChat },
+    'ai.topK': { global: managedGlobal, chat: restrictedChat },
+    'ai.topP': { global: managedGlobal, chat: restrictedChat },
+    'ai.messagesToPass': { global: managedGlobal, chat: restrictedChat },
+    'ai.messageMaxLength': { global: managedGlobal, chat: restrictedChat },
     'ai.includeAttachmentsInHistory': {
         global: managedGlobal,
         chat: managedChat,
     },
-    'ai.bytesLimit': { global: managedGlobal, chat: managedChat },
+    'ai.autoRerouteImageAttachments': { global: managedGlobal },
+    'ai.imageAttachmentFallbackModel': { global: managedGlobal },
+    'ai.bytesLimit': { global: managedGlobal, chat: restrictedChat },
     'ai.google.structuredOutputs': {
         global: managedGlobal,
-        chat: managedChat,
+        chat: restrictedChat,
     },
-    'ai.openrouter.usageInclude': {
-        global: managedGlobal,
-        chat: managedChat,
-    },
-    'startMessage': { global: managedGlobal, chat: managedChat },
-    'names': { global: managedGlobal, chat: managedChat },
-    'tendToReply': { global: managedGlobal, chat: managedChat },
-    'tendToReplyProbability': { global: managedGlobal, chat: managedChat },
-    'tendToIgnore': { global: managedGlobal, chat: managedChat },
-    'tendToIgnoreProbability': { global: managedGlobal, chat: managedChat },
-    'randomReplyProbability': { global: managedGlobal, chat: managedChat },
-    'locale': { global: managedGlobal, chat: managedChat },
-    'blacklistedReactions': { global: managedGlobal, chat: managedChat },
-    'nepons': { global: managedGlobal, chat: managedChat },
-    'filesMaxAge': { global: managedGlobal, chat: managedChat },
+    'startMessage': { global: managedGlobal, chat: restrictedChat },
+    'names': { global: managedGlobal, chat: restrictedChat },
+    'tendToReply': { global: managedGlobal, chat: restrictedChat },
+    'tendToReplyProbability': { global: managedGlobal, chat: restrictedChat },
+    'tendToIgnore': { global: managedGlobal, chat: restrictedChat },
+    'tendToIgnoreProbability': { global: managedGlobal, chat: restrictedChat },
+    'randomReplyProbability': { global: managedGlobal, chat: restrictedChat },
+    'locale': { global: managedGlobal, chat: restrictedChat },
+    'blacklistedReactions': { global: managedGlobal, chat: restrictedChat },
+    'nepons': { global: managedGlobal, chat: restrictedChat },
+    'filesMaxAge': { global: managedGlobal, chat: restrictedChat },
     'maxMessagesToStore': { global: managedGlobal, chat: managedChat },
-    'responseDelay': { global: managedGlobal, chat: managedChat },
+    'responseDelay': { global: managedGlobal, chat: restrictedChat },
 } satisfies Readonly<Record<string, ConfigOptionPolicy>>;
 
 export type ConfigKey = keyof typeof configOptionPolicyDefinitions;

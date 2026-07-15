@@ -60,12 +60,11 @@ const defaultConfig = {
         messagesToPass: 10,
         messageMaxLength: 4096,
         includeAttachmentsInHistory: true,
+        autoRerouteImageAttachments: true,
+        imageAttachmentFallbackModel: 'gemini-3.1-flash-lite-preview',
         bytesLimit: 20971520,
         google: {
             structuredOutputs: true,
-        },
-        openrouter: {
-            usageInclude: false,
         },
     },
     names: [

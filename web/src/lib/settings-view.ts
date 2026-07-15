@@ -3,6 +3,8 @@ export function settingsFieldTitle(key: string) {
         'ai.prompt': 'Character',
         'ai.prePrompt': 'System prompt',
         'ai.model': 'Model',
+        'ai.imageAttachmentFallbackModel': 'Image fallback model',
+        'ai.autoRerouteImageAttachments': 'Use image fallback automatically',
         availableModels: 'Available models',
         names: 'Names',
         tendToReply: 'Reply when matched',

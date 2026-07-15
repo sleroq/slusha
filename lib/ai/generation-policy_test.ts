@@ -5,7 +5,7 @@ import {
     resolveGenerationPolicy,
     resolveModelCapabilities,
 } from './generation-policy.ts';
-import { opencodeGoModels } from './model-catalog.ts';
+import { modelSupportsImageInput, opencodeGoModels } from './model-catalog.ts';
 
 const googleSafetySettings = [
     {
@@ -82,6 +82,19 @@ Deno.test('resolveModelCapabilities applies opencode model rules', () => {
     });
 });
 
+Deno.test('modelSupportsImageInput identifies image-capable model refs', () => {
+    assertEquals(modelSupportsImageInput('gemini-2.5-flash'), true);
+    assertEquals(modelSupportsImageInput('opencode-go/mimo-v2.5'), true);
+    assertEquals(
+        modelSupportsImageInput('opencode-go/deepseek-v4-flash'),
+        false,
+    );
+    assertEquals(
+        modelSupportsImageInput('openrouter:google/gemini-2.5-flash'),
+        false,
+    );
+});
+
 Deno.test('OpenCode Go catalog routes all messages models through Anthropic', () => {
     const anthropicModelIds = Object.entries(opencodeGoModels)
         .filter(([, config]) => config.requestFormat === 'anthropic-messages')
@@ -120,7 +133,10 @@ Deno.test('resolveGenerationPolicy applies fixed model behavior', () => {
         expectsStructuredOutput: false,
     });
     assertEquals(openrouterPolicy.providerOptions, {
-        openrouter: { reasoning: { effort: 'low' } },
+        openrouter: {
+            usage: { include: true },
+            reasoning: { effort: 'low' },
+        },
     });
 
     const opencodePolicy = resolveGenerationPolicy({

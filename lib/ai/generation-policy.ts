@@ -2,7 +2,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { generateText, LanguageModel } from 'ai';
-import { UserConfig } from '../config.ts';
+import type { UserConfig } from '../config.ts';
 import { ModelProvider, parseModelRef } from './model-ref.ts';
 import {
     type HistoryAttachmentInput,
@@ -22,7 +22,6 @@ export interface GenerationPolicyTelemetry {
     modelId: string;
     task: GenerationTask;
     googleThinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
-    openrouterUsageInclude?: boolean;
     openrouterReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
 }
 
@@ -151,25 +150,14 @@ function buildGoogleOptions(
 }
 
 function buildOpenRouterOptions(
-    config: UserConfig['ai'],
     capabilities: ModelCapabilities,
 ): ProviderOptions {
-    const openrouterOptions: {
-        usage?: { include: boolean };
-        reasoning?: { effort: 'minimal' | 'low' | 'medium' | 'high' };
-    } = {};
-
-    if (config.openrouter.usageInclude) {
-        openrouterOptions.usage = { include: true };
-    }
-
-    openrouterOptions.reasoning = { effort: capabilities.reasoningLevel };
-
-    if (Object.keys(openrouterOptions).length === 0) {
-        return {};
-    }
-
-    return { openrouter: openrouterOptions };
+    return {
+        openrouter: {
+            usage: { include: true },
+            reasoning: { effort: capabilities.reasoningLevel },
+        },
+    };
 }
 
 function createOpenRouterModel(
@@ -287,14 +275,13 @@ export function resolveGenerationPolicy(
         throw new Error('OPENROUTER_API_KEY is required for openrouter models');
     }
 
-    const providerOptions = buildOpenRouterOptions(input.config, capabilities);
+    const providerOptions = buildOpenRouterOptions(capabilities);
 
     const telemetry: GenerationPolicyTelemetry = {
         provider: parsed.provider,
         modelRef: parsed.raw,
         modelId: parsed.modelId,
         task: input.task,
-        openrouterUsageInclude: input.config.openrouter.usageInclude,
         openrouterReasoningEffort: capabilities.reasoningLevel,
     };
 

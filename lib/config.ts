@@ -5,6 +5,7 @@ import { configEntries } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { ALLOWED_REACTIONS } from './telegram/reactions.ts';
 import { getConfigOptionPolicy } from './config-access.ts';
+import { modelSupportsImageInput } from './ai/model-catalog.ts';
 
 function isValidRegex(val: unknown): val is RegExp {
     if (val instanceof RegExp) return true;
@@ -48,6 +49,10 @@ export const configSchema = z.object({
          * from user messages when constructing model history
          */
         includeAttachmentsInHistory: z.boolean().default(true),
+        autoRerouteImageAttachments: z.boolean().default(true),
+        imageAttachmentFallbackModel: z.string().min(1).max(200).default(
+            'gemini-3.1-flash-lite-preview',
+        ),
         bytesLimit: boundedPositiveInt(1024, 100 * 1024 * 1024).default(
             20 * 1024 * 1024,
         ),
@@ -55,11 +60,6 @@ export const configSchema = z.object({
             structuredOutputs: z.boolean().default(true),
         }).default({
             structuredOutputs: true,
-        }),
-        openrouter: z.object({
-            usageInclude: z.boolean().default(false),
-        }).default({
-            usageInclude: false,
         }),
     }),
     startMessage: z.string().max(2000),
@@ -269,6 +269,14 @@ export function validateConfigEntryValue(
     const policy = getConfigOptionPolicy(key);
     if (!policy || (scope !== undefined && !policy[scope])) {
         throw new ConfigValidationError(`Unsupported config key: ${key}`);
+    }
+    if (
+        key === 'ai.imageAttachmentFallbackModel' &&
+        (typeof value !== 'string' || !modelSupportsImageInput(value))
+    ) {
+        throw new ConfigValidationError(
+            'Image attachment fallback model must support images',
+        );
     }
 
     const next = fromStoredUserConfig(defaults);

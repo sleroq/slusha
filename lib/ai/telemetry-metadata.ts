@@ -55,11 +55,5 @@ export function buildGenerationTelemetryMetadata(
         'llm.openrouter.reasoning_effort',
         input.policy.telemetry.openrouterReasoningEffort,
     );
-    assignIfDefined(
-        metadata,
-        'llm.openrouter.usage_include',
-        input.policy.telemetry.openrouterUsageInclude,
-    );
-
     return metadata;
 }

@@ -7,12 +7,12 @@ export const scopedSettingsSections = [
     {
         id: 'model-and-generation',
         title: 'Model and generation',
-        keys: ['ai.model', 'availableModels', 'ai.temperature', 'ai.topK', 'ai.topP', 'ai.google.structuredOutputs', 'ai.openrouter.usageInclude'],
+        keys: ['ai.model', 'availableModels', 'ai.imageAttachmentFallbackModel', 'ai.temperature', 'ai.topK', 'ai.topP', 'ai.google.structuredOutputs'],
     },
     {
         id: 'context-and-media',
         title: 'Context and media',
-        keys: ['ai.messagesToPass', 'ai.messageMaxLength', 'ai.includeAttachmentsInHistory', 'ai.bytesLimit', 'filesMaxAge', 'maxMessagesToStore'],
+        keys: ['ai.messagesToPass', 'ai.messageMaxLength', 'ai.includeAttachmentsInHistory', 'ai.autoRerouteImageAttachments', 'ai.bytesLimit', 'filesMaxAge', 'maxMessagesToStore'],
     },
     {
         id: 'prompts',

@@ -1,3 +1,5 @@
+import { parseModelRef } from './model-ref.ts';
+
 export type HistoryAttachmentInput = 'none' | 'images' | 'all';
 export type OpencodeRequestFormat =
     | 'openai-chat-completions'
@@ -83,3 +85,16 @@ export const opencodeGoModels: Readonly<
 export const opencodeGoModelRefs = Object.keys(opencodeGoModels).map(
     (modelId) => `opencode-go/${modelId}`,
 );
+
+export function modelSupportsImageInput(modelRef: string): boolean {
+    const parsed = parseModelRef(modelRef);
+    if (parsed.provider === 'google') {
+        return true;
+    }
+    if (parsed.provider === 'openrouter') {
+        return false;
+    }
+
+    const model = opencodeGoModels[parsed.modelId];
+    return model !== undefined && model.historyAttachmentInput !== 'none';
+}

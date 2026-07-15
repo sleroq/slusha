@@ -88,10 +88,13 @@ function getGoogleGenAI(): GoogleGenAI {
     return ai;
 }
 
-async function uploadToGoogle(path: string, _name: string, mimeType: string) {
+async function uploadToGoogle(
+    fileData: Uint8Array,
+    name: string,
+    mimeType: string,
+) {
     const googleGenAI = getGoogleGenAI();
-    const fileData = await Deno.readFile(path);
-    const blob = new Blob([fileData], { type: mimeType });
+    const blob = new Blob([new Uint8Array(fileData)], { type: mimeType });
 
     const uploadResult = await googleGenAI.files.upload({
         file: blob,
@@ -116,7 +119,7 @@ async function uploadToGoogle(path: string, _name: string, mimeType: string) {
         throw new Error(
             `Attachment processing failed in Google API: ${errorMessage} ` +
                 `(code=${errorCode}, state=${file.state}, mimeType=${mimeType}, ` +
-                `localName=${_name}, remoteName=${
+                `localName=${name}, remoteName=${
                     file.name ?? uploadResult.name ?? 'unknown'
                 }, ` +
                 `details=${errorDetails})`,
@@ -132,9 +135,18 @@ export async function downloadFile(
     fileId: string,
     mimeType: string,
 ) {
+    const fileData = await downloadTelegramFile(api, token, fileId);
+    return uploadToGoogle(fileData, fileId, mimeType);
+}
+
+async function downloadTelegramFile(
+    api: Api<RawApi>,
+    token: string,
+    fileId: string,
+): Promise<Uint8Array> {
     const filePath = `./tmp/${fileId}`;
     if (await exists(filePath)) {
-        return uploadToGoogle(filePath, fileId, mimeType);
+        return Deno.readFile(filePath);
     }
 
     const file = await api.getFile(fileId);
@@ -147,7 +159,7 @@ export async function downloadFile(
 
     await Deno.writeFile(filePath, buffer);
 
-    return uploadToGoogle(filePath, fileId, mimeType);
+    return buffer;
 }
 
 export async function getImageContent(
@@ -156,7 +168,7 @@ export async function getImageContent(
     fileId: string,
     mediaType: string,
 ): Promise<FilePart> {
-    const file = await downloadFile(api, token, fileId, mediaType);
+    const file = await downloadTelegramFile(api, token, fileId);
 
     return {
         type: 'file',
