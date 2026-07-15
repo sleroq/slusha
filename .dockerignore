@@ -5,5 +5,8 @@
 !/lib/
 !/locales/
 !/drizzle/
-!/web/build/
 !/web/package.json*
+!/web/tsconfig.json
+!/web/vite.config.ts
+!/web/src/
+!/web/static/
