@@ -192,10 +192,12 @@ bot.inlineQuery(/.*/, async (ctx) => {
     for (const character of characters) {
         const url = `https://venus.chub.ai/characters/${character.fullPath}`;
 
-        const baseHTMLName = await unified()
-            .use(remarkParse)
-            .use(remarkHtml)
-            .process(character.name);
+        const baseHTMLName = String(
+            await unified()
+                .use(remarkParse)
+                .use(remarkHtml)
+                .process(character.name),
+        );
 
         const noHTMLName = DOMPurify.sanitize(character.name, {
             ALLOWED_TAGS: [],
@@ -211,10 +213,12 @@ bot.inlineQuery(/.*/, async (ctx) => {
             character.description,
             3500,
         );
-        const baseDescription = await unified()
-            .use(remarkParse)
-            .use(remarkHtml)
-            .process(descriptionCut);
+        const baseDescription = String(
+            await unified()
+                .use(remarkParse)
+                .use(remarkHtml)
+                .process(descriptionCut),
+        );
 
         const noHTMLDescription = DOMPurify.sanitize(baseDescription, {
             ALLOWED_TAGS: [],
