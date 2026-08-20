@@ -10,6 +10,7 @@ interface OpencodeGoModelConfig {
     historyAttachmentInput: HistoryAttachmentInput;
     requestFormat: OpencodeRequestFormat;
     structuredOutputMode: StructuredOutputMode;
+    supportsTopK?: boolean;
 }
 
 export const opencodeGoModels: Readonly<
@@ -39,6 +40,7 @@ export const opencodeGoModels: Readonly<
         historyAttachmentInput: 'images',
         requestFormat: 'openai-chat-completions',
         structuredOutputMode: 'tool',
+        supportsTopK: false,
     },
     'kimi-k2.7-code': {
         historyAttachmentInput: 'images',

@@ -2,6 +2,16 @@ import { generateText, hasToolCall, type ModelMessage, type Tool } from 'ai';
 import type { ResolvedGenerationPolicy } from './generation-policy.ts';
 import { parseStructuredJsonText } from './structured-json.ts';
 
+type GenerationSettings = Pick<
+    Parameters<typeof generateText>[0],
+    | 'model'
+    | 'providerOptions'
+    | 'temperature'
+    | 'topK'
+    | 'topP'
+    | 'maxRetries'
+>;
+
 export type StructuredGenerationPrompt =
     | {
         kind: 'messages';
@@ -42,14 +52,16 @@ export interface StructuredGenerationInput<T> {
 export async function generateStructuredOutput<T>(
     input: StructuredGenerationInput<T>,
 ): Promise<T> {
-    const settings = {
+    const settings: GenerationSettings = {
         model: input.policy.model,
         providerOptions: input.policy.providerOptions,
         temperature: input.temperature,
-        topK: input.topK,
         topP: input.topP,
         maxRetries: input.maxRetries,
     };
+    if (input.policy.capabilities.supportsTopK !== false) {
+        settings.topK = input.topK;
+    }
 
     if (input.policy.capabilities.structuredOutputMode === 'json-text') {
         const result = input.prompt.kind === 'messages'

@@ -44,6 +44,13 @@ Deno.test('resolveModelCapabilities applies provider defaults', () => {
 });
 
 Deno.test('resolveModelCapabilities applies opencode model rules', () => {
+    assertEquals(resolveModelCapabilities('opencode', 'kimi-k2.6'), {
+        historyAttachmentInput: 'images',
+        structuredOutputMode: 'tool',
+        reasoningLevel: 'low',
+        opencodeRequestFormat: 'openai-chat-completions',
+        supportsTopK: false,
+    });
     assertEquals(resolveModelCapabilities('opencode', 'deepseek-v4-flash'), {
         historyAttachmentInput: 'none',
         structuredOutputMode: 'json-text',
