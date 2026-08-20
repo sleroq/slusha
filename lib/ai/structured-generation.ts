@@ -42,7 +42,15 @@ export interface StructuredGenerationInput<T> {
 export async function generateStructuredOutput<T>(
     input: StructuredGenerationInput<T>,
 ): Promise<T> {
-    const settings = {
+    const settings: Pick<
+        Parameters<typeof generateText>[0],
+        | 'model'
+        | 'providerOptions'
+        | 'temperature'
+        | 'topK'
+        | 'topP'
+        | 'maxRetries'
+    > = {
         model: input.policy.model,
         providerOptions: input.policy.providerOptions,
         temperature: input.temperature,
@@ -50,7 +58,7 @@ export async function generateStructuredOutput<T>(
         maxRetries: input.maxRetries,
     };
     if (input.policy.capabilities.supportsTopK !== false) {
-        Object.assign(settings, { topK: input.topK });
+        settings.topK = input.topK;
     }
 
     if (input.policy.capabilities.structuredOutputMode === 'json-text') {
