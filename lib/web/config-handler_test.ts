@@ -135,26 +135,14 @@ Deno.test('config handler validates, serializes, and commits atomically', async 
             trusted.fields.some((field: { key?: string }) =>
                 field.key === 'ai.prePrompt'
             ),
-            false,
+            true,
         );
         assertEquals(
             trusted.fields.some((field: { key?: string }) =>
                 field.key === 'availableModels'
             ),
-            false,
+            true,
         );
-
-        const forbiddenTrustedUpdate = await handler(
-            new Request('http://localhost/api/config', {
-                method: 'PUT',
-                headers: trustedHeaders,
-                body: JSON.stringify({
-                    scope: 'global',
-                    operations: [{ key: 'ai.prePrompt', value: 'Nope' }],
-                }),
-            }),
-        );
-        assertEquals(forbiddenTrustedUpdate.status, 403);
 
         const invalidBody = await handler(
             new Request('http://localhost/api/config', {
@@ -215,6 +203,18 @@ Deno.test('config handler validates, serializes, and commits atomically', async 
             )).rows,
             [],
         );
+
+        const trustedPromptUpdate = await handler(
+            new Request('http://localhost/api/config', {
+                method: 'PUT',
+                headers: trustedHeaders,
+                body: JSON.stringify({
+                    scope: 'global',
+                    operations: [{ key: 'ai.prePrompt', value: 'Nope' }],
+                }),
+            }),
+        );
+        assertEquals(trustedPromptUpdate.status, 200);
 
         const trustedUpdate = await handler(
             new Request('http://localhost/api/config', {

@@ -1,4 +1,4 @@
-FROM denoland/deno:2.9.2 AS builder
+FROM denoland/deno:2.9.4 AS builder
 ENV DENO_DIR=/deno-dir
 WORKDIR /app
 
@@ -7,7 +7,7 @@ RUN deno install --frozen
 RUN cd web && deno task build
 RUN deno cache --frozen --allow-import main.ts
 
-FROM denoland/deno:2.9.2
+FROM denoland/deno:2.9.4
 ENV DENO_DIR=/deno-dir
 WORKDIR /app
 

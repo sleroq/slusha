@@ -9,7 +9,7 @@ import type {
     MessageReactionCountUpdated,
     MessageReactionUpdated,
     ReactionType,
-} from 'https://deno.land/x/grammy_types@v3.21.0/message.ts';
+} from 'grammy_types';
 
 function parseReactionSet(
     raw: ReactionType[],

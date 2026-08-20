@@ -3,6 +3,7 @@ import {
     GrammyError,
     InlineKeyboard,
     InlineQueryResultBuilder,
+    InputFile,
 } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
 import { getCharacter, getCharacters, pageSize } from '../../charhub/api.ts';
@@ -168,7 +169,7 @@ bot.inlineQuery(/.*/, async (ctx) => {
         });
     }
 
-    const results: InlineQueryResultArticle[] = [];
+    const results: InlineQueryResultArticle<InputFile>[] = [];
 
     results.push(headerResult(chatId, query, ctx));
 

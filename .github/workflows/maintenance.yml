@@ -25,8 +25,8 @@ jobs:
               with:
                   deno-version: v2.x
 
-            - name: Update root dependencies
-              run: deno outdated --update --latest
+            - name: Update workspace dependencies
+              run: deno outdated --recursive --update --latest
 
             - name: Refresh lockfiles
               run: deno cache --allow-import main.ts
@@ -39,7 +39,8 @@ jobs:
                   commit-message: 'chore: weekly dependency updates'
                   title: 'chore: weekly dependency updates'
                   body: |
-                      Automated dependency refresh for root Deno config.
+                        Automated dependency refresh for the Deno workspace.
                   add-paths: |
-                      deno.json
-                      deno.lock
+                        deno.json
+                        deno.lock
+                        web/package.json

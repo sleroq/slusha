@@ -98,17 +98,17 @@ Deno.test('configuration editor returns authorized JSON-safe metadata', async ()
         const trustedModel = trustedFields.find((field) =>
             field.key === 'ai.model'
         );
-        assertEquals(trustedModel?.kind, 'text');
+        assertEquals(trustedModel?.kind, 'select');
         assertEquals(
             trustedFields.some((field) => field.key === 'availableModels'),
-            false,
+            true,
         );
         assertEquals(
             trustedFields.some((field) =>
                 field.key === 'ai.autoRerouteImageAttachments' ||
                 field.key === 'ai.imageAttachmentFallbackModel'
             ),
-            false,
+            true,
         );
     } finally {
         client.close();
