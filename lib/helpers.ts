@@ -205,6 +205,8 @@ export async function deleteOldFiles(logger: Logger, maxAge: number) {
 
     let deletedCount = 0;
     for await (const file of files) {
+        if (!file.isFile) continue;
+
         const filePath = `./tmp/${file.name}`;
 
         const stat = await Deno.stat(filePath);
@@ -215,11 +217,10 @@ export async function deleteOldFiles(logger: Logger, maxAge: number) {
         if (age > maxAge || stat.mtime === null) {
             try {
                 await Deno.remove(filePath);
+                deletedCount++;
             } catch (error) {
                 logger.warn(`Failed to delete file: ${filePath}`, error);
             }
-
-            deletedCount++;
         }
     }
 
