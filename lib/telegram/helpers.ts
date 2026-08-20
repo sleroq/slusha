@@ -1,6 +1,6 @@
 import { Logger } from '@deno-library/logger';
 import { SlushaContext } from './setup-bot.ts';
-import { Message, ParseMode } from 'grammy_types';
+import type { Message, ParseMode } from 'grammy_types';
 import { splitMessage } from '../helpers.ts';
 
 export async function replyGeneric<Other>(

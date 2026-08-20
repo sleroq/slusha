@@ -1,4 +1,4 @@
-import { Message } from 'grammy_types/message.ts';
+import type { Message } from 'grammy_types';
 import { MessageRepository } from '../persistence/messages.ts';
 
 interface ThreadResolution {

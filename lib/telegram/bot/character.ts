@@ -8,7 +8,7 @@ import { SlushaContext } from '../setup-bot.ts';
 import { getCharacter, getCharacters, pageSize } from '../../charhub/api.ts';
 import { sliceMessage } from '../../helpers.ts';
 import logger from '../../logger.ts';
-import { InlineQueryResultArticle } from 'grammy_types';
+import type { InlineQueryResultArticle } from 'grammy_types';
 import { tool } from 'ai';
 import z from 'zod';
 import { limit } from 'grammy_ratelimiter';

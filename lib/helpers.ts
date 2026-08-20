@@ -4,7 +4,7 @@ import { Api, RawApi } from 'grammy';
 import { Logger } from '@deno-library/logger';
 import { supportedTypesMap } from './history.ts';
 import { exists } from '@std/fs';
-import { Message, PhotoSize } from 'grammy_types';
+import type { Message, PhotoSize } from 'grammy_types';
 import { GoogleGenAI } from '@google/genai';
 import { FilePart } from 'ai';
 

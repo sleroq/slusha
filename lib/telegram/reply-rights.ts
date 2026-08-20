@@ -1,5 +1,5 @@
 import { GrammyError } from 'grammy';
-import { ChatMember } from 'grammy_types';
+import type { ChatMember } from 'grammy_types';
 
 export function canMemberSendTextMessages(member: ChatMember): boolean {
     switch (member.status) {

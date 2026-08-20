@@ -6,7 +6,7 @@ import {
     isTelegramCommentsHistory,
 } from './chat-context.ts';
 import type { ChatMessage, Member } from '../persistence/types.ts';
-import { Message, User } from 'grammy_types';
+import type { Message, User } from 'grammy_types';
 
 function createMessageWithForwardFromTelegram(): ChatMessage {
     return {

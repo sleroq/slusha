@@ -1,5 +1,5 @@
 import { assertEquals } from '@std/assert';
-import { Message } from 'grammy_types';
+import type { Message } from 'grammy_types';
 import { ReplyMessage } from './telegram/helpers.ts';
 import type { ChatMessage, ReplyTo } from './persistence/types.ts';
 import {

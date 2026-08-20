@@ -8,7 +8,7 @@ import {
     sliceMessage,
 } from './helpers.ts';
 import type { ChatMessage, ReplyTo } from './persistence/types.ts';
-import { Message } from 'grammy_types';
+import type { Message } from 'grammy_types';
 import { Logger } from '@deno-library/logger';
 import logger from './logger.ts';
 import type { HistoryAttachmentInput } from './ai/model-catalog.ts';
