@@ -250,11 +250,15 @@ export function resolveGenerationPolicy(
             );
         } else {
             model = createOpencodeModel(parsed.modelId, input.opencodeToken);
-            providerOptions = {
-                opencode: {
-                    reasoningEffort: capabilities.reasoningLevel,
-                },
-            };
+            const usesForcedTool = input.expectsStructuredOutput &&
+                capabilities.structuredOutputMode === 'tool';
+            if (!usesForcedTool) {
+                providerOptions = {
+                    opencode: {
+                        reasoningEffort: capabilities.reasoningLevel,
+                    },
+                };
+            }
         }
 
         return {

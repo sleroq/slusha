@@ -150,6 +150,15 @@ Deno.test('resolveGenerationPolicy applies fixed model behavior', () => {
         opencode: { reasoningEffort: 'low' },
     });
 
+    const opencodeStructuredPolicy = resolveGenerationPolicy({
+        modelRef: 'opencode:kimi-k2.6',
+        config,
+        opencodeToken: 'test',
+        task: 'chat',
+        expectsStructuredOutput: true,
+    });
+    assertEquals(opencodeStructuredPolicy.providerOptions, undefined);
+
     const opencodeAnthropicPolicy = resolveGenerationPolicy({
         modelRef: 'opencode:minimax-m3',
         config,
