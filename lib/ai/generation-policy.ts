@@ -41,6 +41,7 @@ export interface ModelCapabilities {
     historyAttachmentInput: HistoryAttachmentInput;
     structuredOutputMode: StructuredOutputMode;
     reasoningLevel: 'minimal' | 'low' | 'medium' | 'high';
+    supportsTopK?: boolean;
     opencodeRequestFormat?: OpencodeRequestFormat;
     googleSafetySettings?: Array<{ category: string; threshold: string }>;
 }
@@ -108,6 +109,9 @@ export function resolveModelCapabilities(
                 opencodeRequestFormat: modelConfig.requestFormat,
                 structuredOutputMode: modelConfig.structuredOutputMode,
             });
+            if (modelConfig.supportsTopK === false) {
+                capabilities.supportsTopK = false;
+            }
         }
         if (modelId.startsWith('deepseek-v4')) {
             capabilities.structuredOutputMode = 'json-text';

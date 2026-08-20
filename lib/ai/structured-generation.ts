@@ -46,10 +46,12 @@ export async function generateStructuredOutput<T>(
         model: input.policy.model,
         providerOptions: input.policy.providerOptions,
         temperature: input.temperature,
-        topK: input.topK,
         topP: input.topP,
         maxRetries: input.maxRetries,
     };
+    if (input.policy.capabilities.supportsTopK !== false) {
+        Object.assign(settings, { topK: input.topK });
+    }
 
     if (input.policy.capabilities.structuredOutputMode === 'json-text') {
         const result = input.prompt.kind === 'messages'
