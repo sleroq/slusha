@@ -27,6 +27,8 @@ interface HistoryCandidate {
     rootIndex: number;
 }
 
+type MessageLoader = (messageId: number) => Promise<ChatMessage | undefined>;
+
 const HISTORY_META_OPEN = '<slusha_meta>';
 const HISTORY_META_CLOSE = '</slusha_meta>';
 
@@ -46,6 +48,93 @@ function sameThread(left: ChatMessage, right: ChatMessage): boolean {
     }
 
     return false;
+}
+
+/**
+ * Hydrates the active message's reply ancestry before history limits are
+ * applied. Telegram only embeds the direct replied-to message, so persisted
+ * parents are followed recursively while the embedded snapshot is used when
+ * a parent was never stored.
+ */
+export async function resolveReplyHistory(
+    history: ChatMessage[],
+    activeMessageId: number,
+    loadMessage: MessageLoader,
+): Promise<ChatMessage[]> {
+    const messagesById = new Map(
+        history.map((message) => [message.id, message]),
+    );
+    const activeMessage = messagesById.get(activeMessageId) ??
+        await loadMessage(activeMessageId);
+    if (!activeMessage) {
+        return history;
+    }
+    messagesById.set(activeMessage.id, activeMessage);
+
+    const baseHistory = [...history];
+    if (!history.some((message) => message.id === activeMessage.id)) {
+        baseHistory.push(activeMessage);
+    }
+    baseHistory.sort((left, right) => {
+        const dateDifference = left.info.date - right.info.date;
+        if (dateDifference !== 0) {
+            return dateDifference;
+        }
+        return left.id - right.id;
+    });
+
+    async function getAncestors(message: ChatMessage): Promise<ChatMessage[]> {
+        const ancestors: ChatMessage[] = [];
+        const visited = new Set<number>([message.id]);
+        let current = message;
+        while (true) {
+            const parentId = current.threadParentMessageId ??
+                current.replyTo?.id;
+            if (typeof parentId !== 'number' || visited.has(parentId)) {
+                break;
+            }
+            visited.add(parentId);
+
+            let parent = messagesById.get(parentId) ??
+                await loadMessage(parentId);
+            if (!parent && current.replyTo?.id === parentId) {
+                parent = {
+                    id: current.replyTo.id,
+                    text: current.replyTo.text,
+                    isMyself: current.replyTo.isMyself,
+                    info: current.replyTo.info as Message,
+                    threadId: current.threadId,
+                    threadRootMessageId: current.threadRootMessageId ??
+                        parentId,
+                    threadSource: 'reply_snapshot',
+                };
+            }
+            if (!parent) {
+                break;
+            }
+
+            messagesById.set(parent.id, parent);
+            ancestors.push(parent);
+            current = parent;
+        }
+        ancestors.reverse();
+        return ancestors;
+    }
+
+    const resolved: ChatMessage[] = [];
+    for (const message of baseHistory) {
+        const chain = [...await getAncestors(message), message];
+        for (const chainMessage of chain) {
+            const previousIndex = resolved.findIndex((candidate) =>
+                candidate.id === chainMessage.id
+            );
+            if (previousIndex >= 0) {
+                resolved.splice(previousIndex, 1);
+            }
+            resolved.push(chainMessage);
+        }
+    }
+    return resolved;
 }
 
 export function selectHistoryCandidates(
@@ -74,8 +163,8 @@ export function selectHistoryCandidates(
     }
 
     const effectiveAnchor = activeThreadAnchor ?? fallbackAnchor;
-    const anchorTopicId = typeof effectiveAnchor?.info.message_thread_id ===
-            'number'
+    const anchorTopicId = effectiveAnchor?.info.is_topic_message === true &&
+            typeof effectiveAnchor.info.message_thread_id === 'number'
         ? effectiveAnchor.info.message_thread_id
         : undefined;
     const scopedToTelegramTopic = typeof anchorTopicId === 'number';

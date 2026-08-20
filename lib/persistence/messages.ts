@@ -177,9 +177,12 @@ export class MessageRepository {
         const history = await this.getRecentHistory(lookbackLimit);
         for (let i = history.length - 1; i >= 0; i--) {
             const message = history[i];
+            const messageTopicId = message.info.is_topic_message === true
+                ? message.info.message_thread_id
+                : undefined;
             if (
                 message.info.from?.id === authorId &&
-                message.info.message_thread_id === topicId
+                messageTopicId === topicId
             ) return message;
         }
         return undefined;

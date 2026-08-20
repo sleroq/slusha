@@ -12,11 +12,11 @@ import { OptOutRepository } from '../persistence/opt-outs.ts';
 import type { ReplyTo } from '../persistence/types.ts';
 import { sequentialize } from '@grammyjs/runner';
 import { canMemberSendTextMessages } from './reply-rights.ts';
-import { Message } from 'grammy_types';
 import { isRegisteredCommand } from './register-all.ts';
 import reactions from './handlers/reactions.ts';
 import { UserRoleRepository } from '../persistence/user-roles.ts';
 import type { GlobalRole } from '../persistence/user-roles.ts';
+import { resolveThreadForIncomingMessage } from './thread-resolution.ts';
 
 interface RequestInfo {
     isRandom: boolean;
@@ -24,13 +24,6 @@ interface RequestInfo {
     config: Config['ai'];
     openrouterApiKey?: string;
     opencodeToken?: string;
-}
-
-interface ThreadResolution {
-    threadId: string;
-    threadRootMessageId: number;
-    threadParentMessageId?: number;
-    threadSource: string;
 }
 
 export type SlushaContext = Context & I18nFlavor & {
@@ -44,67 +37,6 @@ export type SlushaContext = Context & I18nFlavor & {
     optOuts: OptOutRepository;
     globalRoles: ReadonlySet<GlobalRole>;
 };
-
-function isSameTopic(left: Message, right: Message): boolean {
-    const leftTopic = left.message_thread_id;
-    const rightTopic = right.message_thread_id;
-    return leftTopic === rightTopic;
-}
-
-async function resolveThreadForIncomingMessage(
-    messages: MessageRepository,
-    incoming: Message,
-    replyToId?: number,
-): Promise<ThreadResolution> {
-    if (typeof replyToId === 'number') {
-        const parent = await messages.getMessageById(replyToId);
-        const inheritedRoot = parent?.threadRootMessageId ?? replyToId;
-        const inheritedThread = parent?.threadId ?? `thread:${inheritedRoot}`;
-
-        return {
-            threadId: inheritedThread,
-            threadRootMessageId: inheritedRoot,
-            threadParentMessageId: replyToId,
-            threadSource: parent ? 'explicit_reply' : 'explicit_reply_external',
-        };
-    }
-
-    const incomingAuthorId = incoming.from?.id;
-    const incomingDate = incoming.date;
-    const maxGapSeconds = 180;
-    const maxInterveningMessages = 6;
-
-    if (typeof incomingAuthorId === 'number') {
-        const candidate = await messages.getLastMessageByAuthorInTopic(
-            incomingAuthorId,
-            incoming.message_thread_id,
-            maxInterveningMessages + 1,
-        );
-
-        if (candidate && isSameTopic(candidate.info, incoming)) {
-            const candidateDate = candidate.info.date;
-            const secondsSince = incomingDate - candidateDate;
-            if (secondsSince <= maxGapSeconds) {
-                const inheritedRoot = candidate.threadRootMessageId ??
-                    candidate.id;
-                const inheritedThread = candidate.threadId ??
-                    `thread:${inheritedRoot}`;
-                return {
-                    threadId: inheritedThread,
-                    threadRootMessageId: inheritedRoot,
-                    threadParentMessageId: candidate.id,
-                    threadSource: 'implicit_same_author',
-                };
-            }
-        }
-    }
-
-    return {
-        threadId: `thread:${incoming.message_id}`,
-        threadRootMessageId: incoming.message_id,
-        threadSource: 'new_thread',
-    };
-}
 
 export default async function setupBot(
     config: Config,

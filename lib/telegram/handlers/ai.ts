@@ -2,7 +2,7 @@ import { Bot, Composer } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
 import logger from '../../logger.ts';
 import { APICallError, type ModelMessage, tool } from 'ai';
-import { makeHistory } from '../../history.ts';
+import { makeHistory, resolveReplyHistory } from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
 import type { ChatMessage, ReplyTo } from '../../persistence/types.ts';
@@ -155,7 +155,10 @@ async function sendGeneratedOutput(params: {
         historyById,
     } = params;
     let chatTopicId: number | undefined;
-    if (typeof ctx.msg?.message_thread_id === 'number') {
+    if (
+        ctx.msg?.is_topic_message === true &&
+        typeof ctx.msg.message_thread_id === 'number'
+    ) {
         chatTopicId = ctx.msg.message_thread_id;
     }
 
@@ -419,19 +422,27 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
         const savedHistory = await ctx.messages.getRecentHistory(
             Math.max(maxTargetCount, maxAttemptHistoryLimit),
         );
+        const resolvedHistory = await resolveReplyHistory(
+            savedHistory,
+            ctx.msg.message_id,
+            (messageId) => ctx.messages.getMessageById(messageId),
+        );
 
         let activeMessageThreadId: number | undefined;
-        if (typeof ctx.msg.message_thread_id === 'number') {
+        if (
+            ctx.msg.is_topic_message === true &&
+            typeof ctx.msg.message_thread_id === 'number'
+        ) {
             activeMessageThreadId = ctx.msg.message_thread_id;
         }
-        const targetRefs = buildTargetRefs(savedHistory, maxTargetCount, {
+        const targetRefs = buildTargetRefs(resolvedHistory, maxTargetCount, {
             activeMessageThreadId,
         });
         const targetRefMap = new Map(
             targetRefs.map((target) => [target.ref, target.messageId]),
         );
 
-        const isComments = isTelegramCommentsHistory(savedHistory);
+        const isComments = isTelegramCommentsHistory(resolvedHistory);
         const currentLocale = chatState.locale ??
             ctx.from?.language_code ??
             await ctx.i18n.getLocale();
@@ -546,7 +557,7 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
                 { token: bot.token, id: bot.botInfo.id },
                 bot.api,
                 logger,
-                savedHistory,
+                resolvedHistory,
                 {
                     messagesLimit: plan.historyLimit,
                     bytesLimit,
@@ -733,7 +744,9 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             `for "${name}" ${username}. `,
         );
 
-        const historyById = new Map(savedHistory.map((msg) => [msg.id, msg]));
+        const historyById = new Map(
+            resolvedHistory.map((msg) => [msg.id, msg]),
+        );
 
         await sendGeneratedOutput({
             bot,
