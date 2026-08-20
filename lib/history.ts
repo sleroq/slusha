@@ -239,6 +239,44 @@ export function selectHistoryCandidates(
     return selected;
 }
 
+/**
+ * Returns whether an image would be eligible for inclusion in the bounded
+ * history passed to a model. Keep the recency rule aligned with makeHistory.
+ */
+export function historyHasImageAttachments(
+    history: ChatMessage[],
+    options: { messagesLimit: number; activeMessageId?: number },
+): boolean {
+    const candidates = selectHistoryCandidates(history, {
+        maxRootMessages: undefined,
+        activeMessageId: options.activeMessageId,
+    }).slice(0, options.messagesLimit);
+
+    return candidates.some((candidate) => {
+        if (candidate.rootIndex < history.length - 10) {
+            return false;
+        }
+
+        if (candidate.msg.isMyself) {
+            return false;
+        }
+
+        const info = candidate.msg.info;
+        if (info.photo) {
+            return true;
+        }
+
+        if (info.sticker) {
+            if (!info.sticker.is_video && !info.sticker.is_animated) {
+                return true;
+            }
+            return Boolean(info.sticker.thumbnail);
+        }
+
+        return Boolean(info.video?.thumbnail);
+    });
+}
+
 type PrintType = (name: keyof Message, msg: Message) => string;
 
 function getAttachmentDefault(name: keyof Message) {

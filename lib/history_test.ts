@@ -3,6 +3,7 @@ import { Message } from 'grammy_types';
 import { ReplyMessage } from './telegram/helpers.ts';
 import type { ChatMessage, ReplyTo } from './persistence/types.ts';
 import {
+    historyHasImageAttachments,
     resolveReplyHistory,
     selectHistoryCandidates,
 } from './history.ts';
@@ -49,6 +50,35 @@ function createMessage(
         } as unknown as Message,
     };
 }
+
+Deno.test('historyHasImageAttachments only sees eligible recent images', () => {
+    const history = Array.from(
+        { length: 12 },
+        (_, index) => createMessage(index + 1),
+    );
+    history[0].info.photo = [{
+        file_id: 'old',
+        file_unique_id: 'old',
+        width: 1,
+        height: 1,
+    }];
+
+    assertEquals(
+        historyHasImageAttachments(history, { messagesLimit: 12 }),
+        false,
+    );
+
+    history[11].info.photo = [{
+        file_id: 'recent',
+        file_unique_id: 'recent',
+        width: 1,
+        height: 1,
+    }];
+    assertEquals(
+        historyHasImageAttachments(history, { messagesLimit: 12 }),
+        true,
+    );
+});
 
 Deno.test('selectHistoryCandidates prioritizes active thread', () => {
     const history: ChatMessage[] = [

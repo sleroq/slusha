@@ -2,7 +2,11 @@ import { Bot, Composer } from 'grammy';
 import { SlushaContext } from '../setup-bot.ts';
 import logger from '../../logger.ts';
 import { APICallError, type ModelMessage, tool } from 'ai';
-import { makeHistory, resolveReplyHistory } from '../../history.ts';
+import {
+    historyHasImageAttachments,
+    makeHistory,
+    resolveReplyHistory,
+} from '../../history.ts';
 import { getRandomNepon, prettyDate } from '../../helpers.ts';
 import { replyGeneric, replyWithMarkdownId } from '../helpers.ts';
 import type { ChatMessage, ReplyTo } from '../../persistence/types.ts';
@@ -34,6 +38,7 @@ import { canonicalizeReaction, resolveEnabledReactions } from '../reactions.ts';
 import { isMissingSendTextRightsError } from '../reply-rights.ts';
 import { buildLanguageProtocol } from '../../ai/language-protocol.ts';
 import { resolveGenerationPolicy } from '../../ai/generation-policy.ts';
+import { modelSupportsImageInput } from '../../ai/model-catalog.ts';
 import { generateStructuredOutput } from '../../ai/structured-generation.ts';
 import { UserProfileRepository } from '../../persistence/user-profile.ts';
 
@@ -456,7 +461,33 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             profileAbout = userProfile.about;
         }
 
-        const modelRef = effectiveConfig.ai.model;
+        let modelRef = effectiveConfig.ai.model;
+        if (
+            effectiveConfig.ai.includeAttachmentsInHistory &&
+            effectiveConfig.ai.autoRerouteImageAttachments &&
+            historyHasImageAttachments(resolvedHistory, {
+                messagesLimit: messagesToPass,
+                activeMessageId: ctx.msg.message_id,
+            }) &&
+            !modelSupportsImageInput(modelRef)
+        ) {
+            const fallbackModelRef =
+                effectiveConfig.ai.imageAttachmentFallbackModel;
+            if (modelSupportsImageInput(fallbackModelRef)) {
+                modelRef = fallbackModelRef;
+                logger.info('Rerouting generation to image-capable model', {
+                    selectedModelRef: effectiveConfig.ai.model,
+                    fallbackModelRef,
+                });
+            } else {
+                logger.warn(
+                    'Configured image fallback model has no image support',
+                    {
+                        fallbackModelRef,
+                    },
+                );
+            }
+        }
 
         const time = new Date().getTime();
         const maxGenerationRetries = 2;
