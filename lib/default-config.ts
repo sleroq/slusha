@@ -44,7 +44,7 @@ const hateModePrompt = `
 const defaultConfig = {
     startMessage: 'Привет! Я Слюша, бот-гений.',
     ai: {
-        model: 'opencode-go/kimi-k2.6',
+        model: 'opencode-go/deepseek-v4-flash',
         prePrompt,
         prompt,
         privateChatPromptAddition,
@@ -60,7 +60,7 @@ const defaultConfig = {
         messageMaxLength: 4096,
         includeAttachmentsInHistory: true,
         autoRerouteImageAttachments: true,
-        imageAttachmentFallbackModel: 'gemini-3.1-flash-lite-preview',
+        imageAttachmentFallbackModel: 'opencode-go/kimi-k2.6',
         bytesLimit: 20971520,
         google: {
             structuredOutputs: true,
