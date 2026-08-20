@@ -44,8 +44,7 @@ const hateModePrompt = `
 const defaultConfig = {
     startMessage: 'Привет! Я Слюша, бот-гений.',
     ai: {
-        // model: 'gemini-3.1-flash-lite-preview',
-        model: 'opencode-go/deepseek-v4-flash',
+        model: 'opencode-go/kimi-k2.6',
         prePrompt,
         prompt,
         privateChatPromptAddition,
