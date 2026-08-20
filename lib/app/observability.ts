@@ -4,7 +4,7 @@ function hasLangfuseConfig(): boolean {
     return [
         'LANGFUSE_SECRET_KEY',
         'LANGFUSE_PUBLIC_KEY',
-        'LANGFUSE_BASEURL',
+        'LANGFUSE_BASE_URL',
     ].every((key) => {
         const value = Deno.env.get(key);
         return typeof value === 'string' && value.trim().length > 0;
@@ -16,18 +16,27 @@ export async function startTelemetry(): Promise<NodeSDK | undefined> {
         return undefined;
     }
 
-    const [{ NodeSDK }, { getNodeAutoInstrumentations }, { LangfuseExporter }] =
-        await Promise.all([
-            import('@opentelemetry/sdk-node'),
-            import('@opentelemetry/auto-instrumentations-node'),
-            import('langfuse-vercel'),
-        ]);
+    // Not loading telemetry dependencies into memory if it's not configured
+    const [
+        { NodeSDK },
+        { getNodeAutoInstrumentations },
+        { LangfuseSpanProcessor },
+        { registerTelemetry },
+        { LangfuseVercelAiSdkIntegration },
+    ] = await Promise.all([
+        import('@opentelemetry/sdk-node'),
+        import('@opentelemetry/auto-instrumentations-node'),
+        import('@langfuse/otel'),
+        import('ai'),
+        import('@langfuse/vercel-ai-sdk'),
+    ]);
 
     const sdk = new NodeSDK({
-        traceExporter: new LangfuseExporter(),
+        spanProcessors: [new LangfuseSpanProcessor()],
         instrumentations: [getNodeAutoInstrumentations()],
     });
     sdk.start();
+    registerTelemetry(new LangfuseVercelAiSdkIntegration());
     return sdk;
 }
 

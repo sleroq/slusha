@@ -16,6 +16,7 @@
           direnv
           git
           nix-direnv
+          bore-cli
         ];
       };
     };

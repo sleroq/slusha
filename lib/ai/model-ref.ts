@@ -1,4 +1,4 @@
-export type ModelProvider = 'google' | 'openrouter';
+export type ModelProvider = 'google' | 'openrouter' | 'opencode';
 
 export interface ParsedModelRef {
     provider: ModelProvider;
@@ -9,7 +9,10 @@ export interface ParsedModelRef {
 const providerPrefixes: Record<ModelProvider, string> = {
     google: 'google:',
     openrouter: 'openrouter:',
+    opencode: 'opencode:',
 };
+
+const opencodeGoPrefix = 'opencode-go/';
 
 export function parseModelRef(modelRef: string): ParsedModelRef {
     const raw = modelRef.trim();
@@ -26,6 +29,22 @@ export function parseModelRef(modelRef: string): ParsedModelRef {
         return {
             provider: 'openrouter',
             modelId: raw.slice(providerPrefixes.openrouter.length),
+            raw,
+        };
+    }
+
+    if (raw.startsWith(providerPrefixes.opencode)) {
+        return {
+            provider: 'opencode',
+            modelId: raw.slice(providerPrefixes.opencode.length),
+            raw,
+        };
+    }
+
+    if (raw.startsWith(opencodeGoPrefix)) {
+        return {
+            provider: 'opencode',
+            modelId: raw.slice(opencodeGoPrefix.length),
             raw,
         };
     }

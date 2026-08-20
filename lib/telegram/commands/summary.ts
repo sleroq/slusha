@@ -5,7 +5,7 @@ export function registerSummary(
     composer: Composer<SlushaContext>,
 ) {
     composer.command('summary', async (ctx) => {
-        await ctx.m.setLastUse(Date.now());
+        await ctx.chats.patchChat(ctx.chat.id, { lastUse: Date.now() });
         return ctx.reply(ctx.t('summary-disabled'));
     });
 }

@@ -5,4 +5,8 @@
 !/lib/
 !/locales/
 !/drizzle/
-!/widget/
+!/web/package.json*
+!/web/tsconfig.json
+!/web/vite.config.ts
+!/web/src/
+!/web/static/

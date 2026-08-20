@@ -4,20 +4,14 @@ import { Api, RawApi } from 'grammy';
 import { Logger } from '@deno-library/logger';
 import { supportedTypesMap } from './history.ts';
 import { exists } from '@std/fs';
-import { Message, PhotoSize, Sticker } from 'grammy_types';
+import type { Message, PhotoSize } from 'grammy_types';
 import { GoogleGenAI } from '@google/genai';
-import { ImagePart, ModelMessage } from 'ai';
-import { BotCharacter } from './memory.ts';
-// import { encodeBase64 } from "@std/encoding/base64";
+import { FilePart } from 'ai';
 
 export function getRandomInt(min: number, max: number) {
     min = Math.ceil(min);
     max = Math.floor(max);
     return Math.floor(Math.random() * (max - min) + min); // The maximum is exclusive and the minimum is inclusive
-}
-
-export function stickerToText({ emoji }: Sticker): string {
-    return emoji ? `[Sticker ${emoji}]` : '[Sticker]';
 }
 
 export function sliceMessage(message: string, maxLength: number): string {
@@ -94,10 +88,13 @@ function getGoogleGenAI(): GoogleGenAI {
     return ai;
 }
 
-async function uploadToGoogle(path: string, _name: string, mimeType: string) {
+async function uploadToGoogle(
+    fileData: Uint8Array,
+    name: string,
+    mimeType: string,
+) {
     const googleGenAI = getGoogleGenAI();
-    const fileData = await Deno.readFile(path);
-    const blob = new Blob([fileData], { type: mimeType });
+    const blob = new Blob([new Uint8Array(fileData)], { type: mimeType });
 
     const uploadResult = await googleGenAI.files.upload({
         file: blob,
@@ -122,7 +119,7 @@ async function uploadToGoogle(path: string, _name: string, mimeType: string) {
         throw new Error(
             `Attachment processing failed in Google API: ${errorMessage} ` +
                 `(code=${errorCode}, state=${file.state}, mimeType=${mimeType}, ` +
-                `localName=${_name}, remoteName=${
+                `localName=${name}, remoteName=${
                     file.name ?? uploadResult.name ?? 'unknown'
                 }, ` +
                 `details=${errorDetails})`,
@@ -138,10 +135,18 @@ export async function downloadFile(
     fileId: string,
     mimeType: string,
 ) {
+    const fileData = await downloadTelegramFile(api, token, fileId);
+    return uploadToGoogle(fileData, fileId, mimeType);
+}
+
+async function downloadTelegramFile(
+    api: Api<RawApi>,
+    token: string,
+    fileId: string,
+): Promise<Uint8Array> {
     const filePath = `./tmp/${fileId}`;
     if (await exists(filePath)) {
-        // return encodeBase64(await Deno.readFile(filePath))
-        return uploadToGoogle(filePath, fileId, mimeType);
+        return Deno.readFile(filePath);
     }
 
     const file = await api.getFile(fileId);
@@ -154,8 +159,7 @@ export async function downloadFile(
 
     await Deno.writeFile(filePath, buffer);
 
-    // return encodeBase64(buffer);
-    return uploadToGoogle(filePath, fileId, mimeType);
+    return buffer;
 }
 
 export async function getImageContent(
@@ -163,12 +167,12 @@ export async function getImageContent(
     token: string,
     fileId: string,
     mediaType: string,
-): Promise<ImagePart> {
-    const file = await downloadFile(api, token, fileId, mediaType);
+): Promise<FilePart> {
+    const file = await downloadTelegramFile(api, token, fileId);
 
     return {
-        type: 'image',
-        image: file,
+        type: 'file',
+        data: file,
         mediaType,
     };
 }
@@ -201,6 +205,8 @@ export async function deleteOldFiles(logger: Logger, maxAge: number) {
 
     let deletedCount = 0;
     for await (const file of files) {
+        if (!file.isFile) continue;
+
         const filePath = `./tmp/${file.name}`;
 
         const stat = await Deno.stat(filePath);
@@ -211,11 +217,10 @@ export async function deleteOldFiles(logger: Logger, maxAge: number) {
         if (age > maxAge || stat.mtime === null) {
             try {
                 await Deno.remove(filePath);
+                deletedCount++;
             } catch (error) {
                 logger.warn(`Failed to delete file: ${filePath}`, error);
             }
-
-            deletedCount++;
         }
     }
 
@@ -340,81 +345,4 @@ export function createNameMatcher(names: Array<string | RegExp>) {
     });
 
     return new RegExp(patterns.join('|'), 'gmi');
-}
-
-export function formatReply(
-    m:
-        | ModelMessage
-        | ({ type: 'reply'; text: string; target_ref?: string } | {
-            type: 'react';
-            react: string;
-            target_ref?: string;
-        })[],
-    char?: BotCharacter,
-) {
-    const charName = char?.name ?? 'Slusha';
-    let text = '';
-
-    let content;
-    if (!Array.isArray(m)) {
-        content = m.content;
-    } else {
-        content = m;
-    }
-
-    if (!('content' in m) || m.role === 'assistant') {
-        text += `${charName}:`;
-
-        if (Array.isArray(content)) {
-            content = content.map((c) => {
-                if ('text' in c) {
-                    return {
-                        ...c,
-                        text: '\n' + c.text,
-                    };
-                } else {
-                    return c;
-                }
-            });
-        }
-    }
-
-    if (!Array.isArray(content)) {
-        return '\n    ' + content.trim().replace(/\n/g, '\n    ');
-    }
-
-    text += content.map((c) => {
-        let res = '';
-
-        if (
-            'type' in c &&
-            (c.type === 'text' || c.type === 'image' || c.type === 'file')
-        ) {
-            switch (c.type) {
-                case 'text':
-                    res = c.text;
-                    break;
-                case 'image':
-                    res = `    image: ${c.image}`;
-                    break;
-                case 'file':
-                    res = `    file: ${c.data}`;
-                    break;
-                default:
-                    res = '';
-            }
-        } else {
-            if (c.type === 'reply') {
-                res = `    ${c.text}`;
-            } else if (c.type === 'react') {
-                res = `    [react ${c.react}${
-                    c.target_ref ? ' -> ' + c.target_ref : ''
-                }]`;
-            }
-        }
-
-        return res.replace(/\n/g, '\n    ');
-    }).join('\n');
-
-    return text;
 }

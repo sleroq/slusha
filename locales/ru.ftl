@@ -143,15 +143,4 @@ nepon-3 = подумаю, может потом тебе скажу
 nepon-4 = Чета непон жесткий, попробуй позже
 nepon-5 = откисаю, попробуй позже
 
-# Config widget
-config-open-widget = Открыть виджет настроек
-config-open-global = Открыть глобальную конфигурацию бота
-config-open-chat = Открыть конфигурацию текущего чата
-config-widget-unavailable = Виджет конфигурации сейчас недоступен
-
 # Usage window
-usage-title = Usage window ({ $tier } tier)
-usage-user-window = Per-user
-usage-chat-window = Per-chat
-usage-downgraded = Cost mode is active. Expensive features are disabled and model switched to { $model }.
-usage-normal = Normal mode is active.

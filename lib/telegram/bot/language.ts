@@ -2,6 +2,7 @@ import { Composer, InlineKeyboard } from 'grammy';
 import logger from '../../logger.ts';
 import { replyWithHTML } from '../helpers.ts';
 import { SlushaContext } from '../setup-bot.ts';
+import { ConfigurationService } from '../../configuration-service.ts';
 
 const bot = new Composer<SlushaContext>();
 
@@ -43,7 +44,7 @@ bot.command('language', async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    const memLocale = (await ctx.m.getChat()).locale;
+    const memLocale = (await ctx.chats.getChat(ctx.chat)).locale;
     const current = memLocale ?? await ctx.i18n.getLocale();
     const keyboard = buildLanguageKeyboard(current, userId);
 
@@ -67,16 +68,44 @@ bot.callbackQuery(/set-lang .*/, async (ctx) => {
         if (!allowed.includes(locale)) {
             return ctx.answerCallbackQuery(ctx.t('language-invalid-locale'));
         }
+        const chat = ctx.chat;
+        if (!chat) {
+            return ctx.answerCallbackQuery(ctx.t('language-invalid-locale'));
+        }
 
-        const current = (await ctx.m.getChat()).locale ??
+        let isChatAdmin = chat.type === 'private';
+        if (!ctx.globalRoles.has('bot_admin') && !isChatAdmin) {
+            try {
+                const member = await ctx.api.getChatMember(
+                    chat.id,
+                    ctx.from.id,
+                );
+                isChatAdmin = member.status === 'administrator' ||
+                    member.status === 'creator';
+            } catch (error) {
+                logger.warn(
+                    'Could not check chat admin for language change',
+                    error,
+                );
+            }
+            if (!isChatAdmin) {
+                return ctx.answerCallbackQuery(ctx.t('admin-only'));
+            }
+        }
+
+        const current = (await ctx.chats.getChat(chat)).locale ??
             await ctx.i18n.getLocale();
         if (current === locale) {
             return ctx.answerCallbackQuery(ctx.t('language-already-set'));
         }
 
-        // Persist in chat memory and use for current update
-        await ctx.m.setLocale(locale);
-        await ctx.i18n.useLocale(locale);
+        await new ConfigurationService(ctx.db, ctx.from.id, {
+            globalRoles: ctx.globalRoles,
+            chatId: chat.id,
+            isChatMember: true,
+            isChatAdmin,
+        }).setValue({ scope: 'chat', chatId: chat.id }, 'locale', locale);
+        ctx.i18n.useLocale(locale);
 
         const keyboard = buildLanguageKeyboard(locale, ownerId);
 

@@ -12,7 +12,7 @@ export async function checkAndMaybeRecoverReplyRights(
         return true;
     }
 
-    const chat = await ctx.m.getChat();
+    const chat = await ctx.chats.getChat(chatInfo);
     if (!chat.disableRepliesDueToRights) {
         return true;
     }
@@ -24,7 +24,7 @@ export async function checkAndMaybeRecoverReplyRights(
         return false;
     }
 
-    await ctx.m.setDisabledReplyRightsLastProbeAt(now);
+    await ctx.chatConfig.setDisabledReplyRightsLastProbeAt(now);
 
     try {
         const selfMember = await ctx.api.getChatMember(chatInfo.id, ctx.me.id);
@@ -34,8 +34,8 @@ export async function checkAndMaybeRecoverReplyRights(
             return false;
         }
 
-        await ctx.m.setDisableRepliesDueToRights(false);
-        await ctx.m.setDisabledReplyRightsLastProbeAt(undefined);
+        await ctx.chatConfig.clearDisableRepliesDueToRights();
+        await ctx.chatConfig.clearDisabledReplyRightsLastProbeAt();
         logger.info('Replies re-enabled after weekly rights probe');
         return true;
     } catch (error) {

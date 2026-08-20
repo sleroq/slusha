@@ -1,10 +1,11 @@
 import { assertEquals } from '@std/assert';
-import { Message } from 'grammy_types';
+import type { Message } from 'grammy_types';
 import { ReplyMessage } from './telegram/helpers.ts';
-import { ChatMessage, ReplyTo } from './memory.ts';
+import type { ChatMessage, ReplyTo } from './persistence/types.ts';
 import {
+    historyHasImageAttachments,
+    resolveReplyHistory,
     selectHistoryCandidates,
-    selectHistoryCandidatesV3,
 } from './history.ts';
 
 function createReplyTo(id: number): ReplyTo {
@@ -23,6 +24,7 @@ function createMessage(
         threadId?: string;
         threadRootMessageId?: number;
         messageThreadId?: number;
+        isTopicMessage?: true;
         fromId?: number;
         date?: number;
     },
@@ -44,41 +46,41 @@ function createMessage(
             },
             date: options?.date ?? id,
             message_thread_id: options?.messageThreadId,
+            is_topic_message: options?.isTopicMessage,
         } as unknown as Message,
     };
 }
 
-Deno.test('selectHistoryCandidates includes reply threads and deduplicates', () => {
-    const history: ChatMessage[] = [
-        createMessage(1),
-        createMessage(2, 1),
-        createMessage(3),
-        createMessage(4, 2),
-    ];
+Deno.test('historyHasImageAttachments only sees eligible recent images', () => {
+    const history = Array.from(
+        { length: 12 },
+        (_, index) => createMessage(index + 1),
+    );
+    history[0].info.photo = [{
+        file_id: 'old',
+        file_unique_id: 'old',
+        width: 1,
+        height: 1,
+    }];
 
-    const selected = selectHistoryCandidates(history, {
-        resolveReplyThread: true,
-    });
+    assertEquals(
+        historyHasImageAttachments(history, { messagesLimit: 12 }),
+        false,
+    );
 
-    assertEquals(selected.map((m) => m.msg.id), [4, 2, 1, 3]);
+    history[11].info.photo = [{
+        file_id: 'recent',
+        file_unique_id: 'recent',
+        width: 1,
+        height: 1,
+    }];
+    assertEquals(
+        historyHasImageAttachments(history, { messagesLimit: 12 }),
+        true,
+    );
 });
 
-Deno.test('selectHistoryCandidates respects maxRootMessages', () => {
-    const history: ChatMessage[] = [
-        createMessage(1),
-        createMessage(2),
-        createMessage(3),
-    ];
-
-    const selected = selectHistoryCandidates(history, {
-        resolveReplyThread: false,
-        maxRootMessages: 2,
-    });
-
-    assertEquals(selected.map((m) => m.msg.id), [3, 2]);
-});
-
-Deno.test('selectHistoryCandidatesV3 prioritizes active thread', () => {
+Deno.test('selectHistoryCandidates prioritizes active thread', () => {
     const history: ChatMessage[] = [
         createMessage(1, undefined, {
             threadId: 'thread:1',
@@ -107,25 +109,13 @@ Deno.test('selectHistoryCandidatesV3 prioritizes active thread', () => {
         }),
     ];
 
-    const selected = selectHistoryCandidatesV3(history, {});
+    const selected = selectHistoryCandidates(history, {});
 
     assertEquals(selected.map((m) => m.msg.id), [5, 3, 1, 4, 2]);
 });
 
-Deno.test('selectHistoryCandidatesV3 falls back to V2 without metadata', () => {
-    const history: ChatMessage[] = [
-        createMessage(1),
-        createMessage(2, 1),
-        createMessage(3),
-        createMessage(4, 2),
-    ];
-
-    const selected = selectHistoryCandidatesV3(history, {});
-    assertEquals(selected.map((m) => m.msg.id), [4, 2, 1, 3]);
-});
-
 Deno.test(
-    'selectHistoryCandidatesV3 keeps continuation thread with interleaving chatter',
+    'selectHistoryCandidates keeps continuation thread with interleaving chatter',
     () => {
         const history: ChatMessage[] = [
             createMessage(10, undefined, {
@@ -160,7 +150,7 @@ Deno.test(
             }),
         ];
 
-        const selected = selectHistoryCandidatesV3(history, {
+        const selected = selectHistoryCandidates(history, {
             maxRootMessages: 5,
         });
 
@@ -169,7 +159,7 @@ Deno.test(
 );
 
 Deno.test(
-    'selectHistoryCandidatesV3 groups difficult group reply thread over meme noise',
+    'selectHistoryCandidates groups difficult group reply thread over meme noise',
     () => {
         const history: ChatMessage[] = [
             // userA root thread
@@ -220,7 +210,7 @@ Deno.test(
             }),
         ];
 
-        const selected = selectHistoryCandidatesV3(history, {});
+        const selected = selectHistoryCandidates(history, {});
 
         assertEquals(selected.map((m) => m.msg.id), [
             108,
@@ -236,7 +226,7 @@ Deno.test(
 );
 
 Deno.test(
-    'selectHistoryCandidatesV3 keeps most recent hard thread context under budget',
+    'selectHistoryCandidates keeps most recent hard thread context under budget',
     () => {
         const history: ChatMessage[] = [
             createMessage(201, undefined, {
@@ -281,7 +271,7 @@ Deno.test(
             }),
         ];
 
-        const selected = selectHistoryCandidatesV3(history, {
+        const selected = selectHistoryCandidates(history, {
             maxRootMessages: 6,
         });
 
@@ -297,42 +287,47 @@ Deno.test(
 );
 
 Deno.test(
-    'selectHistoryCandidatesV3 scopes to active telegram topic when anchor provided',
+    'selectHistoryCandidates scopes to active telegram topic when anchor provided',
     () => {
         const history: ChatMessage[] = [
             createMessage(300, undefined, {
                 threadId: 'thread:300',
                 threadRootMessageId: 300,
                 messageThreadId: 77,
+                isTopicMessage: true,
                 fromId: 10,
             }),
             createMessage(301, undefined, {
                 threadId: 'thread:301',
                 threadRootMessageId: 301,
                 messageThreadId: 88,
+                isTopicMessage: true,
                 fromId: 20,
             }),
             createMessage(302, 300, {
                 threadId: 'thread:300',
                 threadRootMessageId: 300,
                 messageThreadId: 77,
+                isTopicMessage: true,
                 fromId: 30,
             }),
             createMessage(303, undefined, {
                 threadId: 'thread:301',
                 threadRootMessageId: 301,
                 messageThreadId: 88,
+                isTopicMessage: true,
                 fromId: 20,
             }),
             createMessage(304, undefined, {
                 threadId: 'thread:300',
                 threadRootMessageId: 300,
                 messageThreadId: 77,
+                isTopicMessage: true,
                 fromId: 40,
             }),
         ];
 
-        const selected = selectHistoryCandidatesV3(history, {
+        const selected = selectHistoryCandidates(history, {
             activeMessageId: 304,
         });
 
@@ -341,7 +336,146 @@ Deno.test(
 );
 
 Deno.test(
-    'selectHistoryCandidatesV3 falls back to latest non-bot anchor when active message is missing',
+    'selectHistoryCandidates keeps root of non-topic supergroup reply thread',
+    () => {
+        const history: ChatMessage[] = [
+            createMessage(571245, undefined, {
+                threadId: 'thread:571245',
+                threadRootMessageId: 571245,
+                fromId: 10,
+            }),
+            createMessage(571274, 571245, {
+                threadId: 'thread:571245',
+                threadRootMessageId: 571245,
+                messageThreadId: 571245,
+                fromId: 20,
+            }),
+            createMessage(571275, 571245, {
+                threadId: 'thread:571245',
+                threadRootMessageId: 571245,
+                messageThreadId: 571245,
+                fromId: 20,
+            }),
+        ];
+
+        const selected = selectHistoryCandidates(history, {
+            activeMessageId: 571275,
+        });
+
+        assertEquals(
+            selected.map((candidate) => candidate.msg.id),
+            [571275, 571274, 571245],
+        );
+    },
+);
+
+Deno.test('resolveReplyHistory hydrates the complete persisted reply chain', async () => {
+    const root = createMessage(500, undefined, {
+        threadId: 'thread:500',
+        threadRootMessageId: 500,
+        date: 1,
+    });
+    const parent = createMessage(520, 500, {
+        threadId: 'thread:500',
+        threadRootMessageId: 500,
+        date: 3,
+    });
+    parent.threadParentMessageId = 500;
+    const active = createMessage(540, 520, {
+        threadId: 'thread:500',
+        threadRootMessageId: 500,
+        date: 5,
+    });
+    active.threadParentMessageId = 520;
+    const unrelated = createMessage(530, undefined, {
+        threadId: 'thread:530',
+        threadRootMessageId: 530,
+        date: 4,
+    });
+    const stored = new Map([
+        [root.id, root],
+        [parent.id, parent],
+    ]);
+
+    const resolved = await resolveReplyHistory(
+        [unrelated, active],
+        active.id,
+        (messageId) => Promise.resolve(stored.get(messageId)),
+    );
+    const selected = selectHistoryCandidates(resolved, {
+        activeMessageId: active.id,
+    });
+
+    assertEquals(resolved.map((message) => message.id), [530, 500, 520, 540]);
+    assertEquals(
+        selected.map((candidate) => candidate.msg.id),
+        [540, 520, 500, 530],
+    );
+});
+
+Deno.test('resolveReplyHistory uses Telegram reply snapshot for an unstored parent', async () => {
+    const active = createMessage(610, 600, {
+        threadId: 'thread:600',
+        threadRootMessageId: 600,
+        date: 2,
+    });
+    active.threadParentMessageId = 600;
+    active.replyTo = {
+        id: 600,
+        text: 'forwarded source',
+        isMyself: false,
+        info: {
+            message_id: 600,
+            date: 1,
+            text: 'forwarded source',
+        } as ReplyMessage,
+    };
+
+    const resolved = await resolveReplyHistory(
+        [active],
+        active.id,
+        () => Promise.resolve(undefined),
+    );
+
+    assertEquals(resolved.map((message) => message.id), [600, 610]);
+    assertEquals(resolved[0].text, 'forwarded source');
+    assertEquals(resolved[0].threadSource, 'reply_snapshot');
+});
+
+Deno.test('resolveReplyHistory inlines replies from every recent message', async () => {
+    const repliedMessage = createMessage(701, 600, {
+        threadId: 'thread:600',
+        threadRootMessageId: 600,
+        date: 2,
+    });
+    repliedMessage.threadParentMessageId = 600;
+    repliedMessage.replyTo = {
+        id: 600,
+        text: 'older replied message',
+        isMyself: false,
+        info: {
+            message_id: 600,
+            date: 1,
+            text: 'older replied message',
+        } as ReplyMessage,
+    };
+    const active = createMessage(702, undefined, {
+        threadId: 'thread:702',
+        threadRootMessageId: 702,
+        date: 3,
+    });
+
+    const resolved = await resolveReplyHistory(
+        [repliedMessage, active],
+        active.id,
+        () => Promise.resolve(undefined),
+    );
+
+    assertEquals(resolved.map((message) => message.id), [600, 701, 702]);
+});
+
+Deno.test(
+    'selectHistoryCandidates falls back to latest non-bot anchor when active message is missing',
     () => {
         const history: ChatMessage[] = [
             createMessage(401, undefined, {
@@ -361,7 +495,7 @@ Deno.test(
             }),
         ];
 
-        const selected = selectHistoryCandidatesV3(history, {
+        const selected = selectHistoryCandidates(history, {
             activeMessageId: 999999,
         });
 

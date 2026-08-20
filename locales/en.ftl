@@ -143,15 +143,4 @@ nepon-3 = I'll think about it, maybe I'll tell you later
 nepon-4 = Something dunno hardcore, try later
 nepon-5 = Chilling, try later
 
-# Config widget
-config-open-widget = Open config widget
-config-open-global = Open global bot configuration
-config-open-chat = Open current chat configuration
-config-widget-unavailable = Config widget is unavailable right now
-
 # Usage window
-usage-title = Usage window ({ $tier } tier)
-usage-user-window = Per-user
-usage-chat-window = Per-chat
-usage-downgraded = Cost mode is active. Expensive features are disabled and model switched to { $model }.
-usage-normal = Normal mode is active.

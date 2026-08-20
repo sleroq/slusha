@@ -5,8 +5,8 @@ import {
     buildTargetRefs,
     buildTargetRefsPrompt,
 } from './target-refs.ts';
-import { ChatMessage } from '../memory.ts';
-import { Message } from 'grammy_types';
+import type { ChatMessage } from '../persistence/types.ts';
+import type { Message } from 'grammy_types';
 
 function createChatMessage(
     id: number,

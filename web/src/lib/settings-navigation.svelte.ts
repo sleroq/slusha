@@ -1,0 +1,37 @@
+import type { ConfigSelection } from './config.ts';
+import type { ScopedSettingsSectionId } from './scoped-settings.ts';
+
+export type SettingsView =
+    | { kind: 'settings' }
+    | { kind: 'chat-selector'; chatType: 'private' | 'group' }
+    | { kind: 'section'; sectionId: ScopedSettingsSectionId }
+    | { kind: 'expanded-editor'; fieldKey: string; sectionId: ScopedSettingsSectionId };
+
+export function createSettingsNavigation(options: {
+    hasPendingSelection: () => boolean;
+    selection: () => ConfigSelection;
+    cancelPendingSelection: () => void;
+    requestSelection: (selection: ConfigSelection) => void;
+}) {
+    let view = $state<SettingsView>({ kind: 'settings' });
+
+    function back() {
+        if (options.hasPendingSelection()) {
+            options.cancelPendingSelection();
+        } else if (view.kind === 'expanded-editor') {
+            view = { kind: 'section', sectionId: view.sectionId };
+        } else if (view.kind === 'section') {
+            view = { kind: 'settings' };
+        } else if (view.kind === 'chat-selector') {
+            view = { kind: 'settings' };
+        } else if (options.selection().scope !== 'personal') {
+            options.requestSelection({ scope: 'personal' });
+        }
+    }
+
+    return {
+        get view() { return view; },
+        set view(next: SettingsView) { view = next; },
+        back,
+    };
+}
