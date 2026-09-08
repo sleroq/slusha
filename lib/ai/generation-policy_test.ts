@@ -121,6 +121,7 @@ Deno.test('resolveGenerationPolicy applies fixed model behavior', () => {
 
     const googlePolicy = resolveGenerationPolicy({
         modelRef: 'gemini-2.5-flash',
+        sessionId: 'test-session',
         config,
         task: 'chat',
         expectsStructuredOutput: false,
@@ -134,6 +135,7 @@ Deno.test('resolveGenerationPolicy applies fixed model behavior', () => {
 
     const openrouterPolicy = resolveGenerationPolicy({
         modelRef: 'openrouter:anthropic/claude-sonnet-4',
+        sessionId: 'test-session',
         config,
         openrouterApiKey: 'test',
         task: 'chat',
@@ -148,6 +150,7 @@ Deno.test('resolveGenerationPolicy applies fixed model behavior', () => {
 
     const opencodePolicy = resolveGenerationPolicy({
         modelRef: 'opencode:kimi-k2.5',
+        sessionId: 'test-session',
         config,
         opencodeToken: 'test',
         task: 'character',
@@ -159,6 +162,7 @@ Deno.test('resolveGenerationPolicy applies fixed model behavior', () => {
 
     const opencodeStructuredPolicy = resolveGenerationPolicy({
         modelRef: 'opencode:kimi-k2.6',
+        sessionId: 'test-session',
         config,
         opencodeToken: 'test',
         task: 'chat',
@@ -168,6 +172,7 @@ Deno.test('resolveGenerationPolicy applies fixed model behavior', () => {
 
     const opencodeAnthropicPolicy = resolveGenerationPolicy({
         modelRef: 'opencode:minimax-m3',
+        sessionId: 'test-session',
         config,
         opencodeToken: 'test',
         task: 'chat',
@@ -176,11 +181,35 @@ Deno.test('resolveGenerationPolicy applies fixed model behavior', () => {
     assertEquals(opencodeAnthropicPolicy.providerOptions, undefined);
 });
 
-Deno.test('resolveGenerationPolicy routes Anthropic models to /messages', async () => {
+Deno.test('OpenCode providers send the session header', async () => {
     const originalFetch = globalThis.fetch;
-    let requestUrl: string | undefined;
-    globalThis.fetch = (input) => {
-        requestUrl = input instanceof Request ? input.url : String(input);
+    const requests: Array<{ url: string; sessionHeader: string | null }> = [];
+    globalThis.fetch = (input, init) => {
+        const request = new Request(input, init);
+        requests.push({
+            url: request.url,
+            sessionHeader: request.headers.get('x-opencode-session'),
+        });
+        if (request.url.endsWith('/chat/completions')) {
+            return Promise.resolve(
+                Response.json({
+                    id: 'chatcmpl_test',
+                    object: 'chat.completion',
+                    created: 0,
+                    model: 'mimo-v2.5',
+                    choices: [{
+                        index: 0,
+                        message: { role: 'assistant', content: 'ok' },
+                        finish_reason: 'stop',
+                    }],
+                    usage: {
+                        prompt_tokens: 1,
+                        completion_tokens: 1,
+                        total_tokens: 2,
+                    },
+                }),
+            );
+        }
         return Promise.resolve(
             new Response(
                 JSON.stringify({
@@ -199,17 +228,36 @@ Deno.test('resolveGenerationPolicy routes Anthropic models to /messages', async 
     };
 
     try {
-        const policy = resolveGenerationPolicy({
-            modelRef: 'opencode:qwen3.7-max',
+        const openaiPolicy = resolveGenerationPolicy({
+            modelRef: 'opencode:mimo-v2.5',
+            sessionId: 'test-session',
             config: getDefaultUserConfig().ai,
             opencodeToken: 'test',
             task: 'chat',
             expectsStructuredOutput: false,
         });
+        await generateText({ model: openaiPolicy.model, prompt: 'hello' });
 
-        await generateText({ model: policy.model, prompt: 'hello' });
+        const anthropicPolicy = resolveGenerationPolicy({
+            modelRef: 'opencode:qwen3.7-max',
+            sessionId: 'test-session',
+            config: getDefaultUserConfig().ai,
+            opencodeToken: 'test',
+            task: 'chat',
+            expectsStructuredOutput: false,
+        });
+        await generateText({ model: anthropicPolicy.model, prompt: 'hello' });
 
-        assertEquals(requestUrl, 'https://opencode.ai/zen/go/v1/messages');
+        assertEquals(requests, [
+            {
+                url: 'https://opencode.ai/zen/go/v1/chat/completions',
+                sessionHeader: 'test-session',
+            },
+            {
+                url: 'https://opencode.ai/zen/go/v1/messages',
+                sessionHeader: 'test-session',
+            },
+        ]);
     } finally {
         globalThis.fetch = originalFetch;
     }

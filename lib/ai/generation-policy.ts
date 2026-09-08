@@ -48,6 +48,7 @@ export interface ModelCapabilities {
 
 interface GenerationPolicyInput {
     modelRef: string;
+    sessionId: string;
     config: UserConfig['ai'];
     openrouterApiKey?: string;
     opencodeToken?: string;
@@ -180,11 +181,13 @@ function createOpenRouterModel(
 function createOpencodeModel(
     modelId: string,
     apiKey: string | undefined,
+    sessionId: string,
 ): LanguageModel {
     const opencodeProvider = createOpenAICompatible({
         name: 'opencode',
         apiKey,
         baseURL: OPENCODE_BASE_URL,
+        headers: { 'x-opencode-session': sessionId },
     });
 
     return opencodeProvider.chatModel(modelId);
@@ -193,11 +196,13 @@ function createOpencodeModel(
 function createOpencodeAnthropicModel(
     modelId: string,
     apiKey: string,
+    sessionId: string,
 ): LanguageModel {
     const opencodeProvider = createAnthropic({
         name: 'opencode.anthropic',
         apiKey,
         baseURL: OPENCODE_BASE_URL,
+        headers: { 'x-opencode-session': sessionId },
     });
 
     return opencodeProvider.messages(modelId);
@@ -251,9 +256,14 @@ export function resolveGenerationPolicy(
             model = createOpencodeAnthropicModel(
                 parsed.modelId,
                 input.opencodeToken,
+                input.sessionId,
             );
         } else {
-            model = createOpencodeModel(parsed.modelId, input.opencodeToken);
+            model = createOpencodeModel(
+                parsed.modelId,
+                input.opencodeToken,
+                input.sessionId,
+            );
             const usesForcedTool = input.expectsStructuredOutput &&
                 capabilities.structuredOutputMode === 'tool';
             if (!usesForcedTool) {

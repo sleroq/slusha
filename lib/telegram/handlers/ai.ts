@@ -508,10 +508,16 @@ export function createAIMiddleware(bot: Bot<SlushaContext>) {
             activeMembers = await ctx.members.getActiveMembers();
         }
 
+        let generationSessionId = `slusha:telegram:${ctx.chat.id}`;
+        if (activeMessageThreadId !== undefined) {
+            generationSessionId += `:topic:${activeMessageThreadId}`;
+        }
+
         let generationPolicy: ReturnType<typeof resolveGenerationPolicy>;
         try {
             generationPolicy = resolveGenerationPolicy({
                 modelRef,
+                sessionId: generationSessionId,
                 config: effectiveConfig.ai,
                 openrouterApiKey: ctx.info.openrouterApiKey,
                 opencodeToken: ctx.info.opencodeToken,

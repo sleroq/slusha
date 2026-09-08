@@ -454,6 +454,8 @@ bot.callbackQuery(/set.*/, async (ctx) => {
     try {
         const generationPolicy = resolveGenerationPolicy({
             modelRef: model,
+            sessionId:
+                `slusha:telegram:${chatId}:character-names:${characterId}`,
             config,
             openrouterApiKey: ctx.info.openrouterApiKey,
             opencodeToken: ctx.info.opencodeToken,
