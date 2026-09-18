@@ -86,9 +86,15 @@ export const configSchema = z.object({
 export type UserConfig = z.infer<typeof configSchema>;
 
 export class ConfigValidationError extends Error {
-    constructor(message: string, options?: ErrorOptions) {
+    readonly key?: string;
+
+    constructor(
+        message: string,
+        options?: ErrorOptions & { key?: string },
+    ) {
         super(message, options);
         this.name = 'ConfigValidationError';
+        this.key = options?.key;
     }
 }
 const config = configSchema.extend({
@@ -155,7 +161,9 @@ export function deserializeConfigEntryValue(
         return value;
     }
     if (!Array.isArray(value)) {
-        throw new ConfigValidationError(`Invalid config value for ${key}`);
+        throw new ConfigValidationError(`Invalid config value for ${key}`, {
+            key,
+        });
     }
 
     try {
@@ -172,13 +180,15 @@ export function deserializeConfigEntryValue(
                     flags: item.flags,
                 });
             }
-            throw new ConfigValidationError(`Invalid config value for ${key}`);
+            throw new ConfigValidationError(`Invalid config value for ${key}`, {
+                key,
+            });
         });
     } catch (error) {
         if (error instanceof ConfigValidationError) throw error;
         throw new ConfigValidationError(
             `Invalid config value for ${key}`,
-            { cause: error },
+            { key, cause: error },
         );
     }
 }
@@ -268,7 +278,9 @@ export function validateConfigEntryValue(
     const defaults = getStoredDefaults();
     const policy = getConfigOptionPolicy(key);
     if (!policy || (scope !== undefined && !policy[scope])) {
-        throw new ConfigValidationError(`Unsupported config key: ${key}`);
+        throw new ConfigValidationError(`Unsupported config key: ${key}`, {
+            key,
+        });
     }
     if (
         key === 'ai.imageAttachmentFallbackModel' &&
@@ -276,6 +288,7 @@ export function validateConfigEntryValue(
     ) {
         throw new ConfigValidationError(
             'Image attachment fallback model must support images',
+            { key },
         );
     }
 
@@ -285,7 +298,7 @@ export function validateConfigEntryValue(
     if (!parsed.success) {
         throw new ConfigValidationError(
             `Invalid config value for ${key}`,
-            { cause: parsed.error },
+            { key, cause: parsed.error },
         );
     }
 }

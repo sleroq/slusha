@@ -1,42 +1,74 @@
-# sv
+# Slusha Mini App
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A client-rendered Solid 2 application for Telegram, served by the existing Deno
+backend. The interface uses Telegram theme/safe-area tokens and shared controls
+from `@slusha/mini-app`.
 
-## Creating a project
+## Development
 
-If you're seeing this, you've probably already done this step. Congrats!
+Use Deno 2.9+ and Node 24. Oxlint's TypeScript configuration and JavaScript plugin
+host require a recent Node runtime.
 
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
+From the repository root:
 
 ```sh
-# recreate this project
-deno run npm:sv@0.16.3 create --template minimal --types ts --add eslint tailwindcss="plugins:forms" sveltekit-adapter="adapter:static" --install deno web
+deno install --frozen
+cd web
+deno task dev
 ```
 
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Launch the app through Telegram for authenticated development. Set
+`WEB_DEV_SERVER_URL=http://127.0.0.1:5173` on the bot server to proxy frontend
+requests to Vite while keeping `/api/config` on the real backend. Opening Vite
+directly without Telegram launch data is not an authentication bypass.
 
 ```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+deno task check
+deno task lint
+deno task test:install  # First time: install Chromium and WebKit
+deno task test
+deno task build
 ```
 
-## Building
+The build produces `web/build`, matching the Dockerfile and Deno static server.
+The server supports direct SPA route loads, revalidates HTML, and caches Vite's
+hashed `/assets/` immutably. `deno task preview` is for local build inspection;
+it does not supply a backend or Telegram authentication.
 
-To create a production version of your app:
+## Ownership
 
-```sh
-npm run build
-```
+- `src/app`: application composition, routes, navigation guards, titles, scroll,
+  and the policy for Telegram Back/Main buttons.
+- `src/features/settings`: API transport, query and mutation policy, editable
+  drafts, validation feedback, settings sections, and specialized editors.
+- `../packages/mini-app`: shared UI primitives, styles, and the Telegram host
+  adapter. It does not import Slusha settings, routes, or API contracts.
+- `../shared/config-contract.ts`: browser-safe Zod Mini wire schemas and inferred
+  types shared with the backend. Successful PUTs return the canonical snapshot.
 
-You can preview the production build with `npm run preview`.
+TanStack Solid Query owns server caching; drafts are separate and never replace
+the cache while typing. A background refresh cannot overwrite dirty work. Scope
+navigation guards apply to browser history as well as in-app and native Back.
+Routes and cache invalidation policy remain application-owned, not library APIs.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## Tooling and tests
+
+The Solid runtime, DOM renderer, compiler, router, and query adapter are pinned
+to compatible Solid 2 prereleases. Upgrade them as a cohort and verify an actual
+production render, not just types.
+
+Oxlint uses the official
+[`solid-v2/basic` template](https://github.com/solidjs/templates/tree/main/solid-v2/basic)
+configuration with `eslint-plugin-solid/configs/v2`. Strict TypeScript checking
+is separate; Solid diagnostics are enabled only outside production. Tailwind and
+its forms plugin run at build time.
+
+Playwright exercises the whole rendered application with intercepted API
+responses and a test-only Telegram host. There are no component unit tests or
+production mock-auth paths. The browser harness lives under `tests/` and is not
+a production build entry point.
+
+The shared development guidance and device checklist are in
+[`docs/mini-apps/SKILL.md`](../docs/mini-apps/SKILL.md). Automated WebKit/Chromium
+checks do not replace a Telegram iOS/Android smoke test for native controls,
+keyboard resizing, gestures, and safe areas.

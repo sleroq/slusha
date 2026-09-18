@@ -5,7 +5,8 @@
 /out/
 /tmp/
 /backups/
-/node_modules/
-/docs/
+node_modules/
+/docs/*
+!/docs/mini-apps/
 /.envrc
 /.direnv/

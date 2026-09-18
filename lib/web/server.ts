@@ -5,12 +5,12 @@ import {
 import type { Config } from '../config.ts';
 import logger from '../logger.ts';
 import { type Route, route } from '@std/http/unstable-route';
-import { serveDir } from '@std/http/file-server';
+import { serveDir, serveFile } from '@std/http/file-server';
 import { createConfigHandler } from './config-handler.ts';
 
 function createRoutes(botToken: string, devServerUrl?: string): Route[] {
     const configHandler = createConfigHandler(botToken);
-    const frontendHandler = (req: Request) => {
+    const frontendHandler = async (req: Request) => {
         if (devServerUrl) {
             const requestUrl = new URL(req.url);
             const targetUrl = new URL(
@@ -31,7 +31,32 @@ function createRoutes(botToken: string, devServerUrl?: string): Route[] {
             );
         }
 
-        return serveDir(req, { fsRoot: './web/build' });
+        let response = await serveDir(req, {
+            fsRoot: './web/build',
+            quiet: true,
+        });
+        const pathname = new URL(req.url).pathname;
+        if (
+            response.status === 404 &&
+            (req.method === 'GET' || req.method === 'HEAD') &&
+            req.headers.get('accept')?.includes('text/html') &&
+            !pathname.startsWith('/api/') &&
+            !pathname.startsWith('/assets/')
+        ) {
+            await response.body?.cancel();
+            response = await serveFile(req, './web/build/index.html');
+        }
+        if (response.ok) {
+            if (response.headers.get('content-type')?.includes('text/html')) {
+                response.headers.set('cache-control', 'no-cache');
+            } else if (pathname.startsWith('/assets/')) {
+                response.headers.set(
+                    'cache-control',
+                    'public, max-age=31536000, immutable',
+                );
+            }
+        }
+        return response;
     };
 
     return [

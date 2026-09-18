@@ -15,6 +15,14 @@ import {
     type UserConfig,
     validateConfigEntryValue,
 } from './config.ts';
+import type {
+    ConfigEditor,
+    ConfigOperation,
+} from '../shared/config-contract.ts';
+export type {
+    ConfigEditor,
+    ConfigOperation,
+} from '../shared/config-contract.ts';
 import type { DbClient } from './db/client.ts';
 import { ConfigEntryRepository } from './persistence/config-entries.ts';
 import { modelSupportsImageInput } from './ai/model-catalog.ts';
@@ -29,20 +37,6 @@ export class ConfigPermissionError extends Error {
 export type ConfigTarget =
     | { scope: 'global' }
     | { scope: 'chat'; chatId: number };
-
-export type ConfigOperation =
-    | { key: string; value: unknown; reset?: false }
-    | { key: string; reset: true };
-
-export type ConfigEditor =
-    | { kind: 'boolean'; optional?: boolean }
-    | { kind: 'number'; optional?: boolean }
-    | { kind: 'range'; min: number; max: number; step: number; unit?: string }
-    | { kind: 'text'; multiline?: boolean; optional?: boolean }
-    | { kind: 'select'; options: string[]; optional?: boolean }
-    | { kind: 'matcher-list' }
-    | { kind: 'string-list' }
-    | { kind: 'object-list'; keys: string[] };
 
 const text = { kind: 'text' } as const;
 const multiline = { kind: 'text', multiline: true } as const;
@@ -222,7 +216,7 @@ export class ConfigurationService {
     ) {
         const runtimeOperations = operations.map((operation) => {
             this.assertAllowed(operation.key, target, 'write');
-            if (operation.reset) {
+            if ('reset' in operation) {
                 return operation;
             }
             const value = deserializeConfigEntryValue(
@@ -244,7 +238,7 @@ export class ConfigurationService {
         );
         await this.db.transaction(async (tx) => {
             for (const operation of runtimeOperations) {
-                if (operation.reset) {
+                if ('reset' in operation) {
                     await entries.resetRawValueInTx(
                         tx,
                         operation.key,

@@ -1,6 +1,13 @@
 import { createClient } from '@libsql/client';
 import { assert, assertEquals, assertRejects } from '@std/assert';
 import { sign } from '@tma.js/init-data-node';
+import {
+    type ApiErrorResponse,
+    apiErrorSchema,
+    configResponseSchema,
+    updateConfigSchema,
+} from '../../shared/config-contract.ts';
+import { CONFIG_CONTRACT_VERSION } from '../../shared/config-contract-version.ts';
 import { createConfigHandler } from './config-handler.ts';
 
 Deno.test('config handler validates, serializes, and commits atomically', async () => {
@@ -96,7 +103,9 @@ Deno.test('config handler validates, serializes, and commits atomically', async 
             }),
         );
         assertEquals(getResponse.status, 200);
+        assertEquals(getResponse.headers.get('cache-control'), 'no-store');
         const body = await getResponse.json();
+        assertEquals(body.contractVersion, CONFIG_CONTRACT_VERSION);
         assert(Array.isArray(body.fields));
         const matchers = body.fields.find(
             (field: { key?: string }) => field.key === 'tendToIgnore',
@@ -152,6 +161,46 @@ Deno.test('config handler validates, serializes, and commits atomically', async 
             }),
         );
         assertEquals(invalidBody.status, 400);
+        assertEquals(
+            apiErrorSchema.parse(await invalidBody.json()),
+            {
+                contractVersion: CONFIG_CONTRACT_VERSION,
+                message: 'Invalid settings request',
+            },
+        );
+
+        assertEquals(
+            updateConfigSchema.safeParse({
+                scope: 'global',
+                operations: [{ key: 'locale' }],
+            }).success,
+            false,
+        );
+        const invalidShapeBodies = [
+            {
+                scope: 'global',
+                operations: [{ key: 'locale' }],
+            },
+            {
+                scope: 'global',
+                operations: [{ key: 'locale', reset: true, value: 'en' }],
+            },
+            {
+                scope: 'global',
+                chatId: Number.MAX_SAFE_INTEGER + 1,
+                operations: [{ key: 'locale', value: 'en' }],
+            },
+        ];
+        for (const body of invalidShapeBodies) {
+            const response = await handler(
+                new Request('http://localhost/api/config', {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify(body),
+                }),
+            );
+            assertEquals(response.status, 400);
+        }
 
         const personalUpdate = await handler(
             new Request('http://localhost/api/config', {
@@ -167,17 +216,28 @@ Deno.test('config handler validates, serializes, and commits atomically', async 
             }),
         );
         assertEquals(personalUpdate.status, 200);
+        const personalUpdateBody = configResponseSchema.parse(
+            await personalUpdate.json(),
+        );
+        assertEquals(
+            personalUpdateBody.contractVersion,
+            CONFIG_CONTRACT_VERSION,
+        );
         const personalResponse = await handler(
             new Request('http://localhost/api/config?scope=personal', {
                 headers,
             }),
         );
         assertEquals(personalResponse.status, 200);
-        const personal = await personalResponse.json();
+        const personal = configResponseSchema.parse(
+            await personalResponse.json(),
+        );
+        assertEquals(personalUpdateBody, personal);
         assertEquals(personal.fields, [{
             key: 'profile.about',
             kind: 'text',
             multiline: true,
+            maxLength: 4000,
             value: 'I prefer concise answers.',
             overridden: true,
             writable: true,
@@ -197,6 +257,14 @@ Deno.test('config handler validates, serializes, and commits atomically', async 
             }),
         );
         assertEquals(partialBatch.status, 400);
+        const partialError: ApiErrorResponse = apiErrorSchema.parse(
+            await partialBatch.json(),
+        );
+        assertEquals(partialError.contractVersion, CONFIG_CONTRACT_VERSION);
+        assertEquals(
+            partialError.fieldErrors?.['ai.temperature'],
+            'Invalid config value for ai.temperature',
+        );
         assertEquals(
             (await client.execute(
                 "SELECT * FROM config_entries WHERE scope_key = 'global'",
@@ -227,6 +295,57 @@ Deno.test('config handler validates, serializes, and commits atomically', async 
             }),
         );
         assertEquals(trustedUpdate.status, 200);
+        const trustedUpdateBody = configResponseSchema.parse(
+            await trustedUpdate.json(),
+        );
+        assertEquals(
+            trustedUpdateBody.contractVersion,
+            CONFIG_CONTRACT_VERSION,
+        );
+        assertEquals(
+            trustedUpdateBody.fields.find((field) =>
+                field.key === 'ai.temperature'
+            )?.value,
+            1,
+        );
+
+        await client.execute({
+            sql: 'INSERT INTO chats (id, info) VALUES (?, ?)',
+            args: [1, JSON.stringify({ type: 'private', first_name: 'Admin' })],
+        });
+        for (
+            const operation of [
+                { key: 'ai.temperature', value: 1.25 },
+                { key: 'ai.temperature', reset: true },
+            ]
+        ) {
+            const chatUpdate = await handler(
+                new Request('http://localhost/api/config', {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify({
+                        scope: 'private',
+                        chatId: 1,
+                        operations: [operation],
+                    }),
+                }),
+            );
+            assertEquals(chatUpdate.status, 200);
+            const chat = configResponseSchema.parse(await chatUpdate.json());
+            assertEquals(chat.scope, 'private');
+            assertEquals(chat.chatId, 1);
+            const temperature = chat.fields.find((field) =>
+                field.key === 'ai.temperature'
+            );
+            assertEquals(temperature?.inheritedValue, 1);
+            if ('reset' in operation) {
+                assertEquals(temperature?.value, 1);
+                assertEquals(temperature?.overridden, false);
+            } else {
+                assertEquals(temperature?.value, 1.25);
+                assertEquals(temperature?.overridden, true);
+            }
+        }
 
         await client.execute('DROP TABLE chats');
         await assertRejects(() =>

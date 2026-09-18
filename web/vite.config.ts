@@ -1,23 +1,18 @@
 import tailwindcss from '@tailwindcss/vite';
-import adapter from '@sveltejs/adapter-static';
-import { sveltekit } from '@sveltejs/kit/vite';
+import solid from '@solidjs/vite-plugin';
 import { defineConfig } from 'vite';
 
-export default defineConfig({
-	server: {
-		hmr: {
-			host: '127.0.0.1',
-			clientPort: 5173
-		}
-	},
-	plugins: [
-		tailwindcss(),
-		sveltekit({
-			compilerOptions: {
-				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
-				runes: ({ filename }) => filename.split(/[/\\]/).includes('node_modules') ? undefined : true
-			},
-			adapter: adapter()
-		})
-	]
-});
+export default defineConfig(({ mode }) => ({
+    plugins: [tailwindcss(), solid({ diagnostics: mode !== 'production' })],
+    publicDir: 'static',
+    server: {
+        hmr: { host: '127.0.0.1', clientPort: 5173 },
+    },
+    resolve: {
+        dedupe: ['solid-js', '@solidjs/web'],
+    },
+    build: {
+        outDir: 'build',
+        emptyOutDir: true,
+    },
+}));

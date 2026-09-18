@@ -1,0 +1,26 @@
+{
+    "name": "@slusha/mini-app",
+    "private": true,
+    "version": "0.0.1",
+    "type": "module",
+    "sideEffects": ["**/*.css"],
+    "exports": {
+        ".": "./src/index.ts",
+        "./ui": "./src/ui/index.ts",
+        "./telegram": "./src/telegram.ts",
+        "./styles": "./src/styles.css"
+    },
+    "dependencies": {
+        "@tma.js/sdk": "3.3.0"
+    },
+    "devDependencies": {
+        "@solidjs/web": "2.0.0-rc.8",
+        "solid-js": "2.0.0-rc.8"
+    },
+    "peerDependencies": {
+        "@tailwindcss/forms": "^0.5.11",
+        "tailwindcss": "^4.3.3",
+        "solid-js": "2.0.0-rc.8",
+        "@solidjs/web": "2.0.0-rc.8"
+    }
+}

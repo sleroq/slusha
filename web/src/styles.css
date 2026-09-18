@@ -1,0 +1,303 @@
+@import '@slusha/mini-app/styles';
+
+.app-shell {
+    max-width: 42rem;
+    min-height: 100dvh;
+    margin: 0 auto;
+    padding-bottom: 7rem;
+}
+.app-header {
+    position: relative;
+    display: flex;
+    min-height: 3.5rem;
+    align-items: center;
+    justify-content: center;
+}
+.app-header h1 {
+    font-size: 1.05rem;
+}
+.back-button {
+    position: absolute;
+    left: 0;
+    font-size: 1rem;
+}
+.section-heading {
+    margin: 1.25rem .75rem .5rem;
+    color: var(--tg-theme-section-header-text-color,
+        var(--tg-theme-accent-text-color, #3390ec));
+    font-size: .8rem;
+    text-transform: uppercase;
+}
+.setting-row {
+    padding: 1rem;
+    border-top: 1px solid var(--app-separator-color);
+}
+.setting-row:first-child {
+    border-top: 0;
+}
+.setting-row.dirty {
+    box-shadow: inset 3px 0 var(--tg-theme-accent-text-color, #3390ec);
+}
+.setting-label {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .65rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+.setting-label i {
+    width: .45rem;
+    height: .45rem;
+    border-radius: 50%;
+    background: var(--tg-theme-link-color, #3390ec);
+}
+.reset-button {
+    margin-left: auto;
+    border: 0;
+    background: none;
+    color: var(--tg-theme-link-color, #3390ec);
+    font-size: 1.3rem;
+}
+.setting-row input,
+.setting-row textarea,
+.chat-picker input {
+    width: 100%;
+    border: 0;
+    border-radius: .75rem;
+    background: var(--tg-theme-secondary-bg-color, #f2f3f5);
+    padding: .7rem;
+}
+.setting-row textarea {
+    min-height: 10rem;
+    resize: vertical;
+}
+.row .field textarea,
+.editor-row input:not(.slider),
+.editor-row textarea {
+    width: 100%;
+    border: 0;
+    border-radius: .75rem;
+    background: var(--tg-theme-secondary-bg-color, #f2f3f5);
+    padding: .7rem;
+}
+.editor-row textarea {
+    min-height: 12rem;
+    resize: vertical;
+}
+.hint,
+.refreshing {
+    color: var(--tg-theme-hint-color, #707579);
+    font-size: .8rem;
+}
+.reset-pending {
+    color: var(--tg-theme-hint-color, #707579);
+}
+.empty {
+    padding: 2rem;
+    text-align: center;
+    color: var(--tg-theme-hint-color, #707579);
+}
+.settings-loading {
+    display: grid;
+    gap: 1.25rem;
+}
+.settings-loading .surface {
+    display: grid;
+}
+.skeleton-row {
+    display: flex;
+    min-height: 3.5rem;
+    align-items: center;
+}
+.skeleton-about {
+    display: grid;
+    gap: .75rem;
+    min-height: 15rem;
+    align-content: start;
+}
+.skeleton {
+    display: block;
+    border-radius: .5rem;
+    background: var(--tg-theme-secondary-bg-color, #f2f3f5);
+    animation: skeleton-pulse 1.2s ease-in-out infinite alternate;
+}
+.skeleton-label {
+    width: 55%;
+    height: 1rem;
+}
+.skeleton-area {
+    width: 100%;
+    min-height: 10rem;
+}
+.skeleton-wide {
+    width: 72%;
+    height: 1rem;
+}
+.skeleton-medium {
+    width: 48%;
+    height: 1rem;
+}
+@keyframes skeleton-pulse {
+    from {
+        opacity: .55;
+    }
+    to {
+        opacity: 1;
+    }
+}
+.save-bar {
+    position: fixed;
+    right: max(1rem, var(--app-safe-right));
+    bottom: var(--app-safe-bottom);
+    left: max(1rem, var(--app-safe-left));
+    z-index: 5;
+}
+.save-button {
+    display: block;
+    min-height: 3.5rem;
+    width: min(100%, 42rem);
+    margin: 0 auto;
+    border: 0;
+    border-radius: 999px;
+    padding: .75rem 1.25rem;
+    font-weight: 600;
+    box-shadow: 0 4px 16px #0003;
+}
+.dialog-actions {
+    display: grid;
+    flex-shrink: 0;
+    gap: .5rem;
+    padding: 1rem;
+}
+.dialog-actions button {
+    min-height: 3rem;
+    border: 0;
+    border-radius: 999px;
+    padding: .5rem 1rem;
+}
+.dialog-sheet > p {
+    padding: 0 1rem;
+    color: var(--tg-theme-hint-color, #707579);
+}
+.editor-row {
+    display: grid;
+    gap: .75rem;
+}
+.editor-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+.editor-row fieldset,
+.setting-row fieldset {
+    min-width: 0;
+    margin: 0;
+    border: 0;
+    padding: 0;
+}
+.reset-cancel {
+    font-size: .8rem;
+}
+.view-enter {
+    animation: view-enter .12s ease-out;
+}
+@keyframes view-enter {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+.chat-picker {
+    display: grid;
+    gap: .5rem;
+    max-height: 60dvh;
+    overflow: auto;
+    padding: .5rem 1rem 1rem;
+}
+.chat-picker button {
+    border: 0;
+    border-top: 1px solid var(--app-separator-color);
+    background: none;
+    padding: 1rem 0;
+    text-align: left;
+}
+.range-field output {
+    display: block;
+    margin-bottom: .25rem;
+    color: var(--tg-theme-link-color, #3390ec);
+    text-align: right;
+}
+.list-preview {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    border: 0;
+    border-radius: .75rem;
+    background: var(--tg-theme-secondary-bg-color, #f2f3f5);
+    padding: .7rem;
+    text-align: left;
+    color: var(--tg-theme-hint-color, #707579);
+}
+.list-editor {
+    display: grid;
+    gap: .75rem;
+}
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+}
+.chips span {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: .25rem;
+    border-radius: 99px;
+    background: var(--tg-theme-secondary-bg-color, #f2f3f5);
+    padding: .25rem .35rem .25rem .65rem;
+    font-size: .8rem;
+}
+.chips button {
+    border: 0;
+    background: none;
+}
+.add-row {
+    display: flex;
+    gap: .5rem;
+}
+.add-row input {
+    min-width: 0;
+    flex: 1;
+}
+.add-row button {
+    border: 0;
+    border-radius: .75rem;
+    padding: .5rem .75rem;
+}
+.object-editor {
+    display: grid;
+    gap: .5rem;
+}
+.object-row {
+    display: flex;
+    gap: .5rem;
+    padding: .5rem;
+    border-radius: .75rem;
+    background: var(--tg-theme-secondary-bg-color, #f2f3f5);
+}
+.object-row > div {
+    flex: 1;
+}
+.object-row input {
+    margin: .2rem 0;
+    background: var(--tg-theme-bg-color, #fff);
+}
+.object-row button {
+    border: 0;
+    background: none;
+}

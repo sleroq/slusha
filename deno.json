@@ -35,7 +35,6 @@
         "@std/http/unstable-route": "jsr:@std/http@^1.1.3/unstable-route",
         "@std/http/file-server": "jsr:@std/http@^1.1.3/file-server",
         "@tma.js/init-data-node": "npm:@tma.js/init-data-node@^2.0.8",
-        "@tma.js/sdk-svelte": "npm:@tma.js/sdk-svelte@^1.0.23",
         "ai": "npm:ai@^7.0.22",
         "@ai-sdk/google": "npm:@ai-sdk/google@^4.0.12",
         "@ai-sdk/openai-compatible": "npm:@ai-sdk/openai-compatible@^3.0.7",
@@ -67,5 +66,5 @@
             "npm:protobufjs@7.6.5"
         ]
     },
-    "workspace": ["./web/"]
+    "workspace": ["./web/", "./packages/mini-app/"]
 }

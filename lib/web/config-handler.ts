@@ -2,6 +2,14 @@ import { eq } from 'drizzle-orm';
 import { Api, GrammyError } from 'grammy';
 import { z } from 'zod';
 import {
+    type ApiErrorResponse,
+    type ConfigChat,
+    type ConfigOperation,
+    type ConfigScope,
+    updateConfigSchema,
+} from '../../shared/config-contract.ts';
+import { CONFIG_CONTRACT_VERSION } from '../../shared/config-contract-version.ts';
+import {
     canAccessConfig,
     type ConfigAccessContext,
     configOptionPolicies,
@@ -9,7 +17,6 @@ import {
 } from '../config-access.ts';
 import { chatScopeKey, ConfigValidationError } from '../config.ts';
 import {
-    type ConfigOperation,
     ConfigPermissionError,
     type ConfigTarget,
     ConfigurationService,
@@ -25,38 +32,7 @@ import {
 } from '../persistence/user-profile.ts';
 import { withTelegramAuth } from './telegram-auth.ts';
 
-type UiScope = 'personal' | 'private' | 'group' | 'global';
-type ChatOption = {
-    id: number;
-    title: string;
-    type: 'private' | 'group';
-};
-
-const operationSchema = z.object({
-    key: z.string().min(1).max(200),
-    value: z.unknown().optional(),
-    reset: z.boolean().optional(),
-}).strict().superRefine((operation, context) => {
-    const hasValue = Object.hasOwn(operation, 'value');
-    if (operation.reset === true && hasValue) {
-        context.addIssue({
-            code: 'custom',
-            message: 'Reset operations cannot include a value',
-        });
-    }
-    if (operation.reset !== true && !hasValue) {
-        context.addIssue({
-            code: 'custom',
-            message: 'Set operations require a value',
-        });
-    }
-});
-
-const updateConfigSchema = z.object({
-    scope: z.enum(['personal', 'private', 'group', 'global']),
-    chatId: z.number().int().safe().optional(),
-    operations: z.array(operationSchema).min(1).max(100),
-}).strict();
+const personalAboutMaxLength = 4000;
 
 const chatInfoSchema = z.object({
     type: z.string(),
@@ -66,18 +42,35 @@ const chatInfoSchema = z.object({
     username: z.string().optional(),
 });
 
-function isUiScope(value: string | null): value is UiScope {
+function isUiScope(value: string | null): value is ConfigScope {
     return value === 'personal' || value === 'private' || value === 'group' ||
         value === 'global';
 }
 
-function json(body: unknown) {
+function json(body: unknown, status = 200) {
     return new Response(JSON.stringify(body), {
-        headers: { 'content-type': 'application/json' },
+        status,
+        headers: {
+            'content-type': 'application/json',
+            'cache-control': 'no-store',
+        },
     });
 }
 
-function chatOption(row: { id: number; info: string }): ChatOption {
+function configError(
+    message: string,
+    status: number,
+    fieldErrors?: Record<string, string>,
+) {
+    const body: ApiErrorResponse = {
+        contractVersion: CONFIG_CONTRACT_VERSION,
+        message,
+    };
+    if (fieldErrors) body.fieldErrors = fieldErrors;
+    return json(body, status);
+}
+
+function chatOption(row: { id: number; info: string }): ConfigChat {
     const info = chatInfoSchema.parse(JSON.parse(row.info));
     let title = info.title;
     if (!title) {
@@ -86,7 +79,7 @@ function chatOption(row: { id: number; info: string }): ChatOption {
     if (!title) title = info.username;
     if (!title) title = String(row.id);
 
-    let type: ChatOption['type'] = 'group';
+    let type: ConfigChat['type'] = 'group';
     if (info.type === 'private') type = 'private';
     return { id: row.id, title, type };
 }
@@ -127,32 +120,24 @@ export function createConfigHandler(botToken: string) {
 
         const url = new URL(request.url);
         const requestedScope = url.searchParams.get('scope');
-        let scope: UiScope | null = null;
+        let scope: ConfigScope | null = null;
         if (isUiScope(requestedScope)) scope = requestedScope;
         let chatId = Number(url.searchParams.get('chatId'));
+        let selection: Awaited<ReturnType<typeof selectTarget>> | undefined;
 
         if (request.method === 'PUT') {
             let input: unknown;
             try {
                 input = await request.json();
             } catch {
-                return new Response('Invalid JSON body', { status: 400 });
+                return configError('Invalid JSON body', 400);
             }
             const parsed = updateConfigSchema.safeParse(input);
             if (!parsed.success) {
-                return new Response('Invalid settings request', {
-                    status: 400,
-                });
+                return configError('Invalid settings request', 400);
             }
             const body = parsed.data;
-            const operations: ConfigOperation[] = body.operations.map(
-                (operation) => {
-                    if (operation.reset === true) {
-                        return { key: operation.key, reset: true };
-                    }
-                    return { key: operation.key, value: operation.value };
-                },
-            );
+            const operations: ConfigOperation[] = body.operations;
             scope = body.scope;
             chatId = body.chatId ?? 0;
 
@@ -160,14 +145,17 @@ export function createConfigHandler(botToken: string) {
                 if (
                     operations.some((operation) =>
                         operation.key !== personalAboutKey ||
-                        (!operation.reset &&
+                        (!('reset' in operation) &&
                             (typeof operation.value !== 'string' ||
-                                operation.value.length > 4000))
+                                operation.value.length >
+                                    personalAboutMaxLength))
                     )
                 ) {
-                    return new Response('Invalid personal settings', {
-                        status: 400,
-                    });
+                    return configError(
+                        'Invalid personal settings',
+                        400,
+                        personalFieldErrors(operations),
+                    );
                 }
                 const entries = new ConfigEntryRepository(
                     db,
@@ -176,7 +164,7 @@ export function createConfigHandler(botToken: string) {
                 );
                 await db.transaction(async (tx) => {
                     for (const operation of operations) {
-                        if (operation.reset) {
+                        if ('reset' in operation) {
                             await entries.resetRawValueInTx(
                                 tx,
                                 operation.key,
@@ -192,53 +180,52 @@ export function createConfigHandler(botToken: string) {
                         }
                     }
                 });
-                return json({ ok: true });
-            }
-
-            const selection = await selectTarget(
-                scope,
-                chatId,
-                chats,
-                isBotAdmin,
-                userId,
-                roles,
-                api,
-            );
-            if (selection.unavailable) {
-                return new Response(
-                    'The bot no longer has access to this chat. Add it back to manage this chat’s settings.',
-                    { status: 409 },
+                selection = { access: { globalRoles: roles } };
+            } else {
+                selection = await selectTarget(
+                    scope,
+                    chatId,
+                    chats,
+                    isBotAdmin,
+                    userId,
+                    roles,
+                    api,
                 );
-            }
-            if (!selection.target) {
-                return new Response('This scope has no settings', {
-                    status: 400,
-                });
-            }
+                if (selection.unavailable) {
+                    return configError(
+                        'The bot no longer has access to this chat. Add it back to manage this chat’s settings.',
+                        409,
+                    );
+                }
+                if (!selection.target) {
+                    return configError('This scope has no settings', 400);
+                }
 
-            const service = new ConfigurationService(
-                db,
-                userId,
-                selection.access,
-            );
-            try {
-                await service.applyOperations(
-                    selection.target,
-                    operations,
+                const service = new ConfigurationService(
+                    db,
+                    userId,
+                    selection.access,
                 );
-                return json({ ok: true });
-            } catch (error) {
-                if (error instanceof ConfigPermissionError) {
-                    return new Response(error.message, { status: 403 });
+                try {
+                    await service.applyOperations(
+                        selection.target,
+                        operations,
+                    );
+                } catch (error) {
+                    if (error instanceof ConfigPermissionError) {
+                        return configError(error.message, 403);
+                    }
+                    if (error instanceof ConfigValidationError) {
+                        let fieldErrors: Record<string, string> | undefined;
+                        if (error.key) {
+                            fieldErrors = { [error.key]: error.message };
+                        }
+                        return configError(error.message, 400, fieldErrors);
+                    }
+                    throw error;
                 }
-                if (error instanceof ConfigValidationError) {
-                    return new Response(error.message, { status: 400 });
-                }
-                throw error;
             }
-        }
-
-        if (!scope) {
+        } else if (!scope) {
             const launchChat = initData.chat &&
                 chats.find((chat) => chat.id === initData.chat?.id);
             if (launchChat) {
@@ -248,20 +235,23 @@ export function createConfigHandler(botToken: string) {
                 scope = 'personal';
             }
         }
+
         if (!chatId && scope !== 'global' && scope !== 'personal') {
             chatId = chats.find((chat) => chat.type === scope)?.id ?? 0;
         }
 
-        const selection = await selectTarget(
-            scope,
-            chatId,
-            chats,
-            isBotAdmin,
-            userId,
-            roles,
-            api,
-        );
-        const scopes: UiScope[] = ['personal', 'private', 'group'];
+        if (!selection) {
+            selection = await selectTarget(
+                scope,
+                chatId,
+                chats,
+                isBotAdmin,
+                userId,
+                roles,
+                api,
+            );
+        }
+        const scopes: ConfigScope[] = ['personal', 'private', 'group'];
         if (hasReadableGlobalConfig({ globalRoles: roles })) {
             scopes.push('global');
         }
@@ -273,11 +263,12 @@ export function createConfigHandler(botToken: string) {
                     personalScopeKey(userId),
                 ),
             });
-            return json({
+            return configResponse({
                 fields: [{
                     key: personalAboutKey,
                     kind: 'text',
                     multiline: true,
+                    maxLength: personalAboutMaxLength,
                     value: entry ? JSON.parse(entry.value) : '',
                     overridden: Boolean(entry),
                     writable: true,
@@ -290,13 +281,13 @@ export function createConfigHandler(botToken: string) {
         }
 
         if (selection.unavailable) {
-            return new Response(
+            return configError(
                 'The bot no longer has access to this chat. Add it back to manage this chat’s settings.',
-                { status: 409 },
+                409,
             );
         }
         if (!selection.target) {
-            return json({
+            return configResponse({
                 fields: [],
                 scopes,
                 chats,
@@ -317,7 +308,7 @@ export function createConfigHandler(botToken: string) {
         let targetChatId: number | undefined;
         if (target.scope === 'chat') targetChatId = target.chatId;
 
-        return json({
+        return configResponse({
             fields: readable.map((field) => ({
                 ...field,
                 overridden: overridden.has(field.key),
@@ -338,10 +329,27 @@ export function createConfigHandler(botToken: string) {
     });
 }
 
+function configResponse(body: Record<string, unknown>) {
+    return json({ contractVersion: CONFIG_CONTRACT_VERSION, ...body });
+}
+
+function personalFieldErrors(operations: ConfigOperation[]) {
+    const invalid = operations.find((operation) =>
+        operation.key === personalAboutKey && !('reset' in operation) &&
+        (typeof operation.value !== 'string' ||
+            operation.value.length > personalAboutMaxLength)
+    );
+    if (!invalid) return undefined;
+    return {
+        [personalAboutKey]:
+            `Personal about must be at most ${personalAboutMaxLength} characters`,
+    };
+}
+
 async function selectTarget(
-    scope: UiScope,
+    scope: ConfigScope,
     chatId: number,
-    chats: ChatOption[],
+    chats: ConfigChat[],
     isBotAdmin: boolean,
     userId: number,
     roles: Awaited<ReturnType<UserRoleRepository['getActiveRoles']>>,
