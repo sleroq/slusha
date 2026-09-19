@@ -4,7 +4,10 @@ import type {
     ConfigResponse,
     ConfigSelection,
 } from '../../../../shared/config-contract.ts';
-import { CONFIG_CONTRACT_VERSION } from '../../../../shared/config-contract-version.ts';
+import {
+    apiErrorSchema,
+    configResponseSchema,
+} from '../../../../shared/config-contract.ts';
 
 export class ConfigApiError extends Error {
     fieldErrors: Record<string, string>;
@@ -24,23 +27,6 @@ export class ConfigApiError extends Error {
 
 type ReadError = Pick<ApiErrorResponse, 'message' | 'fieldErrors'>;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null &&
-        !Array.isArray(value);
-}
-
-function readFieldErrors(value: unknown) {
-    if (!isRecord(value)) return undefined;
-    const result: Record<string, string> = {};
-    for (const [key, message] of Object.entries(value)) {
-        if (typeof message !== 'string') {
-            return undefined;
-        }
-        result[key] = message;
-    }
-    return result;
-}
-
 async function readError(response: Response): Promise<ReadError> {
     const text = await response.text();
     let payload: unknown;
@@ -49,24 +35,10 @@ async function readError(response: Response): Promise<ReadError> {
     } catch {
         return { message: text || `Request failed (${response.status})` };
     }
-    if (typeof payload === 'string' && payload) return { message: payload };
-    if (
-        isRecord(payload) && typeof payload.message === 'string' &&
-        payload.message
-    ) {
-        const error: ReadError = { message: payload.message };
-        if (payload.contractVersion === CONFIG_CONTRACT_VERSION) {
-            const fieldErrors = readFieldErrors(payload.fieldErrors);
-            if (fieldErrors) error.fieldErrors = fieldErrors;
-        }
-        return error;
-    }
-    return { message: `Request failed (${response.status})` };
-}
+    const parsed = apiErrorSchema.safeParse(payload);
+    if (parsed.success) return parsed.data;
 
-function hasCurrentContractVersion(value: unknown) {
-    return isRecord(value) &&
-        value.contractVersion === CONFIG_CONTRACT_VERSION;
+    return { message: `Request failed (${response.status})` };
 }
 
 async function readConfig(response: Response): Promise<ConfigResponse> {
@@ -86,18 +58,18 @@ async function readConfig(response: Response): Promise<ConfigResponse> {
             'The server returned an unreadable settings response. Please retry.',
         );
     }
-    if (!hasCurrentContractVersion(payload)) {
+    const parsed = configResponseSchema.safeParse(payload);
+    if (!parsed.success) {
         throw new ConfigApiError(
             'The settings response does not match this app. Please reload or retry.',
         );
     }
-    // SAFETY: same-version backends own the payload shape behind this contract.
-    return payload as ConfigResponse;
+    return parsed.data;
 }
 
 function headers(auth: string, json = false) {
-    const result: Record<string, string> = { authorization: `tma ${auth}` };
-    if (json) result['content-type'] = 'application/json';
+    const result = new Headers({ authorization: `tma ${auth}` });
+    if (json) result.set('content-type', 'application/json');
     return result;
 }
 

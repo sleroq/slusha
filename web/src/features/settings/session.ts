@@ -38,7 +38,7 @@ function sameSelection(
 }
 
 function authValue(auth: string | (() => string)) {
-    if (typeof auth === 'function') return auth();
+    if (auth instanceof Function) return auth();
     return auth;
 }
 
@@ -142,9 +142,11 @@ export function createSettingsSession(props: {
         }
         const selection = props.selection();
         if (!selection) return false;
+
         const operations = dirtyFields().map(draft.operationFor);
         setSaving(true);
         setSaveError(undefined);
+
         try {
             const response = await saveConfig(
                 authValue(props.auth),
@@ -152,6 +154,7 @@ export function createSettingsSession(props: {
                 operations,
             );
             client.setQueryData(configQueryKey(selection), response);
+
             const responseSelection = selectionFor(response);
             if (!sameSelection(selection, responseSelection)) {
                 client.setQueryData(
@@ -159,6 +162,7 @@ export function createSettingsSession(props: {
                     response,
                 );
             }
+
             if (selection.scope === 'global') {
                 await client.invalidateQueries({
                     queryKey: ['config', 'private'],
@@ -169,6 +173,7 @@ export function createSettingsSession(props: {
                     refetchType: 'none',
                 });
             }
+
             draft.install(response);
             installed = response;
             installedKey = configQueryKey(responseSelection).join(':');

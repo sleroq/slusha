@@ -15,14 +15,17 @@ export function Selection(
     },
 ) {
     const [open, setOpen] = createSignal(false);
+
     function choose(value: string) {
         if (value === '' && props.onReset) {
             props.onReset();
         } else {
             props.onChange(value);
         }
+
         setOpen(false);
     }
+
     return (
         <>
             <button

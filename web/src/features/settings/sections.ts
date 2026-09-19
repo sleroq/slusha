@@ -67,7 +67,7 @@ export function sectionFor(id: string) {
 }
 
 export function titleFor(key: string) {
-    const labels: Record<string, string> = {
+    const labels = new Map(Object.entries({
         'ai.prompt': 'Character',
         'ai.prePrompt': 'System prompt',
         'ai.model': 'Model',
@@ -80,9 +80,9 @@ export function titleFor(key: string) {
         nepons: 'Fallback replies',
         blacklistedReactions: 'Blocked reactions',
         locale: 'Language',
-    };
+    }));
     const last = key.split('.').at(-1) ?? key;
-    return labels[key] ??
+    return labels.get(key) ??
         last.replace(/([A-Z])/g, ' $1').replace(
             /^./,
             (value) => value.toUpperCase(),

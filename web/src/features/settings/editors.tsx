@@ -432,6 +432,7 @@ function BooleanField(props: FieldEditorProps) {
         if (value.kind === 'boolean') return value;
         return undefined;
     };
+
     const value = () => {
         const current = field();
         if (!current) return '';
@@ -439,6 +440,7 @@ function BooleanField(props: FieldEditorProps) {
         if (current.value === false) return 'Disabled';
         return '';
     };
+
     function change(next: string) {
         const current = field();
         if (!current) return;
@@ -448,6 +450,7 @@ function BooleanField(props: FieldEditorProps) {
         }
         props.onChange({ ...current, value: next === 'Enabled' });
     }
+
     return (
         <Show when={field()}>
             <Show
@@ -493,6 +496,7 @@ function NumberField(props: FieldEditorProps) {
         if (value.kind === 'number') return value;
         return undefined;
     };
+
     return (
         <Show when={field()}>
             <Field
@@ -591,6 +595,7 @@ function TextField(props: FieldEditorProps) {
                 error={props.error}
                 errorId={errorId(field()!.key, props.error)}
             >
+
                 <Show
                     when={field()!.multiline}
                     fallback={
@@ -622,6 +627,7 @@ function TextField(props: FieldEditorProps) {
                             props.onRaw(field()!, event.currentTarget.value)}
                     />
                 </Show>
+
             </Field>
         </Show>
     );
@@ -638,11 +644,13 @@ function ListField(props: FieldEditorProps) {
         }
         return undefined;
     };
+
     const display = (item: Matcher) => {
-        if (typeof item === 'string') return item;
+        if (!(item instanceof Object)) return item;
         return `/${item.__regex}/${item.flags ?? ''}`;
     };
     const error = () => regexError() || props.error;
+
     function add() {
         const current = field();
         const value = text().trim();
@@ -666,6 +674,7 @@ function ListField(props: FieldEditorProps) {
         setText('');
         setRegexError('');
     }
+
     function remove(index: number) {
         const current = field();
         if (!current) return;
@@ -683,6 +692,7 @@ function ListField(props: FieldEditorProps) {
             value: current.value.filter((_, itemIndex) => itemIndex !== index),
         });
     }
+
     return (
         <Show when={field()}>
             <Show
@@ -778,6 +788,7 @@ function ObjectField(props: FieldEditorProps) {
         if (value.kind === 'object-list') return value;
         return undefined;
     };
+
     function add() {
         const current = field();
         if (!current) return;
@@ -785,6 +796,7 @@ function ObjectField(props: FieldEditorProps) {
         for (const key of current.keys) value[key] = '';
         props.onChange({ ...current, value: [...current.value, value] });
     }
+
     return (
         <Show when={field()}>
             <div class='object-editor'>

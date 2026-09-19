@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query';
+import { z } from 'zod/mini';
 import {
     createRouter,
     useBeforeLeave,
@@ -96,6 +97,7 @@ function decodeSegment(segment: string) {
 function parseRoute(pathname: string, search: string): Route {
     const selection = parseSelection(search);
     const parts = pathname.split('/').filter(Boolean);
+
     if (parts.length === 0) {
         return {
             valid: selection !== undefined || search === '',
@@ -103,6 +105,7 @@ function parseRoute(pathname: string, search: string): Route {
             selection,
         };
     }
+
     if (parts[0] === 'section' && parts.length === 2) {
         const id = decodeSegment(parts[1]);
         let section;
@@ -114,6 +117,7 @@ function parseRoute(pathname: string, search: string): Route {
             section: section?.id,
         };
     }
+
     if (parts[0] === 'editor' && parts.length === 2) {
         const field = decodeSegment(parts[1]);
         let fieldSection;
@@ -129,6 +133,7 @@ function parseRoute(pathname: string, search: string): Route {
             section: fieldSection,
         };
     }
+
     if (
         parts[0] === 'section' && parts.length === 4 && parts[2] === 'editor'
     ) {
@@ -148,6 +153,7 @@ function parseRoute(pathname: string, search: string): Route {
             section: section?.id ?? derived?.id,
         };
     }
+
     return { valid: false, kind: 'home', selection: undefined };
 }
 
@@ -205,11 +211,13 @@ function NotFound() {
 function AppRoot(props: { createHost: HostFactory }) {
     let backHandler = () => {};
     let mainHandler = () => {};
+
     const createHost = untrack(() => props.createHost);
     const adapter = createHost({
         onBack: () => backHandler(),
         onMain: () => mainHandler(),
     });
+
     const [auth, setAuth] = createSignal('');
     const [bootError, setBootError] = createSignal('');
     const [ready, setReady] = createSignal(false);
@@ -217,6 +225,7 @@ function AppRoot(props: { createHost: HostFactory }) {
         parseRoute(globalThis.location.pathname, globalThis.location.search),
     );
     let canonicalNavigation = (_selection: ConfigSelection) => {};
+
     const session = createSettingsSession({
         auth: () => auth(),
         selection: () => {
@@ -227,10 +236,12 @@ function AppRoot(props: { createHost: HostFactory }) {
         onSaved: adapter.notifySuccess,
         onCanonicalSelection: (selection) => canonicalNavigation(selection),
     });
+
     const Router = createRouter({
         scrollRestoration: true,
         routes: [{ path: '/*route', component: () => null }],
     });
+
     createEffect(() => true, () => {
         void Promise.resolve().then(() => adapter.mount()).then((value) => {
             setAuth(value);
@@ -242,6 +253,7 @@ function AppRoot(props: { createHost: HostFactory }) {
         });
     });
     onCleanup(() => adapter.dispose());
+
     return (
         <Router>
             {() => (
@@ -283,6 +295,7 @@ function RouteOwner(props: {
         parseRoute(location.pathname, location.search)
     );
     const navigate = useNavigate();
+
     const registerCanonical = untrack(() => props.registerCanonical);
     registerCanonical((selection) => {
         const currentRoute = untrack(() => route());
@@ -293,12 +306,14 @@ function RouteOwner(props: {
             navigate(selectionUrl(selection), { replace: true });
         }
     });
+
     createEffect(
         () => [location.pathname, location.search],
         () => {
             props.setRoute(route());
         },
     );
+
     return (
         <Show
             when={props.ready()}
@@ -379,14 +394,16 @@ function SettingsApp(props: SettingsAppProps) {
         const from = parseSelection(event.from.search);
         const target: string | number = event.to;
         let targetLocation = event.to;
-        if (typeof event.to === 'number') {
+        const offset = z.number().safeParse(event.to);
+        if (offset.success) {
             targetLocation = globalThis.location.pathname +
                 globalThis.location.search;
         }
         let targetRoute: Route | undefined;
-        if (typeof targetLocation === 'string') {
+        const path = z.string().safeParse(targetLocation);
+        if (path.success) {
             const destination = new URL(
-                targetLocation,
+                path.data,
                 globalThis.location.origin,
             );
             targetRoute = parseRoute(

@@ -14,10 +14,11 @@ type DraftState = {
 };
 
 function copy<T>(value: T): T {
+    // SAFETY: draft values are schema-owned structured-clone values, and snapshot preserves their shape.
     return structuredClone(snapshot(value as object)) as T;
 }
 
-function valuesEqual(left: unknown, right: unknown) {
+function valuesEqual(left: ConfigValue, right: ConfigValue | undefined) {
     return JSON.stringify(left) === JSON.stringify(right);
 }
 
@@ -44,6 +45,7 @@ export function createSettingsDraft() {
                     return 'Enter a valid number.';
                 }
             }
+
             if (field.value !== null) {
                 if (field.min !== undefined && field.value < field.min) {
                     return `Use ${field.min} or greater.`;
@@ -55,6 +57,7 @@ export function createSettingsDraft() {
                 return 'Enter a number.';
             }
         }
+
         if (field.kind === 'text') {
             if (!field.optional && field.value === '') {
                 return 'This field is required.';
@@ -66,19 +69,22 @@ export function createSettingsDraft() {
                 return `Use ${field.maxLength} characters or fewer.`;
             }
         }
+
         if (
             field.kind === 'select' && !field.optional && field.value === null
         ) {
             return 'Choose a value.';
         }
+
         if (
             field.kind === 'boolean' && !field.optional && field.value === null
         ) {
             return 'Choose a value.';
         }
+
         if (field.kind === 'matcher-list') {
             for (const item of field.value) {
-                if (typeof item !== 'string') {
+                if (item instanceof Object) {
                     try {
                         new RegExp(item.__regex, item.flags);
                     } catch {
@@ -87,6 +93,7 @@ export function createSettingsDraft() {
                 }
             }
         }
+
         return undefined;
     }
 
@@ -160,28 +167,34 @@ export function createSettingsDraft() {
             return;
         }
         if (field.kind !== 'number') return;
+
         let parsed: number | null;
         if (value === '') parsed = null;
         else parsed = Number(value);
+
         setState((current) => {
             current.rawInputs[field.key] = value;
         });
+
         if (value === '' && field.optional) {
             updateField({ ...field, value: null });
             return;
         }
+
         if (value !== '' && !Number.isFinite(parsed)) {
             setState((current) => {
                 current.validation[field.key] = 'Enter a valid number.';
             });
             return;
         }
+
         if (value === '' && !field.optional) {
             setState((current) => {
                 current.validation[field.key] = 'Enter a number.';
             });
             return;
         }
+
         if (parsed === null) return;
         updateField({ ...field, value: parsed });
         setState((current) => {
@@ -193,6 +206,7 @@ export function createSettingsDraft() {
                 delete current.validation[field.key];
             }
         });
+
         queueMicrotask(() => {
             if (untrack(() => state.rawInputs[field.key]) !== value) return;
             setState((current) => {

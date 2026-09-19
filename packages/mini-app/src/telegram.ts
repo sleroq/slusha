@@ -42,13 +42,13 @@ export function createTelegramAdapter(
 
     function bindTheme() {
         previousColorScheme = document.documentElement.style.colorScheme;
-        const applyColorScheme = (isDark: boolean) => {
+        function applyColorScheme(isDark: boolean) {
             if (isDark) {
                 document.documentElement.style.colorScheme = 'dark';
             } else {
                 document.documentElement.style.colorScheme = 'light';
             }
-        };
+        }
         applyColorScheme(themeParams.isDark());
         cleanups.push(themeParams.isDark.sub(applyColorScheme));
     }

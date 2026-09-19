@@ -83,6 +83,7 @@ async function routeConfig(
     const requests: string[] = [];
     await page.route('**/api/config**', async (route: Route) => {
         if (route.request().method() === 'PUT') {
+            // SAFETY: this route only receives the app's JSON update requests.
             const body = route.request().postDataJSON() as {
                 operations?: Array<{
                     key: string;
