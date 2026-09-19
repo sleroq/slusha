@@ -190,6 +190,41 @@ test('reset can be cancelled or saved and an editor is read-only while saving', 
     await expect(page.locator('body')).toHaveCSS('overflow', 'visible');
 });
 
+test('long model names do not create horizontal scrolling', async ({ page }) => {
+    const longModel = 'provider/' + 'unbroken-model-name'.repeat(20);
+    await routeConfig(page, {
+        ...scoped,
+        fields: [
+            ...scoped.fields.map((field) => {
+                if (field.key !== 'ai.model' || field.kind !== 'select') {
+                    return field;
+                }
+                return { ...field, value: longModel, options: [longModel] };
+            }),
+            {
+                key: 'ai.google.structuredOutputs',
+                kind: 'boolean',
+                value: true,
+                overridden: false,
+                writable: true,
+            },
+        ],
+    });
+    await page.goto('/tests/harness.html?scope=private&chatId=7');
+    await page.getByRole('button', { name: 'Model and generation' }).click();
+
+    await expect.poll(() => page.evaluate(() =>
+        document.documentElement.scrollWidth <=
+            document.documentElement.clientWidth
+    )).toBe(true);
+
+    await page.locator('button.selection').click();
+    await expect.poll(() => page.evaluate(() =>
+        document.documentElement.scrollWidth <=
+            document.documentElement.clientWidth
+    )).toBe(true);
+});
+
 test('dirty scope navigation offers stay, discard, and save', async ({ page }) => {
     const requests = await routeConfig(page, personal);
     await page.goto('/tests/harness.html?scope=personal');

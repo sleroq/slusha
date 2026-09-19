@@ -190,6 +190,7 @@ select:focus-visible {
 }
 .selection {
     display: flex;
+    min-width: 0;
     min-height: 2.75rem;
     width: 100%;
     justify-content: space-between;
@@ -199,6 +200,7 @@ select:focus-visible {
     padding: 0 .75rem;
     background: var(--tg-theme-secondary-bg-color, #f2f3f5);
     text-align: left;
+    overflow-wrap: anywhere;
 }
 .loading {
     display: flex;
@@ -274,6 +276,7 @@ select:focus-visible {
 }
 .selection-options {
     display: grid;
+    overflow-x: hidden;
     overflow-y: auto;
     max-height: calc(80dvh - 4rem);
 }
@@ -288,6 +291,7 @@ select:focus-visible {
     padding: 1rem;
     text-align: left;
     min-height: 3.5rem;
+    overflow-wrap: anywhere;
 }
 @keyframes dialog-sheet-enter {
     from {
