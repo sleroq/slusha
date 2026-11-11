@@ -386,7 +386,7 @@ test.skipIf(!enabled)(
                     'Run the shell command `printf sandbox-proof > proof.txt`, then read proof.txt using the shell and reply with its contents.',
                 );
                 expect(await waitForReply(102)).toContain('sandbox-proof');
-                const archive = join(dir, 'workspaces', `${chatId}_0.tar`);
+                const archive = join(dir, 'workspaces', `${chatId}.tar`);
                 const archiveInfo = await stat(archive);
                 expect(archiveInfo.isFile()).toBe(true);
                 archiveInode = archiveInfo.ino;
@@ -440,7 +440,7 @@ test.skipIf(!enabled)(
                 const reply = await waitForReply(103);
                 expect(reply).toContain('sandbox-proof');
                 expect(reply).toMatch(/zephyr|зефир/i);
-                expect((await stat(join(dir, 'workspaces', `${chatId}_0.tar`))).ino).not.toBe(
+                expect((await stat(join(dir, 'workspaces', `${chatId}.tar`))).ino).not.toBe(
                     archiveInode,
                 );
             } else {

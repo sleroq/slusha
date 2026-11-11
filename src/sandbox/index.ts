@@ -11,7 +11,6 @@ export interface SandboxOptions {
 
 export interface SandboxScope {
     chatId: number;
-    topicId: number;
 }
 
 export interface ExecuteOptions extends SandboxScope {
@@ -45,10 +44,8 @@ const brokerResult = z.object({
 });
 
 function scopeName(scope: SandboxScope) {
-    if (!Number.isSafeInteger(scope.chatId) || !Number.isSafeInteger(scope.topicId)) {
-        throw new Error('Invalid sandbox scope');
-    }
-    return `${scope.chatId}_${scope.topicId}`;
+    if (!Number.isSafeInteger(scope.chatId)) throw new Error('Invalid sandbox scope');
+    return String(scope.chatId);
 }
 
 function checkDeadline(deadline: number, signal: AbortSignal) {

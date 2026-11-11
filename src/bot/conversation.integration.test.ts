@@ -72,6 +72,7 @@ async function appFixture(limits: BudgetLimits, contextWindow?: number) {
         });
         const sent: { chatId: number | string; text: string; options: object }[] = [];
         const deleted: number[] = [];
+        const resetChats: number[] = [];
         const telegram: TelegramFailures = {};
         const api = new Api('123:test', {
             fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -168,7 +169,9 @@ async function appFixture(limits: BudgetLimits, contextWindow?: number) {
             budgets: createBudgets(db, limits),
             imageModels: new Set(['test']),
             adminIds: [42],
-            async resetFiles() {},
+            async resetFiles(chatId: number) {
+                resetChats.push(chatId);
+            },
         };
         let processUpdate = createConversationHandler(handlerOptions);
         return {
@@ -176,6 +179,7 @@ async function appFixture(limits: BudgetLimits, contextWindow?: number) {
             faux,
             sent,
             deleted,
+            resetChats,
             telegram,
             restart(this: void) {
                 processUpdate = createConversationHandler(handlerOptions);
@@ -1152,7 +1156,7 @@ test.skipIf(!databaseUrl)(
     async () => {
         const app = await appFixture({}, 1000);
         try {
-            const { db, faux, processUpdate } = app;
+            const { db, faux, processUpdate, resetChats } = app;
             function topic(id: number, text: string, topicId: number): Update {
                 return {
                     update_id: id,
@@ -1188,6 +1192,17 @@ test.skipIf(!databaseUrl)(
             expect(context).toContain('slusha grow');
             expect(context).toContain('old boundary');
             expect(context).not.toContain('other topic secret');
+            await processUpdate(topic(7, '/lobotomy confirm', 1));
+            expect(resetChats).toEqual([group.id]);
+            let otherContext = '';
+            faux.setResponses([
+                (input) => {
+                    otherContext = JSON.stringify(input.messages);
+                    return fauxAssistantMessage('ok');
+                },
+            ]);
+            await processUpdate(topic(8, 'slusha continue', 2));
+            expect(otherContext).toContain('other topic secret');
         } finally {
             await app.close();
         }

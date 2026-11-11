@@ -84,7 +84,7 @@ type Options = {
     budgets: Budgets;
     characters?: Characters;
     imageModels: ReadonlySet<string>;
-    resetFiles(key: AgentKey): Promise<void>;
+    resetFiles(chatId: number): Promise<void>;
     adminIds: readonly number[];
     webAppUrl?: string;
     groupReplyAgeMs?: number;
@@ -542,16 +542,16 @@ export function createConversationHandler(options: Options) {
                 if (messageText(message).trim().split(/\s+/)[1] !== 'confirm') {
                     await delivery.send(
                         key.chatId,
-                        'Send /lobotomy confirm to reset the session and delete its files.',
+                        'Send /lobotomy confirm to reset the session and delete the chat workspace.',
                     );
                     return;
                 }
                 try {
-                    await options.resetFiles(key);
+                    await options.resetFiles(key.chatId);
                 } catch {
                     await delivery.send(
                         key.chatId,
-                        'Could not delete the session files; the session was not reset.',
+                        'Could not delete the chat workspace; the session was not reset.',
                     );
                     return;
                 }

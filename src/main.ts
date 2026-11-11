@@ -88,7 +88,7 @@ const actions = createAgentActions({
         if (!sandboxEnabled) throw new Error('Sandbox is disabled');
         if (!(await settings.resolve(key.chatId, 0)).shellEnabled)
             throw new Error('Shell is disabled in this chat');
-        const result = await sandbox.execute({ ...key, command });
+        const result = await sandbox.execute({ chatId: key.chatId, command });
         return `${result.stdout}\n${result.stderr}\nExit code: ${result.exitCode}`;
     },
 });
@@ -115,7 +115,7 @@ const processUpdate = createConversationHandler({
     adminIds,
     groupReplyAgeMs,
     webAppUrl: process.env.WEB_APP_URL,
-    resetFiles: (key) => sandbox.resetFiles(key),
+    resetFiles: (chatId) => sandbox.resetFiles({ chatId }),
 });
 const ingestion = createIngestion({
     db,

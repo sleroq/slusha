@@ -29,8 +29,9 @@ integration(
         const fakeBin = join(socketDir, 'bin');
         const dockerCalls = join(socketDir, 'docker-calls');
         const scope = { chatId: 123, topicId: 456 };
+        const otherTopic = { chatId: 123, topicId: 457 };
         function execute(command: string, timeoutMs = 30_000) {
-            return sandbox.execute({ ...scope, command, timeoutMs });
+            return sandbox.execute({ chatId: scope.chatId, command, timeoutMs });
         }
         function docker(...args: string[]) {
             return execFileSync(dockerBinary, args, {
@@ -142,7 +143,11 @@ integration(
             }
             const first = await execute('printf out; printf err >&2; echo persisted > file');
             expect(first).toEqual({ stdout: 'out', stderr: 'err', exitCode: 0 });
-            expect((await execute('cat file')).stdout.trim()).toBe('persisted');
+            expect(
+                (
+                    await sandbox.execute({ chatId: otherTopic.chatId, command: 'cat file' })
+                ).stdout.trim(),
+            ).toBe('persisted');
             expect(await readdir(fakeBin)).toEqual(['docker']);
             expect(stat(dockerCalls)).rejects.toMatchObject({ code: 'ENOENT' });
             const executable = await execute(
@@ -152,13 +157,17 @@ integration(
             expect(executable.stdout.trim()).toBe('executable');
             expect((await execute('exit 23')).exitCode).toBe(23);
             expect(
-                (await sandbox.execute({ chatId: 123, topicId: 457, command: 'test ! -e file' }))
-                    .exitCode,
+                (
+                    await sandbox.execute({
+                        chatId: 124,
+                        command: 'test ! -e file; echo separate > file',
+                    })
+                ).exitCode,
             ).toBe(0);
             expect((await readdir(rootDir)).filter((name) => name.endsWith('.tar')).sort()).toEqual(
-                ['123_456.tar', '123_457.tar'],
+                ['123.tar', '124.tar'],
             );
-            expect((await stat(join(rootDir, '123_456.tar'))).isFile()).toBe(true);
+            expect((await stat(join(rootDir, '123.tar'))).isFile()).toBe(true);
             const restarted = createSandbox({ rootDir });
             expect((await restarted.execute({ ...scope, command: 'cat file' })).stdout.trim()).toBe(
                 'persisted',
@@ -180,14 +189,14 @@ integration(
             await waitForContainersToStop();
             expect((await execute('cat file')).stdout.trim()).toBe('persisted');
             expect(docker('ps', '-aq', '--filter', 'label=org.slusha.managed=1').trim()).toBe('');
-            const before = await readFile(join(rootDir, '123_456.tar'));
+            const before = await readFile(join(rootDir, '123.tar'));
             expect(
                 execute(
                     'dd if=/dev/zero of=large bs=100000 count=249 2>/dev/null; i=0; while [ "$i" -lt 400 ]; do touch "f$i"; i=$((i+1)); done',
                 ),
             ).rejects.toThrow();
-            expect(await readFile(join(rootDir, '123_456.tar'))).toEqual(before);
-            expect((await stat(join(rootDir, '123_456.tar'))).size).toBeLessThanOrEqual(25_000_000);
+            expect(await readFile(join(rootDir, '123.tar'))).toEqual(before);
+            expect((await stat(join(rootDir, '123.tar'))).size).toBeLessThanOrEqual(25_000_000);
             expect((await execute('cat file; test ! -e large')).stdout.trim()).toBe('persisted');
             const concurrent = execute('sleep 4');
             await new Promise((done) => setTimeout(done, 2000));
@@ -230,11 +239,14 @@ integration(
             expect(docker('ps', '-aq', '--filter', 'label=org.slusha.managed=1').trim()).toBe('');
             const firstWrite = execute('sleep 2; echo first >> order');
             await new Promise((done) => setTimeout(done, 500));
-            const secondWrite = execute('echo second >> order');
+            const secondWrite = sandbox.execute({
+                chatId: otherTopic.chatId,
+                command: 'echo second >> order',
+            });
             await Promise.all([firstWrite, secondWrite]);
             expect((await execute('cat order')).stdout).toBe('first\nsecond\n');
-            const runs = Array.from({ length: 5 }, (_, topicId) =>
-                sandbox.execute({ chatId: 900, topicId, command: 'sleep 6', timeoutMs: 30000 }),
+            const runs = Array.from({ length: 5 }, (_, chatId) =>
+                sandbox.execute({ chatId: 900 + chatId, command: 'sleep 6', timeoutMs: 30000 }),
             );
             await new Promise((done) => setTimeout(done, 3000));
             const active = docker('ps', '-q', '--filter', 'label=org.slusha.managed=1')
@@ -318,7 +330,7 @@ integration(
 
             // A disconnected client must cancel its running container.
             const modulePath = join(import.meta.dir, 'index.ts');
-            const crashScript = `import {createSandbox} from ${JSON.stringify(modulePath)}; await createSandbox({rootDir:${JSON.stringify(rootDir)}}).execute({chatId:9999,topicId:1,command:'sleep 60',timeoutMs:30000});`;
+            const crashScript = `import {createSandbox} from ${JSON.stringify(modulePath)}; await createSandbox({rootDir:${JSON.stringify(rootDir)}}).execute({chatId:9999,command:'sleep 60',timeoutMs:30000});`;
             const disconnected = spawn(process.execPath, ['-e', crashScript], { stdio: 'ignore' });
             try {
                 let running = '';
@@ -335,7 +347,7 @@ integration(
                 expect(running).toBe('');
                 expect(
                     (
-                        await sandbox.execute({ chatId: 9999, topicId: 1, command: 'echo resumed' })
+                        await sandbox.execute({ chatId: 9999, command: 'echo resumed' })
                     ).stdout.trim(),
                 ).toBe('resumed');
             } finally {
@@ -511,10 +523,13 @@ integration(
                 await rename(blockedBackup, blockedFile);
                 execFileSync(binary, ['setup'], { env: brokerEnv });
             }
-            await sandbox.resetFiles(scope);
+            await sandbox.resetFiles({ chatId: otherTopic.chatId });
             expect((await execute('test ! -e file')).exitCode).toBe(0);
+            expect(
+                (await sandbox.execute({ chatId: 124, command: 'cat file' })).stdout.trim(),
+            ).toBe('separate');
             await execute('echo original > file');
-            const saved = await readFile(join(rootDir, '123_456.tar'));
+            const saved = await readFile(join(rootDir, '123.tar'));
             const running = execute('echo changed > file; sleep 60');
             const runningResult = running.catch((error) => error);
             for (
@@ -533,7 +548,7 @@ integration(
             expect(Date.now() - started).toBeLessThan(10000);
             expect(await runningResult).toBeInstanceOf(Error);
             expect(await waiting).toBeInstanceOf(Error);
-            expect(await readFile(join(rootDir, '123_456.tar'))).toEqual(saved);
+            expect(await readFile(join(rootDir, '123.tar'))).toEqual(saved);
             await waitForContainersToStop();
             expect(docker('ps', '-aq', '--filter', 'label=org.slusha.managed=1').trim()).toBe('');
             expect(
