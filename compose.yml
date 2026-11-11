@@ -1,24 +1,73 @@
 services:
-  slusha-prod:
-    profiles:
-      - production
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: slusha-bot:latest
-    container_name: slusha-bot
+  sandbox-image:
+    image: ${SANDBOX_IMAGE:-slusha-sandbox}
+    build: ./src/sandbox
+    entrypoint: ["/bin/true"]
+    network_mode: none
+    restart: "no"
+
+  db:
+    image: postgres:17
     environment:
-      DENO_ENV: production
-      BOT_TOKEN: ${BOT_TOKEN}
-      AI_TOKEN: ${AI_TOKEN}
-      DATABASE_URL: ${DATABASE_URL:-file:./data/slusha.sqlite}
-      WEB_HOST: ${WEB_HOST:-0.0.0.0}
-      WEB_PORT: ${WEB_PORT:-8080}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      POSTGRES_USER: slusha
+      POSTGRES_DB: slusha
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
     volumes:
-      - ./data:/home/nonroot/app/data:Z
-      - ./tmp:/home/nonroot/app/tmp:Z
-      - ./log:/home/nonroot/app/log:Z
+      - postgres-data:/var/lib/postgresql/data
     ports:
-      - ${WEB_PORT:-8080}:${WEB_PORT:-8080}
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U slusha -d slusha"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
+
+  slusha:
+    build: .
+    user: "0:0"
+    network_mode: host
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL for the compose database}
+      BOT_TOKEN: ${BOT_TOKEN:?Set BOT_TOKEN}
+      OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
+      OPENCODE_TOKEN: ${OPENCODE_TOKEN:-}
+      BOT_ADMIN_IDS: ${BOT_ADMIN_IDS:-}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-deepseek-v4.1-flash}
+      USER_WEEKLY_TOKENS: ${USER_WEEKLY_TOKENS:-}
+      CHAT_WEEKLY_TOKENS: ${CHAT_WEEKLY_TOKENS:-}
+      GROUP_REPLY_MAX_AGE_SECONDS: ${GROUP_REPLY_MAX_AGE_SECONDS:-900}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
+      WEB_APP_URL: ${WEB_APP_URL:-}
+      WEB_PORT: ${WEB_PORT:-8080}
+      DATA_DIR: ${SLUSHA_DATA_DIR:?Set SLUSHA_DATA_DIR to an absolute host path}
+      SANDBOX_ENABLED: ${SANDBOX_ENABLED:-true}
+      SLUSHA_SANDBOX_SOCKET: ${SLUSHA_SANDBOX_SOCKET:-/run/slusha-gvisor/sandbox.sock}
+      BACKUP_DIR: /app/backups
+      BACKUP_KEEP: ${BACKUP_KEEP:-10}
+    volumes:
+      - ${SLUSHA_DATA_DIR}:${SLUSHA_DATA_DIR}
+      - backup-data:/app/backups
+      - /run/slusha-gvisor:/run/slusha-gvisor:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      sandbox-image:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "bun", "-e", "const r = await fetch('http://127.0.0.1:' + (process.env.WEB_PORT || '8080') + '/healthz'); if (!r.ok) process.exit(1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  backup-data:

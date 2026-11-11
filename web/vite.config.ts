@@ -6,10 +6,10 @@ export default defineConfig(({ mode }) => ({
     plugins: [tailwindcss(), solid({ diagnostics: mode !== 'production' })],
     publicDir: 'static',
     server: {
-        hmr: { host: '127.0.0.1', clientPort: 5173 },
+        hmr: { host: '127.0.0.1' },
     },
     resolve: {
-        dedupe: ['solid-js', '@solidjs/web'],
+        dedupe: ['solid-js', '@solidjs/web', '@solidjs/signals'],
     },
     build: {
         outDir: 'build',

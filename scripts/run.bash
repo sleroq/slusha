@@ -8,12 +8,5 @@ cd "$(dirname "$SCRIPTPATH")"
 
 source ./scripts/env.bash
 
-export WEB_DEV_SERVER_URL="http://127.0.0.1:5173/"
-(
-    cd web
-    deno task dev
-) &
-WEB_DEV_SERVER_PID=$!
-trap 'kill "$WEB_DEV_SERVER_PID"' EXIT
-
-deno run --allow-net --allow-ffi --allow-env --allow-write --allow-read --allow-import --allow-sys --allow-run main.ts
+bun run build:web
+exec bun src/main.ts

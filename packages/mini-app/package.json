@@ -1,7 +1,10 @@
 {
     "name": "@slusha/mini-app",
-    "private": true,
     "version": "0.0.1",
+    "publishConfig": {
+        "access": "public"
+    },
+    "files": ["src", "README.md"],
     "type": "module",
     "sideEffects": ["**/*.css"],
     "exports": {

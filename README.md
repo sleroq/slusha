@@ -20,30 +20,32 @@ Dumbest girl in telegram.
   </details>
 - <details>
     <summary>
-      Video, voice, photo, round videos, stickers input support (and more)
+      Photo input support
     </summary>
     <img src="https://i.ibb.co/SwmDZVWp/photo-2025-02-26-20-19-10.jpg" alt="Media support showcase">
   </details>
-- Long-term memory and chat summary command
+- Chat summary command disabled
 - <details>
     <summary>
       Smart replies with ability to answer multiple people in one go
     </summary>
     <img src="https://i.ibb.co/dJtvhfDj/photo-2025-02-26-20-11-49.jpg" alt="Smart reply">
   </details>
-- Extensive per-chat configuration
-- Undertanding of Telegram-specific features, like reply threads, via bot messages, quotes and forwards
+- Per-chat settings
+- Reply threads and reactions
 - <details>
     <summary>
-      Optional AI telemetry for debugging and cost/prompt review
+      Optional AI telemetry
     </summary>
     <img src="https://share.cum.army/u/YQEHu9.png" alt="Langfuse screenshot">
   </details>
 
 ## Requirements
 
-- deno
-- gemini api key (or other supported by [ai-sdk](https://sdk.vercel.ai/providers/ai-sdk-providers/))
+- Bun
+- PostgreSQL
+- OpenCode API key
+- Docker, gVisor, and the host-managed `sandboxd` service, or `SANDBOX_ENABLED=false`
 
 ## Preparation
 
@@ -52,70 +54,8 @@ Dumbest girl in telegram.
 
 ## Development
 
-Starts the Vite frontend and backend server.
+Builds the Mini App and starts the backend server.
 
 ```bash
 scripts/run.bash
-```
-
-## Metrics (Prometheus + Grafana)
-
-- `slusha_http_requests_total`
-- `slusha_http_request_duration_seconds`
-- `slusha_telegram_updates_total`
-- `slusha_telegram_handler_errors_total`
-- `slusha_ai_requests_total`
-- `slusha_ai_request_duration_seconds`
-- `slusha_ai_failures_total`
-- `slusha_ai_finish_reason_total`
-- `slusha_ai_tokens_total`
-- `slusha_rate_limit_exceeded_total`
-- `slusha_process_uptime_seconds`
-- `slusha_process_resident_memory_bytes`
-
-### Prometheus scrape config
-
-Add a target in your `prometheus.yml`:
-
-```yaml
-scrape_configs:
-  - job_name: slusha
-    metrics_path: /metrics
-    static_configs:
-      - targets:
-          - localhost:8080
-```
-
-If Slusha runs in Docker or another host, replace `localhost:8080` with the reachable address.
-
-### Grafana dashboard
-
-Import the dashboard JSON from:
-
-- `grafana/slusha-observability-dashboard.json`
-
-In Grafana:
-
-1. Go to Dashboards -> Import
-2. Upload `grafana/slusha-observability-dashboard.json`
-3. Select your Prometheus datasource when prompted
-
-## Docker Production
-
-```bash
-# Build and run
-docker build -t slusha-bot .
-docker run -d \
-  --name slusha-bot \
-  --restart unless-stopped \
-  -e BOT_TOKEN=your_bot_token \
-  -e AI_TOKEN=your_ai_token \
-  slusha-bot
-
-# Push
-docker build -t <registry>/slusha:latest .
-docker push <registry>/slusha:latest
-
-# Using Docker Compose
-docker-compose --profile production up -d slusha-prod
 ```

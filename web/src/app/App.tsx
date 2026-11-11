@@ -703,7 +703,10 @@ function SettingsApp(props: SettingsAppProps) {
                         fields={session.fields()}
                         saving={session.saving()}
                         validation={session.validation()}
+                        resetKeys={session.resetKeys()}
                         onChange={session.updateField}
+                        onReset={requestReset}
+                        onCancelReset={session.cancelReset}
                         onScope={openChats}
                         onGlobal={() => requestSelection({ scope: 'global' })}
                     />

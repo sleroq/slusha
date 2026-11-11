@@ -11,53 +11,60 @@ permissions:
     contents: read
 
 jobs:
-    changes:
+    checks:
         runs-on: ubuntu-latest
-        outputs:
-            root: ${{ steps.filter.outputs.root }}
+        services:
+            postgres:
+                image: postgres:16
+                env:
+                    POSTGRES_USER: slusha
+                    POSTGRES_PASSWORD: test
+                    POSTGRES_DB: slusha_test
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U slusha -d slusha_test"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 10
+        env:
+            TEST_DATABASE_URL: postgres://slusha:test@localhost:5432/slusha_test
+            SETTINGS_TEST_DATABASE_URL: postgres://slusha:test@localhost:5432/slusha_test
+            TELEGRAM_TEST_DATABASE_URL: postgres://slusha:test@localhost:5432/slusha_test
+            CHARACTERS_TEST_DATABASE_URL: postgres://slusha:test@localhost:5432/slusha_test
         steps:
             - name: Checkout
               uses: actions/checkout@v4
               with:
                   persist-credentials: false
-
-            - name: Detect changed paths
-              id: filter
-              uses: dorny/paths-filter@v3
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v2
               with:
-                  filters: |
-                      root:
-                        - 'main.ts'
-                        - 'lib/**'
-                        - 'scripts/**'
-                        - 'drizzle/**'
-                        - 'locales/**'
-                        - 'deno.json'
-                        - 'deno.lock'
-                        - 'Dockerfile'
-    root-checks:
-        name: Root checks
-        runs-on: ubuntu-latest
-        needs: changes
-        if: needs.changes.outputs.root == 'true'
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+                  bun-version: 1.4.4
+            - name: Setup Go
+              uses: actions/setup-go@v5
               with:
-                  persist-credentials: false
-
-            - name: Setup Deno
-              uses: denoland/setup-deno@v2
-              with:
-                  deno-version: v2.x
-
+                  go-version-file: sandboxd/go.mod
+                  cache: false
+            - name: Check sandbox broker
+              working-directory: sandboxd
+              run: |
+                  go build ./...
+                  go vet ./...
+            - name: Install
+              run: |
+                  bun install --frozen-lockfile
+                  sudo apt-get update -qq
+                  sudo apt-get install -y postgresql-client
             - name: Typecheck
-              run: deno check --allow-import main.ts
-
-            - name: Lint
-              run: deno lint
-
+              run: bun run check
             - name: Test
-              env:
-                  AI_TOKEN: test
-              run: deno test -A
+              run: bun test src
+            - name: Web check and build
+              run: |
+                  bun run --cwd web check
+                  bun run build:web
+            - name: Install Playwright browsers
+              run: bunx --cwd web playwright install --with-deps chromium webkit
+            - name: Browser integration tests
+              run: bun run --cwd web test

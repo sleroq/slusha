@@ -20,16 +20,13 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
 
-            - name: Setup Deno
-              uses: denoland/setup-deno@v2
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v2
               with:
-                  deno-version: v2.x
+                  bun-version: 1.4.4
 
             - name: Update workspace dependencies
-              run: deno outdated --recursive --update --latest
-
-            - name: Refresh lockfiles
-              run: deno cache --allow-import main.ts
+              run: bun update --recursive
 
             - name: Create update PR
               uses: peter-evans/create-pull-request@v7
@@ -39,8 +36,9 @@ jobs:
                   commit-message: 'chore: weekly dependency updates'
                   title: 'chore: weekly dependency updates'
                   body: |
-                        Automated dependency refresh for the Deno workspace.
+                        Automated dependency refresh for the Bun workspace.
                   add-paths: |
-                        deno.json
-                        deno.lock
+                        package.json
+                        bun.lock
                         web/package.json
+                        packages/*/package.json

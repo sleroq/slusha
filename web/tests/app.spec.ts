@@ -137,6 +137,103 @@ test('launch loads the backend default and primes its canonical cache', async ({
     expect(requests).toHaveLength(1);
 });
 
+test('personal model can be chosen and reset', async ({ page }) => {
+    const model = {
+        key: 'ai.model',
+        kind: 'select',
+        options: ['fast', 'accurate'],
+        value: 'fast',
+        inheritedValue: 'fast',
+        overridden: false,
+        writable: true,
+    } as const;
+    const operations: unknown[] = [];
+    let response: ConfigResponse = { ...personal, fields: [...personal.fields, { ...model, options: [...model.options] }] };
+    await page.route('**/api/config**', async (route) => {
+        if (route.request().method() === 'PUT') {
+            const body = route.request().postDataJSON();
+            operations.push(body);
+            if (operations.length === 1) {
+                response = { ...personal, fields: [...personal.fields, { ...model, options: [...model.options], value: 'accurate', overridden: true }] };
+            } else {
+                response = { ...personal, fields: [...personal.fields, { ...model, options: [...model.options] }] };
+            }
+        }
+        await route.fulfill({ json: response });
+    });
+    await harness(page);
+    const selection = page.getByRole('button', { name: 'Model' });
+    await expect(selection).toContainText('fast');
+    await selection.click();
+    await page.getByRole('button', { name: 'accurate', exact: true }).click();
+    await expect(selection).toContainText('accurate');
+    await nativeMain(page);
+    await expect(page.getByLabel('Revert model to default')).toBeVisible();
+    expect(operations[0]).toEqual({ scope: 'personal', operations: [{ key: 'ai.model', value: 'accurate' }] });
+    await page.getByLabel('Revert model to default').click();
+    await page.getByRole('button', { name: 'Revert', exact: true }).click();
+    await nativeMain(page);
+    await expect(selection).toContainText('fast');
+    expect(operations[1]).toEqual({ scope: 'personal', operations: [{ key: 'ai.model', reset: true }] });
+});
+
+for (const scope of ['personal', 'private'] as const) {
+    test(`character name model saves and resets in ${scope} scope`, async ({ page }) => {
+        const operations: unknown[] = [];
+        const fields: ConfigResponse['fields'] = [
+            { key: 'ai.model', kind: 'select', options: ['fast', 'accurate'], value: 'fast', inheritedValue: 'fast', overridden: false, writable: true },
+            { key: 'ai.characterNamesModel', kind: 'select', options: ['fast', 'accurate'], value: 'fast', inheritedValue: 'fast', overridden: false, writable: true },
+        ];
+        let response: ConfigResponse = { ...personal, scope, fields };
+        if (scope === 'private') response = { ...response, chatId: 7 };
+        await page.route('**/api/config**', async (route) => {
+            if (route.request().method() === 'PUT') {
+                const body = route.request().postDataJSON();
+                operations.push(body);
+                const operation = body.operations[0];
+                response = {
+                    ...response,
+                    fields: response.fields.map((field) => {
+                        if (field.key !== operation.key || field.kind !== 'select') return field;
+                        if (operation.reset) return { ...field, value: 'fast', overridden: false };
+                        return { ...field, value: operation.value, overridden: true };
+                    }),
+                };
+            }
+            await route.fulfill({ json: response });
+        });
+        if (scope === 'private') {
+            await page.goto('/tests/harness.html?scope=private&chatId=7');
+            await page.getByRole('button', { name: 'Model and generation' }).click();
+        } else {
+            await harness(page);
+        }
+
+        const selection = page.getByRole('button', { name: 'Character name model' });
+        const model = page.getByRole('button', { name: 'Model', exact: true });
+        await expect(selection).toContainText('fast');
+        await selection.click();
+        await page.getByRole('button', { name: 'accurate', exact: true }).click();
+        await nativeMain(page);
+        const reset = page.getByLabel('Revert Character name model to default');
+        await expect(reset).toBeVisible();
+        await expect(model).toContainText('fast');
+        const saved = { scope, operations: [{ key: 'ai.characterNamesModel', value: 'accurate' }] };
+        if (scope === 'private') expect(operations[0]).toEqual({ ...saved, chatId: 7 });
+        else expect(operations[0]).toEqual(saved);
+
+        await reset.click();
+        await page.getByRole('button', { name: 'Revert', exact: true }).click();
+        await nativeMain(page);
+        await expect(selection).toContainText('fast');
+        await expect(reset).toHaveCount(0);
+        await expect(model).toContainText('fast');
+        const resetOperation = { scope, operations: [{ key: 'ai.characterNamesModel', reset: true }] };
+        if (scope === 'private') expect(operations[1]).toEqual({ ...resetOperation, chatId: 7 });
+        else expect(operations[1]).toEqual(resetOperation);
+    });
+}
+
 test('typing in an editor keeps focus and saves the canonical response without GET', async ({ page }) => {
     const requests = await routeConfig(page, scoped);
     await page.goto('/tests/harness.html?scope=private&chatId=7');

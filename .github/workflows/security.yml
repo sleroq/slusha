@@ -4,8 +4,8 @@ on:
     pull_request:
         paths:
             - 'Dockerfile'
-            - 'deno.json'
-            - 'deno.lock'
+            - 'package.json'
+            - 'bun.lock'
             - '.github/workflows/**'
     push:
         branches:

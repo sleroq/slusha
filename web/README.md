@@ -1,38 +1,34 @@
 # Slusha Mini App
 
-A client-rendered Solid 2 application for Telegram, served by the existing Deno
+A client-rendered Solid 2 application for Telegram, served by the Bun
 backend. The interface uses Telegram theme/safe-area tokens and shared controls
 from `@slusha/mini-app`.
 
 ## Development
 
-Use Deno 2.9+ and Node 24. Oxlint's TypeScript configuration and JavaScript plugin
+Use Bun and Node 24. Oxlint's TypeScript configuration and JavaScript plugin
 host require a recent Node runtime.
 
 From the repository root:
 
 ```sh
-deno install --frozen
+bun install --frozen-lockfile
 cd web
-deno task dev
+bun run dev
 ```
 
-Launch the app through Telegram for authenticated development. Set
-`WEB_DEV_SERVER_URL=http://127.0.0.1:5173` on the bot server to proxy frontend
-requests to Vite while keeping `/api/config` on the real backend. Opening Vite
-directly without Telegram launch data is not an authentication bypass.
+Launch the app through Telegram for authenticated development using the built Mini App served by the backend. Opening Vite directly without Telegram launch data is not an authentication bypass.
 
 ```sh
-deno task check
-deno task lint
-deno task test:install  # First time: install Chromium and WebKit
-deno task test
-deno task build
+bun run check
+bun run lint
+bun run test:install  # First time: install Chromium and WebKit
+bun run test
+bun run build
 ```
 
-The build produces `web/build`, matching the Dockerfile and Deno static server.
-The server supports direct SPA route loads, revalidates HTML, and caches Vite's
-hashed `/assets/` immutably. `deno task preview` is for local build inspection;
+The build produces `web/build`, matching the Dockerfile and Bun static server.
+The server supports direct SPA route loads and revalidates HTML. `bun run preview` is for local build inspection;
 it does not supply a backend or Telegram authentication.
 
 ## Ownership

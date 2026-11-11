@@ -1,7 +1,0 @@
-{
-    "compilerOptions": {
-        "jsx": "react-jsx",
-        "jsxImportSource": "@solidjs/web",
-        "lib": ["dom", "dom.iterable", "esnext"]
-    }
-}

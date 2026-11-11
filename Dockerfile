@@ -1,19 +1,20 @@
-FROM denoland/deno:2.9.4 AS builder
-ENV DENO_DIR=/deno-dir
+FROM oven/bun:1.4.4 AS builder
 WORKDIR /app
-
 COPY . .
-RUN deno install --frozen
-RUN cd web && deno task build
-RUN deno cache --frozen --allow-import main.ts
+RUN bun install --frozen-lockfile
+RUN bun run build:web
 
-FROM denoland/deno:2.9.4
-ENV DENO_DIR=/deno-dir
+FROM oven/bun:1.4.4
 WORKDIR /app
-
-RUN mkdir -p ./tmp ./log
-
-COPY --from=builder /app .
-COPY --from=builder /deno-dir /deno-dir
-
-CMD ["deno", "run", "--node-modules-dir=manual", "--allow-env", "--allow-net", "--allow-read=.", "--allow-import", "--allow-write", "--allow-sys", "--allow-ffi", "--unstable-detect-cjs", "main.ts"]
+ENV NODE_ENV=production DATA_DIR=/app/data BACKUP_DIR=/app/backups
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 util-linux \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /app/data /app/backups && chown bun:bun /app/data /app/backups
+COPY --from=builder --chown=bun:bun /app/node_modules ./node_modules
+COPY --from=builder --chown=bun:bun /app/src ./src
+COPY --from=builder --chown=bun:bun /app/shared ./shared
+COPY --from=builder --chown=bun:bun /app/packages ./packages
+COPY --from=builder --chown=bun:bun /app/web/build ./web/build
+COPY --from=builder --chown=bun:bun /app/package.json ./package.json
+USER bun
+CMD ["bun", "src/main.ts"]

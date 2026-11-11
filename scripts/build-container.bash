@@ -43,9 +43,3 @@ echo "Build context: $(pwd)"
 docker build -t "$FULL_IMAGE_NAME" .
 
 echo "Docker image built successfully: $FULL_IMAGE_NAME"
-echo ""
-echo "To run the container:"
-echo "  docker run -d --name slusha-bot --restart unless-stopped \\"
-echo "    -e BOT_TOKEN=your_bot_token \\"
-echo "    -e AI_TOKEN=your_ai_token \\"
-echo "    $FULL_IMAGE_NAME" 

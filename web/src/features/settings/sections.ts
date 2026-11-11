@@ -17,6 +17,7 @@ export const sections = [
         title: 'Model and generation',
         keys: [
             'ai.model',
+            'ai.characterNamesModel',
             'availableModels',
             'ai.imageAttachmentFallbackModel',
             'ai.temperature',
@@ -71,6 +72,7 @@ export function titleFor(key: string) {
         'ai.prompt': 'Character',
         'ai.prePrompt': 'System prompt',
         'ai.model': 'Model',
+        'ai.characterNamesModel': 'Character name model',
         'ai.imageAttachmentFallbackModel': 'Image fallback model',
         'ai.autoRerouteImageAttachments': 'Use image fallback automatically',
         availableModels: 'Available models',

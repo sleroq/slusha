@@ -24,7 +24,10 @@ export function PersonalView(props: {
     fields: ConfigField[];
     saving: boolean;
     validation: Validation;
+    resetKeys: ReadonlySet<string>;
     onChange: (field: ConfigField) => void;
+    onReset: (field: ConfigField) => void;
+    onCancelReset: (key: string) => void;
     onScope: (type: 'private' | 'group') => void;
     onGlobal: () => void;
 }) {
@@ -34,6 +37,10 @@ export function PersonalView(props: {
         ): field is Extract<ConfigField, { kind: 'text' }> =>
             field.key === 'profile.about' && field.kind === 'text'
         );
+    const model = () =>
+        props.fields.find((field): field is Extract<ConfigField, { kind: 'select' }> =>
+            field.key === 'ai.model' && field.kind === 'select'
+        );
     const chats = (type: ConfigChat['type']) =>
         props.data?.chats.filter((chat) => chat.type === type) ?? [];
     const error = () => props.validation['profile.about'];
@@ -42,6 +49,45 @@ export function PersonalView(props: {
     return (
         <>
             <p class='section-heading'>Personal settings</p>
+            <Show when={model()}>
+                <Surface>
+                    <Row class='editor-row'>
+                        <div class='editor-label'>
+                            <span id={labelId('ai.model')}>Model</span>
+                            <Show when={model()!.overridden && !props.resetKeys.has('ai.model')}>
+                                <Button class='reset-button' disabled={props.saving} aria-label='Revert model to default' onClick={() => props.onReset(model()!)}>↶</Button>
+                            </Show>
+                            <Show when={props.resetKeys.has('ai.model')}>
+                                <Button class='reset-button reset-cancel' disabled={props.saving} onClick={() => props.onCancelReset('ai.model')}>Keep override</Button>
+                            </Show>
+                        </div>
+                        <Show when={props.resetKeys.has('ai.model')}>
+                            <p class='reset-pending'>This setting will be reset when you save.</p>
+                        </Show>
+                        <Selection
+                            value={model()!.value ?? ''}
+                            options={model()!.options}
+                            disabled={props.saving || !model()!.writable}
+                            labelledBy={labelId('ai.model')}
+                            onChange={(value) => {
+                                const field = model();
+                                if (field) props.onChange({ ...field, value });
+                            }}
+                        />
+                    </Row>
+                </Surface>
+            </Show>
+            <For each={props.fields.filter((field) => field.key === 'ai.characterNamesModel')}>
+                {(field) => (
+                    <Surface>
+                        <SettingField field={field} saving={props.saving} error={props.validation[field.key]}
+                            reset={props.resetKeys.has(field.key)} onChange={props.onChange}
+                            onRaw={() => {}} inputValue={() => ''} onReset={props.onReset}
+                            onCancelReset={props.onCancelReset} isDirty={() => false} onOpen={() => {}} />
+                    </Surface>
+                )}
+            </For>
+            <Show when={about()}>
             <Surface>
                 <Row>
                     <Field
@@ -72,6 +118,7 @@ export function PersonalView(props: {
                     </Show>
                 </Row>
             </Surface>
+            </Show>
             <p class='section-heading'>Chat settings</p>
             <Surface>
                 <RowButton
