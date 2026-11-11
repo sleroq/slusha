@@ -101,9 +101,8 @@ async function snapshotSessions(source: string, target: string) {
 async function copyWorkspaces(source: string, target: string) {
     await mkdir(target);
     for (const entry of await entries(source)) {
-        if (!entry.name.endsWith('.tar')) continue;
-        if (!entry.isFile())
-            throw new Error(`Workspace archive is not a regular file: ${entry.name}`);
+        if (!entry.name.endsWith('.json')) continue;
+        if (!entry.isFile()) throw new Error(`Workspace is not a regular file: ${entry.name}`);
         await copyFile(join(source, entry.name), join(target, entry.name));
     }
 }

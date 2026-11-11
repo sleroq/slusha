@@ -1,9 +1,10 @@
 import { Database } from 'bun:sqlite';
 import { expect, test } from 'bun:test';
-import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgres from 'postgres';
+import { createSandbox } from '../sandbox';
 import { createBackup, restoreBackup, scheduleBackups } from './index';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -41,7 +42,12 @@ test.skipIf(!available)(
                 "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; CREATE TABLE events (value TEXT); INSERT INTO events VALUES ('before');",
             );
             expect(Bun.file(join(dataDir, 'sessions', '1_2.sqlite-wal')).size).toBeGreaterThan(0);
-            await writeFile(join(dataDir, 'workspaces', '1_2.tar'), 'original workspace');
+            const sandbox = createSandbox({ rootDir: join(dataDir, 'workspaces') });
+            expect(await sandbox.execute({ chatId: 1, command: 'echo original > /file' })).toEqual({
+                stdout: '',
+                stderr: '',
+                exitCode: 0,
+            });
             const backupSet = await createBackup({
                 databaseUrl: sourceUrl.toString(),
                 dataDir,
@@ -49,7 +55,12 @@ test.skipIf(!available)(
             });
             await source`INSERT INTO events VALUES ('after')`;
             sqlite.exec("INSERT INTO events VALUES ('after')");
-            await writeFile(join(dataDir, 'workspaces', '1_2.tar'), 'changed workspace');
+            expect(await sandbox.execute({ chatId: 1, command: 'echo changed > /file' })).toEqual({
+                stdout: '',
+                stderr: '',
+                exitCode: 0,
+            });
+            await sandbox.close();
             const restoredDir = join(dir, 'restored');
             expect(
                 restoreBackup({
@@ -78,12 +89,16 @@ test.skipIf(!available)(
             } finally {
                 restored.close();
             }
-            expect(await readFile(join(restoredDir, 'workspaces', '1_2.tar'), 'utf8')).toBe(
-                'original workspace',
-            );
+            const restoredSandbox = createSandbox({ rootDir: join(restoredDir, 'workspaces') });
+            expect(await restoredSandbox.execute({ chatId: 1, command: 'cat /file' })).toEqual({
+                stdout: 'original\n',
+                stderr: '',
+                exitCode: 0,
+            });
+            await restoredSandbox.close();
             await symlink(
-                join(dataDir, 'workspaces', '1_2.tar'),
-                join(dataDir, 'workspaces', 'bad.tar'),
+                join(dataDir, 'workspaces', '1.json'),
+                join(dataDir, 'workspaces', 'bad.json'),
             );
             expect(
                 createBackup({ databaseUrl: sourceUrl.toString(), dataDir, backupDir }),
@@ -109,7 +124,7 @@ test.skipIf(!available)(
                 (await new Response(cli.stdout).text()) + (await new Response(cli.stderr).text());
             expect(await cli.exited).not.toBe(0);
             expect(output).not.toContain(decodeURIComponent(sourceUrl.password));
-            await rm(join(dataDir, 'workspaces', 'bad.tar'));
+            await rm(join(dataDir, 'workspaces', 'bad.json'));
             const stop = scheduleBackups(
                 { databaseUrl: sourceUrl.toString(), dataDir, backupDir },
                 50,
