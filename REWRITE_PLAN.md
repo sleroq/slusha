@@ -92,7 +92,7 @@ Slusha responds in private and group Telegram chats using conversation history, 
 - Use one pi conversation per Telegram topic, or per chat when topics are absent. Isolate storage by chat/session by default.
 - Store each topic/chat's pi-durable state in its own SQLite database on persistent storage. PostgreSQL maps Telegram chat/topic IDs to session storage; the sandbox cannot access the databases directly.
 - The pi session is the model's context during a conversation. Populate it from Telegram history as needed; append or reconcile changes without rebuilding the entire context every generation.
-- Keep a stable context prefix across replies to benefit from provider prompt caching. Initially rotate near 70% of the model's context limit and seed the new session with up to 50 recent eligible messages that fit its budget. Treat these as tunable defaults; adjust from pricing and observed performance.
+- Keep a stable context prefix across replies to benefit from provider prompt caching. Initially rotate near 70% of the model's context limit and seed the new session with up to 20 recent eligible messages that fit its budget. Treat these as tunable defaults; adjust from pricing and observed performance.
 - Append new context as messages or system events rather than rebuilding the session. Record message edits with before/after content and reaction changes as system events.
 - Assign stable, compact message references so the agent can target replies and the application can identify messages in edits and reactions.
 - Keep other topics and relevant external context outside the active session, accessible through scoped files or tools when useful. Do not expose another chat's data unless explicitly permitted later.
