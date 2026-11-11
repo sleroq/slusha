@@ -62,23 +62,16 @@ export function createSettingsDraft() {
             if (!field.optional && field.value === '') {
                 return 'This field is required.';
             }
-            if (
-                field.maxLength !== undefined &&
-                (field.value?.length ?? 0) > field.maxLength
-            ) {
+            if (field.maxLength !== undefined && (field.value?.length ?? 0) > field.maxLength) {
                 return `Use ${field.maxLength} characters or fewer.`;
             }
         }
 
-        if (
-            field.kind === 'select' && !field.optional && field.value === null
-        ) {
+        if (field.kind === 'select' && !field.optional && field.value === null) {
             return 'Choose a value.';
         }
 
-        if (
-            field.kind === 'boolean' && !field.optional && field.value === null
-        ) {
+        if (field.kind === 'boolean' && !field.optional && field.value === null) {
             return 'Choose a value.';
         }
 
@@ -109,9 +102,7 @@ export function createSettingsDraft() {
 
     function install(data: { fields: ConfigField[] }) {
         const fields = copy(data.fields);
-        const baseline = Object.fromEntries(
-            fields.map((field) => [field.key, copy(field.value)]),
-        );
+        const baseline = Object.fromEntries(fields.map((field) => [field.key, copy(field.value)]));
         setState((current) => {
             reconcile(fields, 'key')(current.fields);
             current.baseline = baseline;
@@ -127,8 +118,10 @@ export function createSettingsDraft() {
             if (raw === '') return true;
             if (!Number.isFinite(Number(raw))) return true;
         }
-        return Boolean(state.resetKeys[field.key]) ||
-            !valuesEqual(field.value, state.baseline[field.key]);
+        return (
+            Boolean(state.resetKeys[field.key]) ||
+            !valuesEqual(field.value, state.baseline[field.key])
+        );
     }
 
     function dirtyFields() {
@@ -137,14 +130,15 @@ export function createSettingsDraft() {
 
     function updateField(field: ConfigField) {
         const next = copy(field);
-        const clearingOptional = (
-            next.kind === 'boolean' || next.kind === 'number' ||
-            next.kind === 'text' || next.kind === 'select'
-        ) && next.optional === true && next.value === null;
+        const clearingOptional =
+            (next.kind === 'boolean' ||
+                next.kind === 'number' ||
+                next.kind === 'text' ||
+                next.kind === 'select') &&
+            next.optional === true &&
+            next.value === null;
         setState((current) => {
-            const index = current.fields.findIndex((item) =>
-                item.key === next.key
-            );
+            const index = current.fields.findIndex((item) => item.key === next.key);
             if (index >= 0) reconcile(next)(current.fields[index]);
             current.resetKeys[next.key] = clearingOptional;
             if (next.kind !== 'number') delete current.rawInputs[next.key];
@@ -275,11 +269,7 @@ export function createSettingsDraft() {
             return state.validation;
         },
         get resetKeys() {
-            return new Set(
-                Object.keys(state.resetKeys).filter((key) =>
-                    state.resetKeys[key]
-                ),
-            );
+            return new Set(Object.keys(state.resetKeys).filter((key) => state.resetKeys[key]));
         },
     };
 }

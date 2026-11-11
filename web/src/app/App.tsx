@@ -1,34 +1,18 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query';
 import { z } from 'zod/mini';
+import { createRouter, useBeforeLeave, useLocation, useNavigate } from '@solidjs/router';
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from 'solid-js';
 import {
-    createRouter,
-    useBeforeLeave,
-    useLocation,
-    useNavigate,
-} from '@solidjs/router';
-import {
-    createEffect,
-    createMemo,
-    createSignal,
-    For,
-    onCleanup,
-    Show,
-    untrack,
-} from 'solid-js';
-import { Button, DialogSheet, ErrorNotice, Loading } from '@slusha/mini-app/ui';
-import {
+    Button,
+    DialogSheet,
+    ErrorNotice,
+    Loading,
     DIALOG_CHANGE_EVENT,
     dismissTopDialog,
     hasOpenDialog,
 } from '@slusha/mini-app/ui';
-import {
-    createTelegramAdapter,
-    type TelegramAdapter,
-} from '@slusha/mini-app/telegram';
-import type {
-    ConfigField,
-    ConfigSelection,
-} from '../../../shared/config-contract.ts';
+import { createTelegramAdapter, type TelegramAdapter } from '@slusha/mini-app/telegram';
+import type { ConfigField, ConfigSelection } from '../../../shared/config-contract.ts';
 import { createSettingsSession } from '../features/settings/session.ts';
 import {
     EditorView,
@@ -37,17 +21,9 @@ import {
     SectionView,
     SettingsLoading,
 } from '../features/settings/editors.tsx';
-import {
-    sectionFor,
-    type SectionId,
-    sections,
-    titleFor,
-} from '../features/settings/sections.ts';
+import { sectionFor, type SectionId, sections, titleFor } from '../features/settings/sections.ts';
 
-type HostFactory = (callbacks: {
-    onBack: () => void;
-    onMain: () => void;
-}) => TelegramAdapter;
+type HostFactory = (callbacks: { onBack: () => void; onMain: () => void }) => TelegramAdapter;
 
 export type AppProps = { createHost?: HostFactory };
 
@@ -64,10 +40,8 @@ function parseSelection(search: string): ConfigSelection | undefined {
     const scope = params.get('scope');
     const chatIdText = params.get('chatId');
     if (scope === null && chatIdText === null) return undefined;
-    if (
-        scope !== 'personal' && scope !== 'private' && scope !== 'group' &&
-        scope !== 'global'
-    ) return undefined;
+    if (scope !== 'personal' && scope !== 'private' && scope !== 'group' && scope !== 'global')
+        return undefined;
     if (scope === 'private' || scope === 'group') {
         if (chatIdText === null || !/^-?\d+$/.test(chatIdText)) {
             return undefined;
@@ -134,9 +108,7 @@ function parseRoute(pathname: string, search: string): Route {
         };
     }
 
-    if (
-        parts[0] === 'section' && parts.length === 4 && parts[2] === 'editor'
-    ) {
+    if (parts[0] === 'section' && parts.length === 4 && parts[2] === 'editor') {
         const sectionId = decodeSegment(parts[1]);
         const field = decodeSegment(parts[3]);
         let section;
@@ -144,7 +116,9 @@ function parseRoute(pathname: string, search: string): Route {
         let derived;
         if (field) derived = sectionFor(field);
         return {
-            valid: Boolean(section) && Boolean(field) &&
+            valid:
+                Boolean(section) &&
+                Boolean(field) &&
                 (!derived || derived.id === section?.id) &&
                 selection !== undefined,
             kind: 'editor',
@@ -169,9 +143,7 @@ function selectionUrl(
     }
     let path = '/';
     if (kind === 'editor' && section && field) {
-        path = `/section/${encodeURIComponent(section)}/editor/${
-            encodeURIComponent(field)
-        }`;
+        path = `/section/${encodeURIComponent(section)}/editor/${encodeURIComponent(field)}`;
     } else if (kind === 'editor' && field) {
         path = `/editor/${encodeURIComponent(field)}`;
     } else if (kind === 'section' && section) {
@@ -201,7 +173,7 @@ export function App(props: AppProps = {}) {
 function NotFound() {
     const navigate = useNavigate();
     return (
-        <main class='app-shell'>
+        <main class="app-shell">
             <h1 tabindex={-1}>Page not found</h1>
             <Button onClick={() => navigate('/')}>Go home</Button>
         </main>
@@ -242,16 +214,22 @@ function AppRoot(props: { createHost: HostFactory }) {
         routes: [{ path: '/*route', component: () => null }],
     });
 
-    createEffect(() => true, () => {
-        void Promise.resolve().then(() => adapter.mount()).then((value) => {
-            setAuth(value);
-            setReady(true);
-        }).catch((cause) => {
-            if (cause instanceof Error) setBootError(cause.message);
-            else setBootError('Could not initialize Telegram');
-            setReady(true);
-        });
-    });
+    createEffect(
+        () => true,
+        () => {
+            void Promise.resolve()
+                .then(() => adapter.mount())
+                .then((value) => {
+                    setAuth(value);
+                    setReady(true);
+                })
+                .catch((cause) => {
+                    if (cause instanceof Error) setBootError(cause.message);
+                    else setBootError('Could not initialize Telegram');
+                    setReady(true);
+                });
+        },
+    );
     onCleanup(() => adapter.dispose());
 
     return (
@@ -264,8 +242,7 @@ function AppRoot(props: { createHost: HostFactory }) {
                     adapter={adapter}
                     session={session}
                     setRoute={setCurrentRoute}
-                    registerCanonical={(handler) =>
-                        canonicalNavigation = handler}
+                    registerCanonical={(handler) => (canonicalNavigation = handler)}
                     registerHandlers={(handlers) => {
                         backHandler = handlers.back;
                         mainHandler = handlers.main;
@@ -283,24 +260,19 @@ function RouteOwner(props: {
     adapter: TelegramAdapter;
     session: ReturnType<typeof createSettingsSession>;
     setRoute: (route: Route) => void;
-    registerCanonical: (
-        handler: (selection: ConfigSelection) => void,
-    ) => void;
-    registerHandlers: (
-        handlers: { back: () => void; main: () => void },
-    ) => void;
+    registerCanonical: (handler: (selection: ConfigSelection) => void) => void;
+    registerHandlers: (handlers: { back: () => void; main: () => void }) => void;
 }) {
     const location = useLocation();
-    const route = createMemo(() =>
-        parseRoute(location.pathname, location.search)
-    );
+    const route = createMemo(() => parseRoute(location.pathname, location.search));
     const navigate = useNavigate();
 
     const registerCanonical = untrack(() => props.registerCanonical);
     registerCanonical((selection) => {
         const currentRoute = untrack(() => route());
         if (
-            currentRoute.valid && currentRoute.kind === 'home' &&
+            currentRoute.valid &&
+            currentRoute.kind === 'home' &&
             currentRoute.selection === undefined
         ) {
             navigate(selectionUrl(selection), { replace: true });
@@ -315,14 +287,11 @@ function RouteOwner(props: {
     );
 
     return (
-        <Show
-            when={props.ready()}
-            fallback={<Loading label='Starting settings' />}
-        >
+        <Show when={props.ready()} fallback={<Loading label="Starting settings" />}>
             <Show
                 when={!props.bootError()}
                 fallback={
-                    <main class='app-shell'>
+                    <main class="app-shell">
                         <ErrorNotice message={props.bootError()} />
                     </main>
                 }
@@ -350,18 +319,14 @@ type SettingsAppProps = {
     navigate: ReturnType<typeof useNavigate>;
     adapter: TelegramAdapter;
     session: ReturnType<typeof createSettingsSession>;
-    registerHandlers: (
-        handlers: { back: () => void; main: () => void },
-    ) => void;
+    registerHandlers: (handlers: { back: () => void; main: () => void }) => void;
 };
 
 function SettingsApp(props: SettingsAppProps) {
     const session = untrack(() => props.session);
     const [dialog, setDialog] = createSignal<'unsaved' | 'chat' | 'reset'>();
     const [resetField, setResetField] = createSignal<ConfigField>();
-    const [chatType, setChatType] = createSignal<'private' | 'group'>(
-        'private',
-    );
+    const [chatType, setChatType] = createSignal<'private' | 'group'>('private');
     const [chatSearch, setChatSearch] = createSignal('');
     const [pending, setPending] = createSignal<{
         to: string | number;
@@ -372,14 +337,15 @@ function SettingsApp(props: SettingsAppProps) {
     let heading: HTMLHeadingElement | undefined;
     let focusHeading = false;
 
-    createEffect(() => true, () => {
-        const update = () => setOpenDialog(hasOpenDialog());
-        document.addEventListener(DIALOG_CHANGE_EVENT, update);
-        update();
-        onCleanup(() =>
-            document.removeEventListener(DIALOG_CHANGE_EVENT, update)
-        );
-    });
+    createEffect(
+        () => true,
+        () => {
+            const update = () => setOpenDialog(hasOpenDialog());
+            document.addEventListener(DIALOG_CHANGE_EVENT, update);
+            update();
+            onCleanup(() => document.removeEventListener(DIALOG_CHANGE_EVENT, update));
+        },
+    );
 
     createEffect(
         () => [props.location.pathname, props.location.search],
@@ -396,24 +362,16 @@ function SettingsApp(props: SettingsAppProps) {
         let targetLocation = event.to;
         const offset = z.number().safeParse(event.to);
         if (offset.success) {
-            targetLocation = globalThis.location.pathname +
-                globalThis.location.search;
+            targetLocation = globalThis.location.pathname + globalThis.location.search;
         }
         let targetRoute: Route | undefined;
         const path = z.string().safeParse(targetLocation);
         if (path.success) {
-            const destination = new URL(
-                path.data,
-                globalThis.location.origin,
-            );
-            targetRoute = parseRoute(
-                destination.pathname,
-                destination.search,
-            );
+            const destination = new URL(path.data, globalThis.location.origin);
+            targetRoute = parseRoute(destination.pathname, destination.search);
         }
         const to = targetRoute?.selection;
-        const scopeChanged = from?.scope !== to?.scope ||
-            from?.chatId !== to?.chatId;
+        const scopeChanged = from?.scope !== to?.scope || from?.chatId !== to?.chatId;
         if (!scopeChanged) return;
         if (session.saving()) {
             event.preventDefault();
@@ -421,7 +379,7 @@ function SettingsApp(props: SettingsAppProps) {
         }
         if (!session.dirty()) return;
         event.preventDefault();
-        setPending({ to: target, retry: event.retry, selection: to });
+        setPending({ to: target, retry: (force) => event.retry(force), selection: to });
         setDialog('unsaved');
     });
 
@@ -446,9 +404,7 @@ function SettingsApp(props: SettingsAppProps) {
                 main: {
                     text: saveLabel(),
                     visible: dirty,
-                    enabled: dirty &&
-                        Object.keys(session.validation()).length === 0 &&
-                        !saving,
+                    enabled: dirty && Object.keys(session.validation()).length === 0 && !saving,
                     loading: saving,
                 },
             });
@@ -456,8 +412,7 @@ function SettingsApp(props: SettingsAppProps) {
     );
 
     function canGoBack() {
-        return props.route.kind !== 'home' ||
-            props.route.selection?.scope !== 'personal';
+        return props.route.kind !== 'home' || props.route.selection?.scope !== 'personal';
     }
 
     function routeTo(
@@ -562,16 +517,13 @@ function SettingsApp(props: SettingsAppProps) {
     const data = () => session.query.data;
     const chatList = createMemo(() => {
         const query = chatSearch().toLocaleLowerCase();
-        return (data()?.chats ?? []).filter((chat) =>
-            chat.type === chatType() &&
-            chat.title.toLocaleLowerCase().includes(query)
+        return (data()?.chats ?? []).filter(
+            (chat) => chat.type === chatType() && chat.title.toLocaleLowerCase().includes(query),
         );
     });
     const editorField = createMemo(() => {
         if (!props.route.field) return undefined;
-        return session.fields().find((field) =>
-            field.key === props.route.field
-        );
+        return session.fields().find((field) => field.key === props.route.field);
     });
     const saveRetry = createMemo<(() => void) | undefined>(() => {
         const error = session.saveError();
@@ -593,69 +545,65 @@ function SettingsApp(props: SettingsAppProps) {
             return 'Slusha Settings';
         }
         if (props.route.selection?.scope === 'global') return 'Global Settings';
-        const chat = data()?.chats.find((item) =>
-            item.id === props.route.selection?.chatId
-        );
+        const chat = data()?.chats.find((item) => item.id === props.route.selection?.chatId);
         if (chat) return chat.title;
         return 'Chat Settings';
     });
     const availableSections = createMemo(() =>
         sections.filter((item) =>
-            item.keys.some((key) =>
-                session.fields().some((field) => field.key === key)
-            )
-        )
+            item.keys.some((key) => session.fields().some((field) => field.key === key)),
+        ),
     );
 
     return (
         <main
-            class='app-shell'
+            class="app-shell"
             style={{
                 'padding-top': 'var(--app-safe-top)',
                 'padding-left': 'max(.75rem, var(--app-safe-left))',
                 'padding-right': 'max(.75rem, var(--app-safe-right))',
             }}
         >
-            <header class='app-header'>
+            <header class="app-header">
                 <Show when={canGoBack() && !props.adapter.nativeBack}>
-                    <Button class='button-plain back-button' onClick={back}>
+                    <Button class="button-plain back-button" onClick={back}>
                         ‹ Back
                     </Button>
                 </Show>
-                <h1 ref={(element) => heading = element} tabindex={-1}>
+                <h1 ref={(element) => (heading = element)} tabindex={-1}>
                     {pageTitle()}
                 </h1>
             </header>
-            <Show
-                when={session.query.isFetching && session.fields().length > 0}
-            >
-                <p class='refreshing' role='status'>Refreshing…</p>
+            <Show when={session.query.isFetching && session.fields().length > 0}>
+                <p class="refreshing" role="status">
+                    Refreshing…
+                </p>
             </Show>
             <Show when={session.query.isError && session.fields().length > 0}>
                 <ErrorNotice
-                    message={session.query.error?.message ??
-                        'Could not refresh settings'}
+                    message={session.query.error?.message ?? 'Could not refresh settings'}
                     retry={() => void session.query.refetch()}
                 />
             </Show>
-            <Show
-                when={session.query.isPending && session.fields().length === 0}
-            >
+            <Show when={session.query.isPending && session.fields().length === 0}>
                 <SettingsLoading
-                    personal={props.route.selection === undefined ||
-                        props.route.selection.scope === 'personal'}
+                    personal={
+                        props.route.selection === undefined ||
+                        props.route.selection.scope === 'personal'
+                    }
                 />
             </Show>
             <Show when={session.query.isError && session.fields().length === 0}>
                 <ErrorNotice
-                    message={session.query.error?.message ??
-                        'Could not load settings'}
+                    message={session.query.error?.message ?? 'Could not load settings'}
                     retry={() => void session.query.refetch()}
                 />
             </Show>
             <Show
-                when={!session.query.isPending &&
-                    !(session.query.isError && session.fields().length === 0)}
+                when={
+                    !session.query.isPending &&
+                    !(session.query.isError && session.fields().length === 0)
+                }
             >
                 <Show when={!props.route.field && props.route.section}>
                     <SectionView
@@ -671,12 +619,8 @@ function SettingsApp(props: SettingsAppProps) {
                         onCancelReset={session.cancelReset}
                         isDirty={session.draft.isDirty}
                         onOpen={(key) =>
-                            routeTo(
-                                props.route.selection!,
-                                'editor',
-                                props.route.section,
-                                key,
-                            )}
+                            routeTo(props.route.selection!, 'editor', props.route.section, key)
+                        }
                     />
                 </Show>
                 <Show when={props.route.field}>
@@ -695,8 +639,11 @@ function SettingsApp(props: SettingsAppProps) {
                     </Show>
                 </Show>
                 <Show
-                    when={!props.route.field && !props.route.section &&
-                        props.route.selection?.scope === 'personal'}
+                    when={
+                        !props.route.field &&
+                        !props.route.section &&
+                        props.route.selection?.scope === 'personal'
+                    }
                 >
                     <PersonalView
                         data={data()}
@@ -713,33 +660,28 @@ function SettingsApp(props: SettingsAppProps) {
                     />
                 </Show>
                 <Show
-                    when={!props.route.field && !props.route.section &&
-                        props.route.selection?.scope !== 'personal'}
+                    when={
+                        !props.route.field &&
+                        !props.route.section &&
+                        props.route.selection?.scope !== 'personal'
+                    }
                 >
                     <ScopeView
                         fields={session.fields()}
                         sections={availableSections()}
                         saving={session.saving()}
-                        onOpen={(id) =>
-                            routeTo(props.route.selection!, 'section', id)}
+                        onOpen={(id) => routeTo(props.route.selection!, 'section', id)}
                     />
                 </Show>
             </Show>
             <Show when={session.saveError()}>
-                <ErrorNotice
-                    message={session.saveError()!.message}
-                    retry={saveRetry()}
-                />
+                <ErrorNotice message={session.saveError()!.message} retry={saveRetry()} />
             </Show>
-            <Show
-                when={session.dirty() && !session.query.isPending &&
-                    !props.adapter.nativeMain}
-            >
-                <div class='save-bar'>
+            <Show when={session.dirty() && !session.query.isPending && !props.adapter.nativeMain}>
+                <div class="save-bar">
                     <Button
-                        class='button-primary save-button'
-                        disabled={session.saving() ||
-                            Object.keys(session.validation()).length > 0}
+                        class="button-primary save-button"
+                        disabled={session.saving() || Object.keys(session.validation()).length > 0}
                         onClick={() => void session.save()}
                     >
                         {saveLabel()}
@@ -747,24 +689,19 @@ function SettingsApp(props: SettingsAppProps) {
                 </div>
             </Show>
             <Show when={dialog() === 'chat'}>
-                <DialogSheet
-                    open
-                    title={chatPickerTitle()}
-                    onClose={() => setDialog()}
-                >
-                    <div class='chat-picker'>
+                <DialogSheet open title={chatPickerTitle()} onClose={() => setDialog()}>
+                    <div class="chat-picker">
                         <input
                             autofocus
-                            type='search'
-                            placeholder='Search'
+                            type="search"
+                            placeholder="Search"
                             value={chatSearch()}
-                            onInput={(event) =>
-                                setChatSearch(event.currentTarget.value)}
+                            onInput={(event) => setChatSearch(event.currentTarget.value)}
                         />
                         <For each={chatList()}>
                             {(chat) => (
                                 <button
-                                    type='button'
+                                    type="button"
                                     onClick={() => {
                                         setDialog();
                                         requestSelection({
@@ -781,31 +718,21 @@ function SettingsApp(props: SettingsAppProps) {
                 </DialogSheet>
             </Show>
             <Show when={dialog() === 'unsaved'}>
-                <DialogSheet
-                    open
-                    title='Save your changes?'
-                    onClose={closeUnsaved}
-                >
-                    <p>
-                        Save or discard the changes in this scope before
-                        switching.
-                    </p>
-                    <div class='dialog-actions'>
+                <DialogSheet open title="Save your changes?" onClose={closeUnsaved}>
+                    <p>Save or discard the changes in this scope before switching.</p>
+                    <div class="dialog-actions">
                         <Button
-                            class='button-primary'
+                            class="button-primary"
                             disabled={session.saving()}
                             onClick={() => void saveAndContinue()}
                         >
                             {unsavedActionLabel()}
                         </Button>
-                        <Button
-                            disabled={session.saving()}
-                            onClick={discardAndContinue}
-                        >
+                        <Button disabled={session.saving()} onClick={discardAndContinue}>
                             Discard changes
                         </Button>
                         <Button
-                            class='button-plain'
+                            class="button-plain"
                             disabled={session.saving()}
                             onClick={() => setDialog()}
                         >
@@ -820,18 +747,12 @@ function SettingsApp(props: SettingsAppProps) {
                     title={`Revert ${titleFor(resetField()?.key ?? '')}?`}
                     onClose={() => setDialog()}
                 >
-                    <p>
-                        This setting will return to its inherited value when you
-                        save.
-                    </p>
-                    <div class='dialog-actions'>
-                        <Button class='button-primary' onClick={confirmReset}>
+                    <p>This setting will return to its inherited value when you save.</p>
+                    <div class="dialog-actions">
+                        <Button class="button-primary" onClick={confirmReset}>
                             Revert
                         </Button>
-                        <Button
-                            class='button-plain'
-                            onClick={() => setDialog()}
-                        >
+                        <Button class="button-plain" onClick={() => setDialog()}>
                             Cancel
                         </Button>
                     </div>

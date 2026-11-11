@@ -7,10 +7,26 @@
     --app-surface-color: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #fff));
     --app-separator-color: var(--tg-theme-section-separator-color, #dfe1e5);
     --app-destructive-color: var(--tg-theme-destructive-text-color, #d14e4e);
-    --app-safe-top: max(.25rem, var(--tg-viewport-safe-area-inset-top, 0px), var(--tg-viewport-content-safe-area-inset-top, 0px));
-    --app-safe-bottom: max(.75rem, var(--tg-viewport-safe-area-inset-bottom, 0px), var(--tg-viewport-content-safe-area-inset-bottom, 0px));
-    --app-safe-left: max(0px, var(--tg-viewport-safe-area-inset-left, 0px), var(--tg-viewport-content-safe-area-inset-left, 0px));
-    --app-safe-right: max(0px, var(--tg-viewport-safe-area-inset-right, 0px), var(--tg-viewport-content-safe-area-inset-right, 0px));
+    --app-safe-top: max(
+        .25rem,
+        var(--tg-viewport-safe-area-inset-top, 0px),
+        var(--tg-viewport-content-safe-area-inset-top, 0px)
+    );
+    --app-safe-bottom: max(
+        .75rem,
+        var(--tg-viewport-safe-area-inset-bottom, 0px),
+        var(--tg-viewport-content-safe-area-inset-bottom, 0px)
+    );
+    --app-safe-left: max(
+        0px,
+        var(--tg-viewport-safe-area-inset-left, 0px),
+        var(--tg-viewport-content-safe-area-inset-left, 0px)
+    );
+    --app-safe-right: max(
+        0px,
+        var(--tg-viewport-safe-area-inset-right, 0px),
+        var(--tg-viewport-content-safe-area-inset-right, 0px)
+    );
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     color: var(--tg-theme-text-color, #111827);
     background: var(--app-bg-color);
@@ -30,7 +46,7 @@ button {
 }
 button:disabled {
     cursor: not-allowed;
-    opacity: .55;
+    opacity: 0.55;
 }
 button:focus-visible,
 input:focus-visible,
@@ -54,7 +70,7 @@ select:focus-visible {
     min-height: 3.5rem;
     width: 100%;
     align-items: center;
-    gap: .75rem;
+    gap: 0.75rem;
     border: 0;
     border-top: 1px solid var(--app-separator-color);
     background: none;
@@ -89,14 +105,14 @@ select:focus-visible {
 }
 .field-label {
     display: block;
-    margin-bottom: .5rem;
+    margin-bottom: 0.5rem;
     font-weight: 600;
 }
 .field-error {
     display: block;
     color: var(--app-destructive-color);
-    font-size: .8rem;
-    margin-top: .35rem;
+    font-size: 0.8rem;
+    margin-top: 0.35rem;
 }
 .switch {
     display: inline-flex;
@@ -123,11 +139,11 @@ select:focus-visible {
     position: absolute;
     width: 1.25rem;
     height: 1.25rem;
-    left: .25rem;
-    top: .25rem;
+    left: 0.25rem;
+    top: 0.25rem;
     border-radius: 50%;
     background: #fff;
-    transition: transform .15s;
+    transition: transform 0.15s;
 }
 .switch input:checked + span {
     background: var(--tg-theme-button-color, #3390ec);
@@ -148,34 +164,32 @@ select:focus-visible {
     cursor: pointer;
 }
 .slider::-webkit-slider-runnable-track {
-    height: .25rem;
+    height: 0.25rem;
     border-radius: 999px;
     background: linear-gradient(
         to right,
         var(--tg-theme-button-color, #3390ec) var(--range-progress),
         color-mix(in srgb, var(--tg-theme-hint-color, #707579) 32%, transparent)
-        var(--range-progress)
+            var(--range-progress)
     );
 }
 .slider::-webkit-slider-thumb {
     width: 1.25rem;
     height: 1.25rem;
-    margin-top: -.5rem;
+    margin-top: -0.5rem;
     appearance: none;
     border: 0;
     border-radius: 50%;
     background: var(--tg-theme-button-color, #3390ec);
-    box-shadow: 0 1px 3px color-mix(in srgb, var(--tg-theme-text-color, #111827)
-        24%, transparent);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--tg-theme-text-color, #111827) 24%, transparent);
 }
 .slider::-moz-range-track {
-    height: .25rem;
+    height: 0.25rem;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--tg-theme-hint-color, #707579) 32%,
-        transparent);
+    background: color-mix(in srgb, var(--tg-theme-hint-color, #707579) 32%, transparent);
 }
 .slider::-moz-range-progress {
-    height: .25rem;
+    height: 0.25rem;
     border-radius: 999px;
     background: var(--tg-theme-button-color, #3390ec);
 }
@@ -185,8 +199,7 @@ select:focus-visible {
     border: 0;
     border-radius: 50%;
     background: var(--tg-theme-button-color, #3390ec);
-    box-shadow: 0 1px 3px color-mix(in srgb, var(--tg-theme-text-color, #111827)
-        24%, transparent);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--tg-theme-text-color, #111827) 24%, transparent);
 }
 .selection {
     display: flex;
@@ -196,46 +209,46 @@ select:focus-visible {
     justify-content: space-between;
     align-items: center;
     border: 0;
-    border-radius: .75rem;
-    padding: 0 .75rem;
+    border-radius: 0.75rem;
+    padding: 0 0.75rem;
     background: var(--tg-theme-secondary-bg-color, #f2f3f5);
     text-align: left;
     overflow-wrap: anywhere;
 }
 .loading {
     display: flex;
-    gap: .4rem;
+    gap: 0.4rem;
     justify-content: center;
     padding: 3rem;
 }
 .loading span {
-    width: .5rem;
-    height: .5rem;
+    width: 0.5rem;
+    height: 0.5rem;
     border-radius: 50%;
     background: var(--tg-theme-hint-color, #707579);
     animation: pulse 1s infinite alternate;
 }
 .loading span:nth-child(2) {
-    animation-delay: .15s;
+    animation-delay: 0.15s;
 }
 .loading span:nth-child(3) {
-    animation-delay: .3s;
+    animation-delay: 0.3s;
 }
 @keyframes pulse {
     to {
-        opacity: .25;
-        transform: translateY(-.2rem);
+        opacity: 0.25;
+        transform: translateY(-0.2rem);
     }
 }
 .error-notice {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: .75rem;
-    padding: .75rem 1rem;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
     color: var(--app-destructive-color);
     background: #d14e4e1f;
-    border-radius: .75rem;
+    border-radius: 0.75rem;
 }
 .dialog-sheet {
     position: fixed;
@@ -253,7 +266,7 @@ select:focus-visible {
     max-width: none;
     max-height: min(80dvh, var(--tg-viewport-stable-height, 80dvh));
     overflow: hidden;
-    animation: dialog-sheet-enter .16s ease-out;
+    animation: dialog-sheet-enter 0.16s ease-out;
 }
 .dialog-sheet::backdrop {
     background: #000b;
@@ -267,7 +280,7 @@ select:focus-visible {
     flex-shrink: 0;
     align-items: center;
     justify-content: space-between;
-    padding: .75rem 1rem;
+    padding: 0.75rem 1rem;
 }
 .dialog-sheet header button {
     border: 0;
@@ -307,8 +320,8 @@ select:focus-visible {
     *,
     *::before,
     *::after {
-        animation-duration: .01ms !important;
+        animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
-        transition-duration: .01ms !important;
+        transition-duration: 0.01ms !important;
     }
 }

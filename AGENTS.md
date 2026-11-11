@@ -1,4 +1,3 @@
-- Prefer if / else over ternary operators
 - when writing docs drop all of the words that can be left out without idea loosing it's meaning - this way keep the plans concrete but concise with no unnecessary words
 - avoid adding any unit-tests. ideally no unit-tests in the repo unless user-confirmed. instead write integration tests, e2e tests
 - The agent maintains Slusha; the user owns product decisions. Use domain methods where they clarify behavior; avoid unnecessary layers and branching.

@@ -11,11 +11,11 @@ export function Field(
     return (
         <label class={['field', props.class]}>
             <Show when={props.label}>
-                <span class='field-label'>{props.label}</span>
+                <span class="field-label">{props.label}</span>
             </Show>
             {props.children}
             <Show when={props.error}>
-                <span id={props.errorId} class='field-error' role='alert'>
+                <span id={props.errorId} class="field-error" role="alert">
                     {props.error}
                 </span>
             </Show>

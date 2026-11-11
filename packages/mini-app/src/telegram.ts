@@ -24,15 +24,16 @@ export type TelegramChrome = {
 export interface TelegramAdapter {
     mount(): string | Promise<string>;
     sync(chrome: TelegramChrome): void;
-    notifySuccess(): void;
+    notifySuccess(this: void): void;
     dispose(): void;
     readonly nativeBack: boolean;
     readonly nativeMain: boolean;
 }
 
-export function createTelegramAdapter(
-    callbacks: { onBack: () => void; onMain: () => void },
-): TelegramAdapter {
+export function createTelegramAdapter(callbacks: {
+    onBack: () => void;
+    onMain: () => void;
+}): TelegramAdapter {
     const cleanups: VoidFunction[] = [];
     let disposed = false;
     let mounted = false;
@@ -108,14 +109,16 @@ export function createTelegramAdapter(
 
         const viewportMount = viewport.mount.ifAvailable();
         if (viewportMount.ok) {
-            void Promise.resolve(viewportMount.data).then(() => {
-                if (disposed) return;
-                const binding = viewport.bindCssVars.ifAvailable();
-                if (binding.ok) cleanups.push(binding.data);
-                viewport.expand.ifAvailable();
-            }).catch(() => {
-                // Viewport support is optional and must not prevent config loading.
-            });
+            void Promise.resolve(viewportMount.data)
+                .then(() => {
+                    if (disposed) return;
+                    const binding = viewport.bindCssVars.ifAvailable();
+                    if (binding.ok) cleanups.push(binding.data);
+                    viewport.expand.ifAvailable();
+                })
+                .catch(() => {
+                    // Viewport support is optional and must not prevent config loading.
+                });
         }
         return auth;
     }

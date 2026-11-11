@@ -1,12 +1,7 @@
 import { z } from 'zod/mini';
 import { CONFIG_CONTRACT_VERSION } from './config-contract-version.ts';
 
-const configScopeSchema = z.enum([
-    'personal',
-    'private',
-    'group',
-    'global',
-]);
+const configScopeSchema = z.enum(['personal', 'private', 'group', 'global']);
 
 const matcherSchema = z.union([
     z.string(),
@@ -97,11 +92,13 @@ export const configResponseSchema = z.strictObject({
     chatId: z.optional(z.number()),
     fields: z.array(configFieldSchema),
     scopes: z.array(configScopeSchema),
-    chats: z.array(z.strictObject({
-        id: z.number(),
-        title: z.string(),
-        type: z.enum(['private', 'group']),
-    })),
+    chats: z.array(
+        z.strictObject({
+            id: z.number(),
+            title: z.string(),
+            type: z.enum(['private', 'group']),
+        }),
+    ),
     isAdmin: z.boolean(),
 });
 
@@ -118,9 +115,9 @@ const resetConfigOperationSchema = z.strictObject({
 export const updateConfigSchema = z.strictObject({
     scope: configScopeSchema,
     chatId: z.optional(z.number().check(z.int())),
-    operations: z.array(
-        z.union([setConfigOperationSchema, resetConfigOperationSchema]),
-    ).check(z.minLength(1), z.maxLength(100)),
+    operations: z
+        .array(z.union([setConfigOperationSchema, resetConfigOperationSchema]))
+        .check(z.minLength(1), z.maxLength(100)),
 });
 
 export const apiErrorSchema = z.strictObject({
@@ -140,12 +137,7 @@ export type ConfigEditor = {
         'key' | 'value' | 'overridden' | 'writable' | 'inheritedValue'
     >;
 }[ConfigField['kind']];
-export type ConfigSelection = Pick<
-    z.infer<typeof configResponseSchema>,
-    'scope' | 'chatId'
->;
+export type ConfigSelection = Pick<z.infer<typeof configResponseSchema>, 'scope' | 'chatId'>;
 export type ConfigResponse = z.infer<typeof configResponseSchema>;
-export type ConfigOperation = z.infer<
-    typeof updateConfigSchema
->['operations'][number];
+export type ConfigOperation = z.infer<typeof updateConfigSchema>['operations'][number];
 export type ApiErrorResponse = z.infer<typeof apiErrorSchema>;

@@ -61,35 +61,36 @@ export const sections = [
     },
 ] as const;
 
-export type SectionId = typeof sections[number]['id'];
+export type SectionId = (typeof sections)[number]['id'];
 
 export function sectionFor(id: string) {
     return sections.find((section) => section.id === id);
 }
 
 export function titleFor(key: string) {
-    const labels = new Map(Object.entries({
-        'ai.prompt': 'Character',
-        'ai.prePrompt': 'System prompt',
-        'ai.chatActionsToolDescription': 'Chat action guidance (not tool schema)',
-        'ai.model': 'Model',
-        'ai.characterNamesModel': 'Character name model',
-        'ai.imageAttachmentFallbackModel': 'Image fallback model',
-        'ai.autoRerouteImageAttachments': 'Use image fallback automatically',
-        availableModels: 'Available models',
-        names: 'Names',
-        tendToReply: 'Reply when matched',
-        tendToIgnore: 'Ignore when matched',
-        nepons: 'Fallback replies',
-        blacklistedReactions: 'Blocked reactions',
-        locale: 'Language',
-    }));
+    const labels = new Map(
+        Object.entries({
+            'ai.prompt': 'Character',
+            'ai.prePrompt': 'System prompt',
+            'ai.chatActionsToolDescription': 'Chat action guidance (not tool schema)',
+            'ai.model': 'Model',
+            'ai.characterNamesModel': 'Character name model',
+            'ai.imageAttachmentFallbackModel': 'Image fallback model',
+            'ai.autoRerouteImageAttachments': 'Use image fallback automatically',
+            availableModels: 'Available models',
+            names: 'Names',
+            tendToReply: 'Reply when matched',
+            tendToIgnore: 'Ignore when matched',
+            nepons: 'Fallback replies',
+            blacklistedReactions: 'Blocked reactions',
+            locale: 'Language',
+        }),
+    );
     const last = key.split('.').at(-1) ?? key;
-    return labels.get(key) ??
-        last.replace(/([A-Z])/g, ' $1').replace(
-            /^./,
-            (value) => value.toUpperCase(),
-        );
+    return (
+        labels.get(key) ??
+        last.replace(/([A-Z])/g, ' $1').replace(/^./, (value) => value.toUpperCase())
+    );
 }
 
 export function labelId(key: string) {

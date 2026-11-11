@@ -6,7 +6,9 @@ export function pollingApi(api: Api): IngestionApi {
     return {
         async getUpdates(options, signal) {
             const controller = new AbortController();
-            function abort() { controller.abort(); }
+            function abort() {
+                controller.abort();
+            }
             if (signal?.aborted) abort();
             else signal?.addEventListener('abort', abort, { once: true });
             try {

@@ -1,43 +1,53 @@
 {
-  "name": "slusha",
-  "private": true,
-  "type": "module",
-  "packageManager": "bun@1.4.4",
-  "workspaces": ["web", "packages/*"],
-  "overrides": {
-    "@solidjs/compiler": "2.0.0-rc.8",
-    "@solidjs/babel-plugin": "2.0.0-rc.8",
-    "@solidjs/signals": "2.0.0-rc.8"
-  },
-  "scripts": {
-    "start": "bun src/main.ts",
-    "dev": "bun --watch src/main.ts",
-    "check": "tsc --noEmit",
-    "test": "bun test src",
-    "db:migrate": "bun src/db/migrate.ts",
-    "db:import-legacy": "bun src/db/import-legacy.ts",
-    "build:web": "bun run --cwd web build"
-  },
-  "dependencies": {
-    "@earendil-works/chord": "1.5.2",
-    "@earendil-works/pi-ai": "1.5.2",
-    "@earendil-works/pi-durable": "1.5.2",
-    "@earendil-works/pi-schema": "1.5.2",
-    "@earendil-works/pi-telemetry": "1.5.2",
-    "@langfuse/otel": "5.10.1",
-    "@opentelemetry/api": "1.9.0",
-    "@opentelemetry/exporter-trace-otlp-http": "0.221.0",
-    "@opentelemetry/sdk-trace-base": "2.10.0",
-    "@tma.js/init-data-node": "2.0.8",
-    "abort-controller": "3.0.0",
-    "drizzle-orm": "0.45.4",
-    "grammy": "1.46.0",
-    "postgres": "3.4.8",
-    "zod": "4.4.3"
-  },
-  "devDependencies": {
-    "@types/bun": "1.4.4",
-    "drizzle-kit": "0.31.10",
-    "typescript": "6.0.3"
-  }
+    "name": "slusha",
+    "private": true,
+    "type": "module",
+    "packageManager": "bun@1.4.4",
+    "workspaces": [
+        "web",
+        "packages/*"
+    ],
+    "overrides": {
+        "@solidjs/compiler": "2.0.0-rc.8",
+        "@solidjs/babel-plugin": "2.0.0-rc.8",
+        "@solidjs/signals": "2.0.0-rc.8"
+    },
+    "scripts": {
+        "start": "bun src/main.ts",
+        "dev": "bun --watch src/main.ts",
+        "check": "tsc --noEmit",
+        "test": "bun test src",
+        "db:migrate": "bun src/db/migrate.ts",
+        "db:import-legacy": "bun src/db/import-legacy.ts",
+        "build:web": "bun run --cwd web build",
+        "format": "bun fmt",
+        "format:check": "bun fmt --check",
+        "lint": "oxlint --deny-warnings src shared web packages oxlint.config.ts",
+        "lint:fix": "oxlint --deny-warnings --fix src shared web packages oxlint.config.ts"
+    },
+    "dependencies": {
+        "@earendil-works/chord": "1.5.2",
+        "@earendil-works/pi-ai": "1.5.2",
+        "@earendil-works/pi-durable": "1.5.2",
+        "@earendil-works/pi-schema": "1.5.2",
+        "@earendil-works/pi-telemetry": "1.5.2",
+        "@langfuse/otel": "5.10.1",
+        "@opentelemetry/api": "1.9.0",
+        "@opentelemetry/exporter-trace-otlp-http": "0.221.0",
+        "@opentelemetry/sdk-trace-base": "2.10.0",
+        "@tma.js/init-data-node": "2.0.8",
+        "abort-controller": "3.0.0",
+        "drizzle-orm": "0.45.4",
+        "grammy": "1.46.0",
+        "postgres": "3.4.8",
+        "zod": "4.4.3"
+    },
+    "devDependencies": {
+        "@types/bun": "1.4.4",
+        "drizzle-kit": "0.31.10",
+        "typescript": "6.0.3",
+        "oxlint": "1.79.0",
+        "eslint-plugin-solid": "0.18.0",
+        "oxlint-tsgolint": "7.0.2006"
+    }
 }

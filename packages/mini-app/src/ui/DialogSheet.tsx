@@ -11,9 +11,7 @@ export function hasOpenDialog() {
 }
 
 export function dismissTopDialog() {
-    const dialogs = Array.from(
-        document.querySelectorAll<HTMLDialogElement>('dialog[open]'),
-    );
+    const dialogs = Array.from(document.querySelectorAll<HTMLDialogElement>('dialog[open]'));
     const dialog = dialogs.at(-1);
     if (!dialog) return false;
     const cancel = new Event('cancel', { cancelable: true });
@@ -97,9 +95,10 @@ export function DialogSheet(
         () => props.open,
         (open) => {
             if (open && dialog && !dialog.open) {
-                previous = document.activeElement instanceof HTMLElement
-                    ? document.activeElement
-                    : undefined;
+                previous =
+                    document.activeElement instanceof HTMLElement
+                        ? document.activeElement
+                        : undefined;
                 closeRequested = false;
                 dialog.showModal();
                 lockBodyScroll();
@@ -129,7 +128,8 @@ export function DialogSheet(
             onClick={(event) => {
                 if (event.target !== dialog || !dialog) return;
                 const rect = dialog.getBoundingClientRect();
-                const outside = event.clientX < rect.left ||
+                const outside =
+                    event.clientX < rect.left ||
                     event.clientX > rect.right ||
                     event.clientY < rect.top ||
                     event.clientY > rect.bottom;
@@ -138,11 +138,7 @@ export function DialogSheet(
         >
             <header>
                 <h2 id={titleId}>{props.title}</h2>
-                <button
-                    type='button'
-                    aria-label='Close'
-                    onClick={dismissTopDialog}
-                >
+                <button type="button" aria-label="Close" onClick={dismissTopDialog}>
                     ×
                 </button>
             </header>

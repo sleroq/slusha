@@ -12,16 +12,12 @@ export function RowButton(props: {
     onClick: () => void;
 }) {
     return (
-        <Button
-            class='row-button'
-            disabled={props.disabled}
-            onClick={props.onClick}
-        >
+        <Button class="row-button" disabled={props.disabled} onClick={props.onClick}>
             <span>{props.label}</span>
             <Show when={props.detail}>
                 <small>{props.detail}</small>
             </Show>
-            <b aria-hidden='true'>›</b>
+            <b aria-hidden="true">›</b>
         </Button>
     );
 }

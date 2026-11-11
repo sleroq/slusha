@@ -4,9 +4,14 @@
     "publishConfig": {
         "access": "public"
     },
-    "files": ["src", "README.md"],
+    "files": [
+        "src",
+        "README.md"
+    ],
     "type": "module",
-    "sideEffects": ["**/*.css"],
+    "sideEffects": [
+        "**/*.css"
+    ],
     "exports": {
         ".": "./src/index.ts",
         "./ui": "./src/ui/index.ts",

@@ -1,0 +1,12 @@
+[fmt]
+tabWidth = 4
+printWidth = 100
+singleQuote = true
+ignorePatterns = [
+    "**/*.gen.*",
+    "**/build/**",
+    "**/dist/**",
+    "**/target/**",
+    "**/test-results/**",
+    "**/playwright-report/**",
+]

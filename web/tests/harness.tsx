@@ -1,6 +1,5 @@
 import { render } from '@solidjs/web';
-import type { TelegramAdapter } from '@slusha/mini-app/telegram';
-import type { TelegramChrome } from '@slusha/mini-app/telegram';
+import type { TelegramAdapter, TelegramChrome } from '@slusha/mini-app/telegram';
 import { App } from '../src/app/App.tsx';
 import '../src/styles.css';
 
@@ -14,10 +13,7 @@ declare global {
     var __settingsMain: (() => void) | undefined;
 }
 
-function createTestHost(callbacks: {
-    onBack: () => void;
-    onMain: () => void;
-}): TelegramAdapter {
+function createTestHost(callbacks: { onBack: () => void; onMain: () => void }): TelegramAdapter {
     const adapter: TelegramAdapter = {
         nativeBack: true,
         nativeMain: true,
@@ -28,8 +24,7 @@ function createTestHost(callbacks: {
             globalThis.__settingsChrome = chrome;
         },
         notifySuccess() {
-            globalThis.__settingsSuccesses =
-                (globalThis.__settingsSuccesses ?? 0) + 1;
+            globalThis.__settingsSuccesses = (globalThis.__settingsSuccesses ?? 0) + 1;
         },
         dispose() {},
     };
@@ -38,7 +33,4 @@ function createTestHost(callbacks: {
     return adapter;
 }
 
-render(
-    () => <App createHost={createTestHost} />,
-    document.getElementById('app')!,
-);
+render(() => <App createHost={createTestHost} />, document.getElementById('app')!);

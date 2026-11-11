@@ -1,9 +1,27 @@
 import { LangfuseSpanProcessor } from '@langfuse/otel';
-import { ROOT_CONTEXT, SpanStatusCode, trace, type Attributes, type Link, type Span, type Tracer } from '@opentelemetry/api';
+import {
+    ROOT_CONTEXT,
+    SpanStatusCode,
+    trace,
+    type Attributes,
+    type Link,
+    type Span,
+    type Tracer,
+} from '@opentelemetry/api';
 import { BasicTracerProvider } from '@opentelemetry/sdk-trace-base';
-import type { AttributeValue, SpanAttributes, SpanLink, SpanOptions, SpanStatus, TelemetryContext, TelemetrySpan } from '@earendil-works/pi-telemetry';
+import type {
+    AttributeValue,
+    SpanAttributes,
+    SpanLink,
+    SpanOptions,
+    SpanStatus,
+    TelemetryContext,
+    TelemetrySpan,
+} from '@earendil-works/pi-telemetry';
 
-function isList(value: AttributeValue): value is readonly string[] | readonly number[] | readonly boolean[] {
+function isList(
+    value: AttributeValue,
+): value is readonly string[] | readonly number[] | readonly boolean[] {
     return Array.isArray(value);
 }
 
@@ -19,13 +37,22 @@ function attributesFor(attributes?: SpanAttributes): Attributes {
 
 function linkFor(link: SpanLink): Link | undefined {
     if (!(link.context instanceof OtelSpan)) return undefined;
-    return { context: link.context.native.spanContext(), attributes: attributesFor(link.attributes) };
+    return {
+        context: link.context.native.spanContext(),
+        attributes: attributesFor(link.attributes),
+    };
 }
 
 class OtelContext implements TelemetryContext {
-    constructor(protected tracer: Tracer, protected parent?: Span) {}
+    constructor(
+        protected tracer: Tracer,
+        protected parent?: Span,
+    ) {}
 
-    startSpan<T>(options: SpanOptions, callback: (span: TelemetrySpan) => T | Promise<T>): Promise<T> {
+    startSpan<T>(
+        options: SpanOptions,
+        callback: (span: TelemetrySpan) => T | Promise<T>,
+    ): Promise<T> {
         const links = options.links?.flatMap((link) => {
             const native = linkFor(link);
             if (native) return [native];
@@ -33,12 +60,22 @@ class OtelContext implements TelemetryContext {
         });
         let parent = ROOT_CONTEXT;
         if (this.parent) parent = trace.setSpan(parent, this.parent);
-        const native = this.tracer.startSpan(options.name, { attributes: attributesFor(options.attributes), links }, parent);
+        const native = this.tracer.startSpan(
+            options.name,
+            { attributes: attributesFor(options.attributes), links },
+            parent,
+        );
         const span = new OtelSpan(this.tracer, native);
         try {
             return Promise.resolve(callback(span)).then(
-                (value) => { span.finish('ok'); return value; },
-                (error) => { span.finish('error'); throw error; },
+                (value) => {
+                    span.finish('ok');
+                    return value;
+                },
+                (error) => {
+                    span.finish('error');
+                    throw error;
+                },
             );
         } catch (error) {
             span.finish('error');
@@ -51,7 +88,12 @@ class OtelSpan extends OtelContext implements TelemetrySpan {
     private settled = false;
     private status?: SpanStatus;
 
-    constructor(tracer: Tracer, readonly native: Span) { super(tracer, native); }
+    constructor(
+        tracer: Tracer,
+        readonly native: Span,
+    ) {
+        super(tracer, native);
+    }
 
     addLink(link: SpanLink): void {
         if (this.settled) return;
@@ -85,9 +127,22 @@ type TelemetryEnv = {
 type Telemetry = { telemetry?: TelemetryContext; shutdown(): Promise<void> };
 
 export function startTelemetry(env: TelemetryEnv): Telemetry {
-    const { LANGFUSE_PUBLIC_KEY: publicKey, LANGFUSE_SECRET_KEY: secretKey, LANGFUSE_BASE_URL: baseUrl } = env;
+    const {
+        LANGFUSE_PUBLIC_KEY: publicKey,
+        LANGFUSE_SECRET_KEY: secretKey,
+        LANGFUSE_BASE_URL: baseUrl,
+    } = env;
     if (!publicKey || !secretKey || !baseUrl) return { async shutdown() {} };
-    const processor = new LangfuseSpanProcessor({ publicKey, secretKey, baseUrl, shouldExportSpan: () => true, mediaUploadEnabled: false });
+    const processor = new LangfuseSpanProcessor({
+        publicKey,
+        secretKey,
+        baseUrl,
+        shouldExportSpan: () => true,
+        mediaUploadEnabled: false,
+    });
     const provider = new BasicTracerProvider({ spanProcessors: [processor] });
-    return { telemetry: new OtelContext(provider.getTracer('slusha.pi-durable')), shutdown: () => provider.shutdown() };
+    return {
+        telemetry: new OtelContext(provider.getTracer('slusha.pi-durable')),
+        shutdown: () => provider.shutdown(),
+    };
 }

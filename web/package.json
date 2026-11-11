@@ -10,7 +10,7 @@
         "test": "playwright test",
         "test:install": "playwright install chromium webkit",
         "check": "tsc --noEmit",
-        "lint": "cd .. && oxlint --config web/oxlint.config.ts web/src web/tests web/*.config.ts packages/mini-app/src shared"
+        "lint": "cd .. && bun run lint"
     },
     "dependencies": {
         "@slusha/mini-app": "workspace:*",
@@ -25,9 +25,7 @@
         "@tailwindcss/forms": "^0.5.11",
         "@tailwindcss/vite": "^4.3.3",
         "@types/node": "^26.2.0",
-        "eslint-plugin-solid": "0.18.0",
         "@playwright/test": "1.63.0",
-        "oxlint": "1.79.0",
         "tailwindcss": "^4.3.3",
         "typescript": "^6.0.3",
         "vite": "^8.1.4"

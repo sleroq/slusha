@@ -56,6 +56,10 @@ jobs:
                   bun install --frozen-lockfile
                   sudo apt-get update -qq
                   sudo apt-get install -y postgresql-client
+            - name: Format check
+              run: bun run format:check
+            - name: Lint
+              run: bun run lint
             - name: Typecheck
               run: bun run check
             - name: Test

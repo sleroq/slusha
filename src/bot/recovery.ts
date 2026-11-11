@@ -14,35 +14,50 @@ type PendingRun = {
 };
 
 export async function pendingRuns(db: Db, groupReplyAgeMs: number): Promise<PendingRun[]> {
-    const rows = await db.select({
-        chatId: conversations.chatId,
-        topicId: conversations.topicId,
-        pendingReset: conversations.pendingReset,
-        pendingRotation: conversations.pendingRotation,
-        eventId: conversations.pendingRunEventId,
-        updateId: events.updateId,
-        userId: events.userId,
-        occurredAt: events.occurredAt,
-        chatType: chats.type,
-        hiddenHistory: sql<boolean>`exists (
+    const rows = await db
+        .select({
+            chatId: conversations.chatId,
+            topicId: conversations.topicId,
+            pendingReset: conversations.pendingReset,
+            pendingRotation: conversations.pendingRotation,
+            eventId: conversations.pendingRunEventId,
+            updateId: events.updateId,
+            userId: events.userId,
+            occurredAt: events.occurredAt,
+            chatType: chats.type,
+            hiddenHistory: sql<boolean>`exists (
             select 1 from events as hidden
             where hidden.chat_id = ${conversations.chatId} and hidden.topic_id = ${conversations.topicId}
               and hidden.opted_out and not hidden.released
         )`,
-    }).from(conversations)
+        })
+        .from(conversations)
         .leftJoin(events, eq(conversations.pendingRunEventId, events.id))
         .leftJoin(chats, eq(conversations.chatId, chats.id))
         .where(isNotNull(conversations.pendingRunEventId));
 
     return rows.map((row) => {
-        if (row.eventId === null || row.updateId === null || row.userId === null || row.occurredAt === null || row.chatType === null) {
+        if (
+            row.eventId === null ||
+            row.updateId === null ||
+            row.userId === null ||
+            row.occurredAt === null ||
+            row.chatType === null
+        ) {
             throw new Error('Interrupted run is missing its Telegram event');
         }
         const privateChat = row.chatType === 'private';
         return {
-            chatId: row.chatId, topicId: row.topicId, eventId: row.eventId,
-            updateId: row.updateId, userId: row.userId,
-            canResume: !row.pendingReset && !row.pendingRotation && !row.hiddenHistory && (privateChat || Date.now() - row.occurredAt.getTime() <= groupReplyAgeMs),
+            chatId: row.chatId,
+            topicId: row.topicId,
+            eventId: row.eventId,
+            updateId: row.updateId,
+            userId: row.userId,
+            canResume:
+                !row.pendingReset &&
+                !row.pendingRotation &&
+                !row.hiddenHistory &&
+                (privateChat || Date.now() - row.occurredAt.getTime() <= groupReplyAgeMs),
         };
     });
 }

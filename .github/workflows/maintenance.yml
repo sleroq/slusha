@@ -36,9 +36,9 @@ jobs:
                   commit-message: 'chore: weekly dependency updates'
                   title: 'chore: weekly dependency updates'
                   body: |
-                        Automated dependency refresh for the Bun workspace.
+                      Automated dependency refresh for the Bun workspace.
                   add-paths: |
-                        package.json
-                        bun.lock
-                        web/package.json
-                        packages/*/package.json
+                      package.json
+                      bun.lock
+                      web/package.json
+                      packages/*/package.json

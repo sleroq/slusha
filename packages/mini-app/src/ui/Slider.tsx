@@ -9,22 +9,19 @@ type RangePointerGesture = {
 
 const rangeGestureThreshold = 8;
 
-export function Slider(
-    props: {
-        value: number;
-        min: number;
-        max: number;
-        step: number;
-        disabled?: boolean;
-        labelledBy?: string;
-        describedBy?: string;
-        invalid?: boolean;
-        onChange: (value: number) => void;
-    },
-) {
+export function Slider(props: {
+    value: number;
+    min: number;
+    max: number;
+    step: number;
+    disabled?: boolean;
+    labelledBy?: string;
+    describedBy?: string;
+    invalid?: boolean;
+    onChange: (value: number) => void;
+}) {
     let rangePointerGesture: RangePointerGesture | null = null;
-    const progress = () =>
-        `${((props.value - props.min) / (props.max - props.min)) * 100}%`;
+    const progress = () => `${((props.value - props.min) / (props.max - props.min)) * 100}%`;
 
     function startRangeGesture(event: PointerEvent) {
         rangePointerGesture = {
@@ -39,17 +36,12 @@ export function Slider(
 
     function moveRangeGesture(event: PointerEvent, input: HTMLInputElement) {
         const gesture = rangePointerGesture;
-        if (
-            !gesture || gesture.pointerId !== event.pointerId ||
-            gesture.intent !== 'pending'
-        ) return;
+        if (!gesture || gesture.pointerId !== event.pointerId || gesture.intent !== 'pending')
+            return;
 
         const horizontalDistance = Math.abs(event.clientX - gesture.startX);
         const verticalDistance = Math.abs(event.clientY - gesture.startY);
-        if (
-            Math.max(horizontalDistance, verticalDistance) <
-                rangeGestureThreshold
-        ) return;
+        if (Math.max(horizontalDistance, verticalDistance) < rangeGestureThreshold) return;
 
         if (verticalDistance > horizontalDistance) {
             gesture.intent = 'vertical';
@@ -86,8 +78,8 @@ export function Slider(
 
     return (
         <input
-            class='slider'
-            type='range'
+            class="slider"
+            type="range"
             min={props.min}
             max={props.max}
             step={props.step}
@@ -98,11 +90,9 @@ export function Slider(
             aria-invalid={props.invalid ? 'true' : undefined}
             style={{ '--range-progress': progress() }}
             onPointerDown={startRangeGesture}
-            onPointerMove={(event) =>
-                moveRangeGesture(event, event.currentTarget)}
+            onPointerMove={(event) => moveRangeGesture(event, event.currentTarget)}
             onPointerUp={finishRangeGesture}
-            onPointerCancel={(event) =>
-                cancelRangeGesture(event, event.currentTarget)}
+            onPointerCancel={(event) => cancelRangeGesture(event, event.currentTarget)}
             onKeyDown={() => {
                 rangePointerGesture = null;
             }}
@@ -110,9 +100,7 @@ export function Slider(
                 const gesture = rangePointerGesture;
                 if (gesture) {
                     if (gesture.intent === 'pending') {
-                        gesture.pendingValue = Number(
-                            event.currentTarget.value,
-                        );
+                        gesture.pendingValue = Number(event.currentTarget.value);
                         return;
                     }
                     if (gesture.intent === 'vertical') {

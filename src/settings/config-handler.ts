@@ -1,7 +1,13 @@
 import { parse, validate } from '@tma.js/init-data-node/web';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod/mini';
-import { updateConfigSchema, type ConfigChat, type ConfigScope, type ConfigResponse, type ApiErrorResponse } from '../../shared/config-contract';
+import {
+    updateConfigSchema,
+    type ConfigChat,
+    type ConfigScope,
+    type ConfigResponse,
+    type ApiErrorResponse,
+} from '../../shared/config-contract';
 import { CONFIG_CONTRACT_VERSION } from '../../shared/config-contract-version';
 import type { Db } from '../db/client';
 import { chatMembers, chats } from '../db/schema';
@@ -40,11 +46,21 @@ function title(info: ConfigChatInfo, id: number) {
 }
 type ConfigChatInfo = z.infer<typeof chatInfoSchema>;
 function isMember(member: { status: string; is_member?: boolean }) {
-    return member.status === 'creator' || member.status === 'administrator' || member.status === 'member' ||
-        (member.status === 'restricted' && member.is_member === true);
+    return (
+        member.status === 'creator' ||
+        member.status === 'administrator' ||
+        member.status === 'member' ||
+        (member.status === 'restricted' && member.is_member === true)
+    );
 }
 
-export function createConfigHandler({ db, botToken, adminIds, settings, api }: ConfigHandlerOptions) {
+export function createConfigHandler({
+    db,
+    botToken,
+    adminIds,
+    settings,
+    api,
+}: ConfigHandlerOptions) {
     async function handle(request: Request): Promise<Response> {
         const [scheme, initData] = request.headers.get('authorization')?.split(' ', 2) ?? [];
         if (scheme !== 'tma' || !initData) return error('Unauthorized', 401);
@@ -52,24 +68,33 @@ export function createConfigHandler({ db, botToken, adminIds, settings, api }: C
         try {
             await validate(initData, botToken, { expiresIn: 86400 });
             const data = parse(initData);
-            if (!data.user || data.auth_date.getTime() > Date.now()) return error('Unauthorized', 401);
+            if (!data.user || data.auth_date.getTime() > Date.now())
+                return error('Unauthorized', 401);
             userId = data.user.id;
         } catch {
             return error('Unauthorized', 401);
         }
-        if (request.method !== 'GET' && request.method !== 'PUT') return error('Method not allowed', 405);
+        if (request.method !== 'GET' && request.method !== 'PUT')
+            return error('Method not allowed', 405);
 
         const isAdmin = adminIds.includes(userId);
         const scopes: ConfigScope[] = ['personal', 'private', 'group'];
         if (isAdmin) scopes.push('global');
-        const rows = await db.select({ id: chats.id, type: chats.type, info: chats.info })
-            .from(chatMembers).innerJoin(chats, eq(chatMembers.chatId, chats.id))
+        const rows = await db
+            .select({ id: chats.id, type: chats.type, info: chats.info })
+            .from(chatMembers)
+            .innerJoin(chats, eq(chatMembers.chatId, chats.id))
             .where(eq(chatMembers.userId, userId));
         const available: ConfigChat[] = [];
         const members = new Map<number, Awaited<ReturnType<TelegramApi['getChatMember']>>>();
         for (const row of rows) {
             if (row.type === 'private') {
-                if (row.id === userId) available.push({ id: row.id, title: title(z.catch(chatInfoSchema, {}).parse(row.info), row.id), type: 'private' });
+                if (row.id === userId)
+                    available.push({
+                        id: row.id,
+                        title: title(z.catch(chatInfoSchema, {}).parse(row.info), row.id),
+                        type: 'private',
+                    });
                 continue;
             }
             if (row.type !== 'group' && row.type !== 'supergroup') continue;
@@ -77,7 +102,11 @@ export function createConfigHandler({ db, botToken, adminIds, settings, api }: C
                 const member = await api.getChatMember(row.id, userId);
                 if (!isMember(member)) continue;
                 members.set(row.id, member);
-                available.push({ id: row.id, title: title(z.catch(chatInfoSchema, {}).parse(row.info), row.id), type: 'group' });
+                available.push({
+                    id: row.id,
+                    title: title(z.catch(chatInfoSchema, {}).parse(row.info), row.id),
+                    type: 'group',
+                });
             } catch {
                 // A chat whose current membership cannot be verified is not exposed.
             }
@@ -91,7 +120,11 @@ export function createConfigHandler({ db, botToken, adminIds, settings, api }: C
         let operations: ReturnType<typeof updateConfigSchema.parse>['operations'] | undefined;
         if (request.method === 'PUT') {
             let body: unknown;
-            try { body = await request.json(); } catch { return error('Invalid JSON body', 400); }
+            try {
+                body = await request.json();
+            } catch {
+                return error('Invalid JSON body', 400);
+            }
             const result = updateConfigSchema.safeParse(body);
             if (!result.success) return error('Invalid settings request', 400);
             scope = result.data.scope;
@@ -105,7 +138,8 @@ export function createConfigHandler({ db, botToken, adminIds, settings, api }: C
             const rawId = query.get('chatId');
             if (rawId !== null) {
                 chatId = Number(rawId);
-                if (!Number.isSafeInteger(chatId) || !/^-?\d+$/.test(rawId)) return error('Invalid chat', 400);
+                if (!Number.isSafeInteger(chatId) || !/^-?\d+$/.test(rawId))
+                    return error('Invalid chat', 400);
             }
         }
 
@@ -124,7 +158,14 @@ export function createConfigHandler({ db, botToken, adminIds, settings, api }: C
             if (chatId === undefined) chatId = available.find((chat) => chat.type === 'group')?.id;
             if (chatId === undefined) {
                 if (operations) return error('Chat not available', 403);
-                return json({ contractVersion: CONFIG_CONTRACT_VERSION, scope, fields: [], scopes, chats: available, isAdmin });
+                return json({
+                    contractVersion: CONFIG_CONTRACT_VERSION,
+                    scope,
+                    fields: [],
+                    scopes,
+                    chats: available,
+                    isAdmin,
+                });
             }
             const member = members.get(chatId);
             if (!member) return error('Forbidden', 403);
@@ -135,15 +176,22 @@ export function createConfigHandler({ db, botToken, adminIds, settings, api }: C
             if (!writable) return error('Forbidden', 403);
             const validated: ModelOperation[] = [];
             for (const operation of operations) {
-                const parsed = z.enum(['ai.model', 'ai.characterNamesModel', ...promptKeys]).safeParse(operation.key);
+                const parsed = z
+                    .enum(['ai.model', 'ai.characterNamesModel', ...promptKeys])
+                    .safeParse(operation.key);
                 if (!parsed.success) return error('Unknown setting', 400);
                 const key = parsed.data;
                 if ('reset' in operation) {
                     validated.push({ key, reset: true });
                 } else {
                     const value = z.string().safeParse(operation.value);
-                    if (!value.success || value.data.length > 32000) return error('Invalid setting', 400);
-                    if ((key === 'ai.model' || key === 'ai.characterNamesModel') && !settings.models.includes(value.data)) return error('Invalid model', 400);
+                    if (!value.success || value.data.length > 32000)
+                        return error('Invalid setting', 400);
+                    if (
+                        (key === 'ai.model' || key === 'ai.characterNamesModel') &&
+                        !settings.models.includes(value.data)
+                    )
+                        return error('Invalid model', 400);
                     validated.push({ key, value: value.data });
                 }
             }
@@ -151,14 +199,31 @@ export function createConfigHandler({ db, botToken, adminIds, settings, api }: C
         }
         const model = await settings.read(target);
         const characterNamesModel = await settings.read(target, 'ai.characterNamesModel');
-        const prompts = await Promise.all(promptKeys.map(async (key) => ({
-            key, kind: 'text' as const, multiline: true, maxLength: 32000, ...await settings.read(target, key), writable,
-        })));
+        const prompts = await Promise.all(
+            promptKeys.map(async (key) => ({
+                key,
+                kind: 'text' as const,
+                multiline: true,
+                maxLength: 32000,
+                ...(await settings.read(target, key)),
+                writable,
+            })),
+        );
         const response: ConfigResponse = {
-            contractVersion: CONFIG_CONTRACT_VERSION, scope, scopes, chats: available, isAdmin,
+            contractVersion: CONFIG_CONTRACT_VERSION,
+            scope,
+            scopes,
+            chats: available,
+            isAdmin,
             fields: [
                 { key: 'ai.model', kind: 'select', options: settings.models, ...model, writable },
-                { key: 'ai.characterNamesModel', kind: 'select', options: settings.models, ...characterNamesModel, writable },
+                {
+                    key: 'ai.characterNamesModel',
+                    kind: 'select',
+                    options: settings.models,
+                    ...characterNamesModel,
+                    writable,
+                },
                 ...prompts,
             ],
         };

@@ -10,22 +10,38 @@ import { imageFile } from './messages';
 const offsetIdleMs = 6 * 24 * 60 * 60 * 1000;
 
 export interface IngestionApi {
-    getUpdates(options?: { offset?: number; timeout?: number; allowed_updates?: ('message' | 'edited_message' | 'message_reaction' | 'callback_query' | 'inline_query')[] }, signal?: AbortSignal): Promise<Update[]>;
+    getUpdates(
+        options?: {
+            offset?: number;
+            timeout?: number;
+            allowed_updates?: (
+                | 'message'
+                | 'edited_message'
+                | 'message_reaction'
+                | 'callback_query'
+                | 'inline_query'
+            )[];
+        },
+        signal?: AbortSignal,
+    ): Promise<Update[]>;
 }
 
 interface IngestionOptions {
     db: Db;
     api: IngestionApi;
-    processUpdate(update: Update, context: { deferReply: boolean }): Promise<void>;
-    onError?(error: Error): void;
+    processUpdate(this: void, update: Update, context: { deferReply: boolean }): Promise<void>;
+    onError?(this: void, error: Error): void;
 }
 
 function lane(update: Update): string {
     const target = callbackChatId(update.callback_query?.data);
     if (target !== undefined) return `chat:${target}`;
     if (update.inline_query) return `inline:${update.inline_query.from.id}`;
-    const chat = update.message?.chat ?? update.edited_message?.chat
-        ?? update.message_reaction?.chat ?? update.callback_query?.message?.chat;
+    const chat =
+        update.message?.chat ??
+        update.edited_message?.chat ??
+        update.message_reaction?.chat ??
+        update.callback_query?.message?.chat;
     if (chat) return `chat:${chat.id}`;
     return 'other';
 }
@@ -38,7 +54,11 @@ function privateMessage(update: Update | undefined) {
 }
 
 function retryDelay(error: unknown, delay: number) {
-    if (error instanceof GrammyError && error.error_code === 429 && error.parameters.retry_after !== undefined) {
+    if (
+        error instanceof GrammyError &&
+        error.error_code === 429 &&
+        error.parameters.retry_after !== undefined
+    ) {
         return Math.max(delay, error.parameters.retry_after * 1000);
     }
     return delay;
@@ -79,8 +99,13 @@ export function createIngestion({ db, api, processUpdate, onError }: IngestionOp
                 let delay = 250;
                 while (!signal.aborted) {
                     try {
-                        await processUpdate(current, { deferReply: privateMessage(current) && privateMessage(queue[1]) });
-                        await db.update(updates).set({ status: 'done' }).where(eq(updates.id, current.update_id));
+                        await processUpdate(current, {
+                            deferReply: privateMessage(current) && privateMessage(queue[1]),
+                        });
+                        await db
+                            .update(updates)
+                            .set({ status: 'done' })
+                            .where(eq(updates.id, current.update_id));
                         queue.shift();
                         break;
                     } catch (error) {
@@ -97,7 +122,11 @@ export function createIngestion({ db, api, processUpdate, onError }: IngestionOp
         void worker.finally(() => workers.delete(worker));
     }
 
-    async function poll(offset: number | undefined, lastReceivedAt: number | undefined, signal: AbortSignal) {
+    async function poll(
+        offset: number | undefined,
+        lastReceivedAt: number | undefined,
+        signal: AbortSignal,
+    ) {
         let delay = 250;
         while (!signal.aborted) {
             try {
@@ -105,18 +134,41 @@ export function createIngestion({ db, api, processUpdate, onError }: IngestionOp
                     offset = undefined;
                     lastReceivedAt = undefined;
                 }
-                const received = await api.getUpdates({
-                    offset, timeout: 30,
-                    allowed_updates: ['message', 'edited_message', 'message_reaction', 'callback_query', 'inline_query'],
-                }, signal);
+
+                const received = await api.getUpdates(
+                    {
+                        offset,
+                        timeout: 30,
+                        allowed_updates: [
+                            'message',
+                            'edited_message',
+                            'message_reaction',
+                            'callback_query',
+                            'inline_query',
+                        ],
+                    },
+                    signal,
+                );
                 if (!received.length) continue;
-                const inserted = await db.insert(updates).values(received.map((update) => ({ id: update.update_id, payload: update, status: 'pending' })))
-                    .onConflictDoNothing().returning({ id: updates.id });
+
+                const inserted = await db
+                    .insert(updates)
+                    .values(
+                        received.map((update) => ({
+                            id: update.update_id,
+                            payload: update,
+                            status: 'pending',
+                        })),
+                    )
+                    .onConflictDoNothing()
+                    .returning({ id: updates.id });
+
                 const insertedIds = new Set(inserted.map((row) => row.id));
                 received.sort((a, b) => a.update_id - b.update_id);
                 for (const update of received) {
                     if (insertedIds.delete(update.update_id)) schedule(update, signal);
                 }
+
                 offset = Math.max(offset ?? 0, ...received.map((update) => update.update_id + 1));
                 lastReceivedAt = Date.now();
                 delay = 250;
@@ -135,8 +187,16 @@ export function createIngestion({ db, api, processUpdate, onError }: IngestionOp
         controller = new AbortController();
         const signal = controller.signal;
         startup = (async () => {
-            const pending = await db.select().from(updates).where(eq(updates.status, 'pending')).orderBy(asc(updates.receivedAt), asc(updates.id));
-            const [latest] = await db.select({ id: updates.id, receivedAt: updates.receivedAt }).from(updates).orderBy(desc(updates.receivedAt), desc(updates.id)).limit(1);
+            const pending = await db
+                .select()
+                .from(updates)
+                .where(eq(updates.status, 'pending'))
+                .orderBy(asc(updates.receivedAt), asc(updates.id));
+            const [latest] = await db
+                .select({ id: updates.id, receivedAt: updates.receivedAt })
+                .from(updates)
+                .orderBy(desc(updates.receivedAt), desc(updates.id))
+                .limit(1);
             if (signal.aborted) return;
             for (const row of pending) {
                 // SAFETY: The updates table contains Telegram payloads written by ingestion.

@@ -23,11 +23,25 @@ function keyboard(chatId: number, selectedId?: number) {
     return result;
 }
 
-export function createCharacterHandler({ db, api, characters, adminIds }: { db: Db; api: Api; characters?: Characters; adminIds: readonly number[] }) {
+export function createCharacterHandler({
+    db,
+    api,
+    characters,
+    adminIds,
+}: {
+    db: Db;
+    api: Api;
+    characters?: Characters;
+    adminIds: readonly number[];
+}) {
     async function current(chatId: number) {
         if (!characters) return api.sendMessage(chatId, 'Character selection is unavailable.');
         const selected = await characters.get(chatId);
-        return api.sendMessage(chatId, `Character: ${selected?.name.slice(0, 4000) ?? 'Слюша'}\nSearch Chub.ai for a character.`, { reply_markup: keyboard(chatId, selected?.id) });
+        return api.sendMessage(
+            chatId,
+            `Character: ${selected?.name.slice(0, 4000) ?? 'Слюша'}\nSearch Chub.ai for a character.`,
+            { reply_markup: keyboard(chatId, selected?.id) },
+        );
     }
 
     async function inline(query: InlineQuery) {
@@ -39,7 +53,11 @@ export function createCharacterHandler({ db, api, characters, adminIds }: { db: 
             return { type: 'article', id, title, input_message_content: { message_text: text } };
         }
         if (!match || !Number.isSafeInteger(chatId) || chatId === 0 || !characters) {
-            await api.answerInlineQuery(query.id, [article('help', 'Open character search from a chat', 'Use /character to search.')], { cache_time: 0, is_personal: true });
+            await api.answerInlineQuery(
+                query.id,
+                [article('help', 'Open character search from a chat', 'Use /character to search.')],
+                { cache_time: 0, is_personal: true },
+            );
             return;
         }
 
@@ -50,14 +68,24 @@ export function createCharacterHandler({ db, api, characters, adminIds }: { db: 
             if (words[i]?.toLowerCase() === '/nsfw') excludeNsfw = false;
             else if (words[i] === '/p') {
                 const value = Number(words[i + 1]);
-                if (Number.isSafeInteger(value) && value > 0) { page = value; i++; }
+                if (Number.isSafeInteger(value) && value > 0) {
+                    page = value;
+                    i++;
+                }
             } else if (words[i]) terms.push(words[i]!);
         }
 
         const search = terms.join(' ');
-        const header = article('header', 'Search Chub.ai', 'Search Chub.ai characters. Add /nsfw to include NSFW results.');
+        const header = article(
+            'header',
+            'Search Chub.ai',
+            'Search Chub.ai characters. Add /nsfw to include NSFW results.',
+        );
         header.description = 'Add /nsfw to include NSFW results';
-        header.reply_markup = new InlineKeyboard().switchInlineCurrent('Search', searchButton(chatId, search));
+        header.reply_markup = new InlineKeyboard().switchInlineCurrent(
+            'Search',
+            searchButton(chatId, search),
+        );
         let results: Awaited<ReturnType<Characters['search']>>;
         try {
             results = await characters.search(search, page, excludeNsfw);
@@ -71,7 +99,11 @@ export function createCharacterHandler({ db, api, characters, adminIds }: { db: 
         const cards: InlineQueryResultArticle[] = [header];
         for (const character of results) {
             const link = `https://venus.chub.ai/characters/${character.path.split('/').map(encodeURIComponent).join('/')}`;
-            const text = `${character.name}\n\n${character.description.slice(0, 3000)}\n\n${character.topics.join(', ').slice(0, 500)}\n${character.stars} ⭐\n${link}`.slice(0, 4096);
+            const text =
+                `${character.name}\n\n${character.description.slice(0, 3000)}\n\n${character.topics.join(', ').slice(0, 500)}\n${character.stars} ⭐\n${link}`.slice(
+                    0,
+                    4096,
+                );
             const card = article(String(character.id), character.name.slice(0, 256), text);
             card.description = character.description.slice(0, 256);
             if (/^https:\/\//i.test(character.avatar)) card.thumbnail_url = character.avatar;
@@ -82,13 +114,17 @@ export function createCharacterHandler({ db, api, characters, adminIds }: { db: 
             cards.push(card);
         }
 
-        if (!results.length) cards.push(article('empty', 'No characters found', 'Try a different search.'));
+        if (!results.length)
+            cards.push(article('empty', 'No characters found', 'Try a different search.'));
         if (results.length === pageSize) {
             let next = `/p ${page + 1} `;
             if (!excludeNsfw) next += '/nsfw ';
             next += search;
             const more = article('next', 'Next page', 'Continue searching Chub.ai.');
-            more.reply_markup = new InlineKeyboard().switchInlineCurrent('Next page', searchButton(chatId, next));
+            more.reply_markup = new InlineKeyboard().switchInlineCurrent(
+                'Next page',
+                searchButton(chatId, next),
+            );
             cards.push(more);
         }
         await api.answerInlineQuery(query.id, cards, { cache_time: 0, is_personal: true });
@@ -100,7 +136,12 @@ export function createCharacterHandler({ db, api, characters, adminIds }: { db: 
             const chatId = callbackChatId(query.data);
             const value = query.data?.split(' ')[2];
             if (chatId !== undefined && value && characters) {
-                const [chat] = await db.select({ type: chats.type }).from(chats).where(eq(chats.id, chatId)).limit(1);
+                const [chat] = await db
+                    .select({ type: chats.type })
+                    .from(chats)
+                    .where(eq(chats.id, chatId))
+                    .limit(1);
+
                 let authorized = false;
                 if (chat && adminIds.includes(query.from.id)) authorized = true;
                 else if (chat?.type === 'private') authorized = query.from.id === chatId;
@@ -108,6 +149,7 @@ export function createCharacterHandler({ db, api, characters, adminIds }: { db: 
                     const member = await api.getChatMember(chatId, query.from.id);
                     authorized = member.status === 'creator' || member.status === 'administrator';
                 }
+
                 if (!chat) answer = 'Chat not found.';
                 else if (!authorized) answer = 'Only chat administrators can change the character.';
                 else {
@@ -115,15 +157,30 @@ export function createCharacterHandler({ db, api, characters, adminIds }: { db: 
                     if (value === 'default') {
                         await characters.clear(chatId);
                         const actions = keyboard(chatId);
-                        if (previous) actions.text(`Restore ${previous.name}`.slice(0, 64), `set ${chatId} ${previous.id}`);
+                        if (previous)
+                            actions.text(
+                                `Restore ${previous.name}`.slice(0, 64),
+                                `set ${chatId} ${previous.id}`,
+                            );
                         answer = 'Default character selected.';
-                        await api.sendMessage(chatId, `${query.from.first_name} restored the default character.`, { reply_markup: actions });
+                        await api.sendMessage(
+                            chatId,
+                            `${query.from.first_name} restored the default character.`,
+                            { reply_markup: actions },
+                        );
                     } else {
                         const id = Number(value);
                         if (Number.isSafeInteger(id) && id > 0) {
                             const selected = await characters.select(chatId, id, query.from.id);
                             answer = `Character selected: ${selected.name}`.slice(0, 200);
-                            await api.sendMessage(chatId, `${query.from.first_name} selected ${selected.name}.`.slice(0, 4096), { reply_markup: keyboard(chatId, selected.id) });
+                            await api.sendMessage(
+                                chatId,
+                                `${query.from.first_name} selected ${selected.name}.`.slice(
+                                    0,
+                                    4096,
+                                ),
+                                { reply_markup: keyboard(chatId, selected.id) },
+                            );
                         }
                     }
                 }
@@ -132,6 +189,7 @@ export function createCharacterHandler({ db, api, characters, adminIds }: { db: 
             console.error('Character action failed', error);
             answer = 'Could not change the character.';
         }
+
         await api.answerCallbackQuery(query.id, { text: answer });
     }
 

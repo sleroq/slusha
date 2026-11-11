@@ -6,29 +6,33 @@ const TEST_CONTRACT_VERSION = 1;
 declare global {
     var __settingsBack: (() => void) | undefined;
     var __settingsMain: (() => void) | undefined;
-    var __settingsChrome: {
-        confirmClosing: boolean;
-        backVisible: boolean;
-        main: {
-            text: string;
-            visible: boolean;
-            enabled: boolean;
-            loading: boolean;
-        };
-    } | undefined;
+    var __settingsChrome:
+        | {
+              confirmClosing: boolean;
+              backVisible: boolean;
+              main: {
+                  text: string;
+                  visible: boolean;
+                  enabled: boolean;
+                  loading: boolean;
+              };
+          }
+        | undefined;
 }
 
 const personal = {
     contractVersion: TEST_CONTRACT_VERSION,
     scope: 'personal',
-    fields: [{
-        key: 'profile.about',
-        kind: 'text',
-        value: '',
-        maxLength: 4000,
-        overridden: false,
-        writable: true,
-    }],
+    fields: [
+        {
+            key: 'profile.about',
+            kind: 'text',
+            value: '',
+            maxLength: 4000,
+            overridden: false,
+            writable: true,
+        },
+    ],
     scopes: ['personal', 'private', 'global'],
     chats: [{ id: 7, title: 'Test chat', type: 'private' }],
     isAdmin: true,
@@ -76,10 +80,7 @@ function harness(page: Page) {
     return page.goto('/tests/harness.html');
 }
 
-async function routeConfig(
-    page: Page,
-    response: ConfigResponse = personal,
-) {
+async function routeConfig(page: Page, response: ConfigResponse = personal) {
     const requests: string[] = [];
     await page.route('**/api/config**', async (route: Route) => {
         if (route.request().method() === 'PUT') {
@@ -92,9 +93,7 @@ async function routeConfig(
                 }>;
             };
             const fields = response.fields.map((field) => {
-                const operation = body.operations?.find((item) =>
-                    item.key === field.key
-                );
+                const operation = body.operations?.find((item) => item.key === field.key);
                 if (!operation) return field;
                 if (operation.reset) {
                     return {
@@ -130,8 +129,7 @@ function nativeMain(page: Page) {
 test('launch loads the backend default and primes its canonical cache', async ({ page }) => {
     const requests = await routeConfig(page);
     await harness(page);
-    await expect(page.getByRole('heading', { name: 'Slusha Settings' }))
-        .toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Slusha Settings' })).toBeVisible();
     expect(new URL(requests[0]).search).toBe('');
     expect(new URL(page.url()).searchParams.get('scope')).toBe('personal');
     expect(requests).toHaveLength(1);
@@ -148,19 +146,37 @@ test('personal model can be chosen and reset', async ({ page }) => {
         writable: true,
     } as const;
     const operations: unknown[] = [];
-    let response: ConfigResponse = { ...personal, fields: [...personal.fields, { ...model, options: [...model.options] }] };
+    let response: ConfigResponse = {
+        ...personal,
+        fields: [...personal.fields, { ...model, options: [...model.options] }],
+    };
     await page.route('**/api/config**', async (route) => {
         if (route.request().method() === 'PUT') {
             const body = route.request().postDataJSON();
             operations.push(body);
             if (operations.length === 1) {
-                response = { ...personal, fields: [...personal.fields, { ...model, options: [...model.options], value: 'accurate', overridden: true }] };
+                response = {
+                    ...personal,
+                    fields: [
+                        ...personal.fields,
+                        {
+                            ...model,
+                            options: [...model.options],
+                            value: 'accurate',
+                            overridden: true,
+                        },
+                    ],
+                };
             } else {
-                response = { ...personal, fields: [...personal.fields, { ...model, options: [...model.options] }] };
+                response = {
+                    ...personal,
+                    fields: [...personal.fields, { ...model, options: [...model.options] }],
+                };
             }
         }
         await route.fulfill({ json: response });
     });
+
     await harness(page);
     const selection = page.getByRole('button', { name: 'Model' });
     await expect(selection).toContainText('fast');
@@ -169,20 +185,43 @@ test('personal model can be chosen and reset', async ({ page }) => {
     await expect(selection).toContainText('accurate');
     await nativeMain(page);
     await expect(page.getByLabel('Revert model to default')).toBeVisible();
-    expect(operations[0]).toEqual({ scope: 'personal', operations: [{ key: 'ai.model', value: 'accurate' }] });
+    expect(operations[0]).toEqual({
+        scope: 'personal',
+        operations: [{ key: 'ai.model', value: 'accurate' }],
+    });
+
     await page.getByLabel('Revert model to default').click();
     await page.getByRole('button', { name: 'Revert', exact: true }).click();
     await nativeMain(page);
     await expect(selection).toContainText('fast');
-    expect(operations[1]).toEqual({ scope: 'personal', operations: [{ key: 'ai.model', reset: true }] });
+    expect(operations[1]).toEqual({
+        scope: 'personal',
+        operations: [{ key: 'ai.model', reset: true }],
+    });
 });
 
 for (const scope of ['personal', 'private'] as const) {
     test(`character name model saves and resets in ${scope} scope`, async ({ page }) => {
         const operations: unknown[] = [];
         const fields: ConfigResponse['fields'] = [
-            { key: 'ai.model', kind: 'select', options: ['fast', 'accurate'], value: 'fast', inheritedValue: 'fast', overridden: false, writable: true },
-            { key: 'ai.characterNamesModel', kind: 'select', options: ['fast', 'accurate'], value: 'fast', inheritedValue: 'fast', overridden: false, writable: true },
+            {
+                key: 'ai.model',
+                kind: 'select',
+                options: ['fast', 'accurate'],
+                value: 'fast',
+                inheritedValue: 'fast',
+                overridden: false,
+                writable: true,
+            },
+            {
+                key: 'ai.characterNamesModel',
+                kind: 'select',
+                options: ['fast', 'accurate'],
+                value: 'fast',
+                inheritedValue: 'fast',
+                overridden: false,
+                writable: true,
+            },
         ];
         let response: ConfigResponse = { ...personal, scope, fields };
         if (scope === 'private') response = { ...response, chatId: 7 };
@@ -228,13 +267,18 @@ for (const scope of ['personal', 'private'] as const) {
         await expect(selection).toContainText('fast');
         await expect(reset).toHaveCount(0);
         await expect(model).toContainText('fast');
-        const resetOperation = { scope, operations: [{ key: 'ai.characterNamesModel', reset: true }] };
+        const resetOperation = {
+            scope,
+            operations: [{ key: 'ai.characterNamesModel', reset: true }],
+        };
         if (scope === 'private') expect(operations[1]).toEqual({ ...resetOperation, chatId: 7 });
         else expect(operations[1]).toEqual(resetOperation);
     });
 }
 
-test('typing in an editor keeps focus and saves the canonical response without GET', async ({ page }) => {
+test('typing in an editor keeps focus and saves the canonical response without GET', async ({
+    page,
+}) => {
     const requests = await routeConfig(page, scoped);
     await page.goto('/tests/harness.html?scope=private&chatId=7');
     await page.getByRole('button', { name: 'Reply behavior' }).click();
@@ -243,19 +287,21 @@ test('typing in an editor keeps focus and saves the canonical response without G
     await input.fill('');
     await input.pressSequentially('12');
     await expect(input).toBeFocused();
-    await expect.poll(() =>
-        page.evaluate(() => globalThis.__settingsChrome?.main.enabled)
-    ).toBe(true);
+    await expect
+        .poll(() => page.evaluate(() => globalThis.__settingsChrome?.main.enabled))
+        .toBe(true);
     await nativeMain(page);
     await expect(input).toHaveValue('12');
     expect(requests).toHaveLength(1);
 });
 
-test('reset can be cancelled or saved and an editor is read-only while saving', async ({ page }) => {
+test('reset can be cancelled or saved and an editor is read-only while saving', async ({
+    page,
+}) => {
     let resolveSave: (() => void) | undefined;
     await page.route('**/api/config**', async (route) => {
         if (route.request().method() === 'PUT') {
-            await new Promise<void>((resolve) => resolveSave = resolve);
+            await new Promise<void>((resolve) => (resolveSave = resolve));
             await route.fulfill({ json: scoped });
             return;
         }
@@ -265,9 +311,7 @@ test('reset can be cancelled or saved and an editor is read-only while saving', 
     await page.getByRole('button', { name: 'Reply behavior' }).click();
     await page.getByLabel('Revert Names to default').click();
     await page.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByRole('textbox', { name: 'Names' })).toHaveValue(
-        'Slusha',
-    );
+    await expect(page.getByRole('textbox', { name: 'Names' })).toHaveValue('Slusha');
     await page.getByLabel('Revert Names to default').click();
     await page.getByRole('button', { name: 'Revert', exact: true }).click();
     await nativeMain(page);
@@ -310,16 +354,22 @@ test('long model names do not create horizontal scrolling', async ({ page }) => 
     await page.goto('/tests/harness.html?scope=private&chatId=7');
     await page.getByRole('button', { name: 'Model and generation' }).click();
 
-    await expect.poll(() => page.evaluate(() =>
-        document.documentElement.scrollWidth <=
-            document.documentElement.clientWidth
-    )).toBe(true);
+    await expect
+        .poll(() =>
+            page.evaluate(
+                () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+            ),
+        )
+        .toBe(true);
 
     await page.locator('button.selection').click();
-    await expect.poll(() => page.evaluate(() =>
-        document.documentElement.scrollWidth <=
-            document.documentElement.clientWidth
-    )).toBe(true);
+    await expect
+        .poll(() =>
+            page.evaluate(
+                () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+            ),
+        )
+        .toBe(true);
 });
 
 test('dirty scope navigation offers stay, discard, and save', async ({ page }) => {
@@ -327,27 +377,21 @@ test('dirty scope navigation offers stay, discard, and save', async ({ page }) =
     await page.goto('/tests/harness.html?scope=personal');
     await page.getByRole('button', { name: 'Private Chats Options' }).click();
     await page.getByRole('button', { name: 'Test chat', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Test chat' }))
-        .toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Test chat' })).toBeVisible();
     await page.getByRole('button', { name: 'Reply behavior' }).click();
     await page.getByRole('textbox', { name: 'Names' }).fill('draft');
     await nativeBack(page);
     await page.goBack();
-    await expect(page.getByRole('heading', { name: 'Reply behavior' }))
-        .toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Reply behavior' })).toBeVisible();
     await page.goBack();
-    await expect(page.getByRole('heading', { name: 'Test chat' }))
-        .toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Test chat' })).toBeVisible();
     await page.goBack();
-    await expect(page.getByRole('button', { name: /Discard changes/ }))
-        .toBeVisible();
+    await expect(page.getByRole('button', { name: /Discard changes/ })).toBeVisible();
     await page.getByRole('button', { name: 'Stay' }).click();
     await nativeBack(page);
-    await expect(page.getByRole('button', { name: /Discard changes/ }))
-        .toBeVisible();
+    await expect(page.getByRole('button', { name: /Discard changes/ })).toBeVisible();
     await page.getByRole('button', { name: /Discard changes/ }).click();
-    await expect(page.getByRole('heading', { name: 'Slusha Settings' }))
-        .toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Slusha Settings' })).toBeVisible();
     expect(requests.length).toBeGreaterThanOrEqual(1);
 });
 
@@ -363,7 +407,9 @@ test('cached revisit restores the draft without a fresh request', async ({ page 
     expect(requests).toHaveLength(1);
 });
 
-test('invalid numeric input remains visible across local routes and blocks save', async ({ page }) => {
+test('invalid numeric input remains visible across local routes and blocks save', async ({
+    page,
+}) => {
     await routeConfig(page, scoped);
     await page.goto('/tests/harness.html?scope=private&chatId=7');
     await page.getByRole('button', { name: 'Reply behavior' }).click();
@@ -372,13 +418,13 @@ test('invalid numeric input remains visible across local routes and blocks save'
     await nativeBack(page);
     await page.getByRole('button', { name: 'Reply behavior' }).click();
     await expect(page.getByLabel('Response delay')).toHaveValue('not-a-number');
-    await expect.poll(() =>
-        page.evaluate(() => globalThis.__settingsChrome?.main.enabled)
-    ).toBe(false);
+    await expect
+        .poll(() => page.evaluate(() => globalThis.__settingsChrome?.main.enabled))
+        .toBe(false);
     await input.fill('4');
-    await expect.poll(() =>
-        page.evaluate(() => globalThis.__settingsChrome?.main.enabled)
-    ).toBe(true);
+    await expect
+        .poll(() => page.evaluate(() => globalThis.__settingsChrome?.main.enabled))
+        .toBe(true);
 });
 
 test('a failed save preserves the draft and exposes a retry', async ({ page }) => {
@@ -431,18 +477,20 @@ test('a mismatched contract response preserves the draft and shows an error', as
     const input = page.getByLabel('Response delay');
     await input.fill('8');
     await nativeMain(page);
-    await expect(page.getByText(
-        'The settings response does not match this app. Please reload or retry.',
-    )).toBeVisible();
+    await expect(
+        page.getByText('The settings response does not match this app. Please reload or retry.'),
+    ).toBeVisible();
     await expect(input).toHaveValue('8');
     expect(saves).toBe(1);
 });
 
-test('native modal back works and browser scope navigation is blocked during save', async ({ page }) => {
+test('native modal back works and browser scope navigation is blocked during save', async ({
+    page,
+}) => {
     let resolveSave: (() => void) | undefined;
     await page.route('**/api/config**', async (route: Route) => {
         if (route.request().method() === 'PUT') {
-            await new Promise<void>((resolve) => resolveSave = resolve);
+            await new Promise<void>((resolve) => (resolveSave = resolve));
             await route.fulfill({ json: scoped });
             return;
         }
@@ -455,12 +503,11 @@ test('native modal back works and browser scope navigation is blocked during sav
     });
     await page.goto('/tests/harness.html?scope=personal');
     await page.getByRole('button', { name: 'Private Chats Options' }).click();
-    await expect.poll(() =>
-        page.evaluate(() => globalThis.__settingsChrome?.backVisible)
-    ).toBe(true);
+    await expect
+        .poll(() => page.evaluate(() => globalThis.__settingsChrome?.backVisible))
+        .toBe(true);
     await nativeBack(page);
-    await expect(page.getByRole('button', { name: 'Test chat', exact: true }))
-        .toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Test chat', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Private Chats Options' }).click();
     await page.getByRole('button', { name: 'Test chat', exact: true }).click();
     await page.getByRole('button', { name: 'Reply behavior' }).click();
@@ -473,8 +520,7 @@ test('native modal back works and browser scope navigation is blocked during sav
         dispatchEvent(new PopStateEvent('popstate'));
     });
     await expect(page).toHaveURL(/scope=private/);
-    await expect(page.getByRole('heading', { name: 'Reply behavior' }))
-        .toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Reply behavior' })).toBeVisible();
     resolveSave?.();
     await expect(input).toBeEnabled();
 });

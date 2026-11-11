@@ -4,10 +4,7 @@ import type {
     ConfigResponse,
     ConfigSelection,
 } from '../../../../shared/config-contract.ts';
-import {
-    apiErrorSchema,
-    configResponseSchema,
-} from '../../../../shared/config-contract.ts';
+import { apiErrorSchema, configResponseSchema } from '../../../../shared/config-contract.ts';
 
 export class ConfigApiError extends Error {
     fieldErrors: Record<string, string>;
@@ -15,8 +12,7 @@ export class ConfigApiError extends Error {
 
     constructor(
         message: string,
-        options: { fieldErrors?: Record<string, string>; retryable?: boolean } =
-            {},
+        options: { fieldErrors?: Record<string, string>; retryable?: boolean } = {},
     ) {
         super(message);
         this.name = 'ConfigApiError';

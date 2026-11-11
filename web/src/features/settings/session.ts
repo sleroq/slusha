@@ -1,8 +1,4 @@
-import {
-    type QueryClient,
-    useQuery,
-    useQueryClient,
-} from '@tanstack/solid-query';
+import { type QueryClient, useQuery, useQueryClient } from '@tanstack/solid-query';
 import { createEffect, createMemo, createSignal, untrack } from 'solid-js';
 import type {
     ConfigField,
@@ -12,11 +8,7 @@ import type {
 import { ConfigApiError, loadConfig, saveConfig } from './api.ts';
 import { createSettingsDraft } from './draft.ts';
 
-export type ConfigQueryKey = readonly [
-    'config',
-    string,
-    number?,
-];
+export type ConfigQueryKey = readonly ['config', string, number?];
 
 export function configQueryKey(selection: ConfigSelection | undefined) {
     if (!selection) return ['config', 'launch'] as const;
@@ -30,10 +22,7 @@ function selectionFor(response: ConfigResponse): ConfigSelection {
     return { scope: response.scope };
 }
 
-function sameSelection(
-    left: ConfigSelection | undefined,
-    right: ConfigSelection | undefined,
-) {
+function sameSelection(left: ConfigSelection | undefined, right: ConfigSelection | undefined) {
     return left?.scope === right?.scope && left?.chatId === right?.chatId;
 }
 
@@ -61,8 +50,7 @@ export function createSettingsSession(props: {
 
     const query = useQuery<ConfigResponse, ConfigApiError>(() => ({
         queryKey: configQueryKey(props.selection()),
-        queryFn: ({ signal }) =>
-            loadConfig(authValue(props.auth), props.selection(), signal),
+        queryFn: ({ signal }) => loadConfig(authValue(props.auth), props.selection(), signal),
         retry: false,
         refetchOnWindowFocus: false,
         enabled: props.enabled?.() ?? true,
@@ -73,40 +61,42 @@ export function createSettingsSession(props: {
     const resetKeys = createMemo(() => draft.resetKeys);
     const dirtyFields = createMemo(() => draft.dirtyFields());
     const dirty = createMemo(() => dirtyFields().length > 0);
-    const selectionKey = createMemo(() =>
-        configQueryKey(props.selection()).join(':')
+    const selectionKey = createMemo(() => configQueryKey(props.selection()).join(':'));
+
+    createEffect(
+        () => selectionKey(),
+        (key) => {
+            installed = undefined;
+            installedKey = key;
+            setSaveError(undefined);
+            const cached = client.getQueryData<ConfigResponse>(configQueryKey(props.selection()));
+            if (cached) {
+                installed = cached;
+                draft.install(cached);
+            } else {
+                draft.install({ fields: [] });
+            }
+        },
     );
 
-    createEffect(() => selectionKey(), (key) => {
-        installed = undefined;
-        installedKey = key;
-        setSaveError(undefined);
-        const cached = client.getQueryData<ConfigResponse>(
-            configQueryKey(props.selection()),
-        );
-        if (cached) {
-            installed = cached;
-            draft.install(cached);
-        } else {
-            draft.install({ fields: [] });
-        }
-    });
-
-    createEffect(() => query.data, (data) => {
-        if (!data) return;
-        const key = configQueryKey(props.selection()).join(':');
-        if (props.selection() === undefined) {
-            client.setQueryData(configQueryKey(selectionFor(data)), data);
-            props.onCanonicalSelection(selectionFor(data));
-        }
-        if (key !== installedKey || data !== installed) {
-            installedKey = key;
-            if (draft.dirtyFields().length === 0) {
-                installed = data;
-                draft.install(data);
+    createEffect(
+        () => query.data,
+        (data) => {
+            if (!data) return;
+            const key = configQueryKey(props.selection()).join(':');
+            if (props.selection() === undefined) {
+                client.setQueryData(configQueryKey(selectionFor(data)), data);
+                props.onCanonicalSelection(selectionFor(data));
             }
-        }
-    });
+            if (key !== installedKey || data !== installed) {
+                installedKey = key;
+                if (draft.dirtyFields().length === 0) {
+                    installed = data;
+                    draft.install(data);
+                }
+            }
+        },
+    );
 
     function updateField(field: ConfigField) {
         if (saving()) return;
@@ -129,9 +119,7 @@ export function createSettingsSession(props: {
     }
 
     function installCached(selection: ConfigSelection) {
-        const cached = client.getQueryData<ConfigResponse>(
-            configQueryKey(selection),
-        );
+        const cached = client.getQueryData<ConfigResponse>(configQueryKey(selection));
         if (cached) draft.install(cached);
         else draft.install({ fields: [] });
     }
@@ -148,19 +136,12 @@ export function createSettingsSession(props: {
         setSaveError(undefined);
 
         try {
-            const response = await saveConfig(
-                authValue(props.auth),
-                selection,
-                operations,
-            );
+            const response = await saveConfig(authValue(props.auth), selection, operations);
             client.setQueryData(configQueryKey(selection), response);
 
             const responseSelection = selectionFor(response);
             if (!sameSelection(selection, responseSelection)) {
-                client.setQueryData(
-                    configQueryKey(responseSelection),
-                    response,
-                );
+                client.setQueryData(configQueryKey(responseSelection), response);
             }
 
             if (selection.scope === 'global') {
@@ -184,13 +165,9 @@ export function createSettingsSession(props: {
                 setSaveError(cause);
                 draft.setErrors(cause.fieldErrors);
             } else if (cause instanceof Error) {
-                setSaveError(
-                    new ConfigApiError(cause.message, { retryable: true }),
-                );
+                setSaveError(new ConfigApiError(cause.message, { retryable: true }));
             } else {
-                setSaveError(
-                    new ConfigApiError('Could not save', { retryable: true }),
-                );
+                setSaveError(new ConfigApiError('Could not save', { retryable: true }));
             }
             return false;
         } finally {

@@ -33,14 +33,14 @@ export function PersonalView(props: {
     onPrompts: () => void;
 }) {
     const about = () =>
-        props.fields.find((
-            field,
-        ): field is Extract<ConfigField, { kind: 'text' }> =>
-            field.key === 'profile.about' && field.kind === 'text'
+        props.fields.find(
+            (field): field is Extract<ConfigField, { kind: 'text' }> =>
+                field.key === 'profile.about' && field.kind === 'text',
         );
     const model = () =>
-        props.fields.find((field): field is Extract<ConfigField, { kind: 'select' }> =>
-            field.key === 'ai.model' && field.kind === 'select'
+        props.fields.find(
+            (field): field is Extract<ConfigField, { kind: 'select' }> =>
+                field.key === 'ai.model' && field.kind === 'select',
         );
     const chats = (type: ConfigChat['type']) =>
         props.data?.chats.filter((chat) => chat.type === type) ?? [];
@@ -49,21 +49,34 @@ export function PersonalView(props: {
 
     return (
         <>
-            <p class='section-heading'>Personal settings</p>
+            <p class="section-heading">Personal settings</p>
             <Show when={model()}>
                 <Surface>
-                    <Row class='editor-row'>
-                        <div class='editor-label'>
+                    <Row class="editor-row">
+                        <div class="editor-label">
                             <span id={labelId('ai.model')}>Model</span>
                             <Show when={model()!.overridden && !props.resetKeys.has('ai.model')}>
-                                <Button class='reset-button' disabled={props.saving} aria-label='Revert model to default' onClick={() => props.onReset(model()!)}>↶</Button>
+                                <Button
+                                    class="reset-button"
+                                    disabled={props.saving}
+                                    aria-label="Revert model to default"
+                                    onClick={() => props.onReset(model()!)}
+                                >
+                                    ↶
+                                </Button>
                             </Show>
                             <Show when={props.resetKeys.has('ai.model')}>
-                                <Button class='reset-button reset-cancel' disabled={props.saving} onClick={() => props.onCancelReset('ai.model')}>Keep override</Button>
+                                <Button
+                                    class="reset-button reset-cancel"
+                                    disabled={props.saving}
+                                    onClick={() => props.onCancelReset('ai.model')}
+                                >
+                                    Keep override
+                                </Button>
                             </Show>
                         </div>
                         <Show when={props.resetKeys.has('ai.model')}>
-                            <p class='reset-pending'>This setting will be reset when you save.</p>
+                            <p class="reset-pending">This setting will be reset when you save.</p>
                         </Show>
                         <Selection
                             value={model()!.value ?? ''}
@@ -81,68 +94,75 @@ export function PersonalView(props: {
             <For each={props.fields.filter((field) => field.key === 'ai.characterNamesModel')}>
                 {(field) => (
                     <Surface>
-                        <SettingField field={field} saving={props.saving} error={props.validation[field.key]}
-                            reset={props.resetKeys.has(field.key)} onChange={props.onChange}
-                            onRaw={() => {}} inputValue={() => ''} onReset={props.onReset}
-                            onCancelReset={props.onCancelReset} isDirty={() => false} onOpen={() => {}} />
+                        <SettingField
+                            field={field}
+                            saving={props.saving}
+                            error={props.validation[field.key]}
+                            reset={props.resetKeys.has(field.key)}
+                            onChange={props.onChange}
+                            onRaw={() => {}}
+                            inputValue={() => ''}
+                            onReset={props.onReset}
+                            onCancelReset={props.onCancelReset}
+                            isDirty={() => false}
+                            onOpen={() => {}}
+                        />
                     </Surface>
                 )}
             </For>
             <Show when={about()}>
-            <Surface>
-                <Row>
-                    <Field
-                        label='What should Slusha know about you?'
-                        error={error()}
-                        errorId={errorId}
-                    >
-                        <textarea
-                            aria-label='What should Slusha know about you?'
-                            aria-describedby={error() ? errorId : undefined}
-                            aria-invalid={error() ? 'true' : undefined}
-                            maxlength={about()?.maxLength}
-                            value={about()?.value ?? ''}
-                            disabled={props.saving || !about()?.writable}
-                            onInput={(event) => {
-                                const field = about();
-                                if (field) {
-                                    props.onChange({
-                                        ...field,
-                                        value: event.currentTarget.value,
-                                    });
-                                }
-                            }}
-                        />
-                    </Field>
-                    <Show when={about() && !about()!.writable}>
-                        <small class='hint'>This setting is read-only.</small>
-                    </Show>
-                </Row>
-            </Surface>
+                <Surface>
+                    <Row>
+                        <Field
+                            label="What should Slusha know about you?"
+                            error={error()}
+                            errorId={errorId}
+                        >
+                            <textarea
+                                aria-label="What should Slusha know about you?"
+                                aria-describedby={error() ? errorId : undefined}
+                                aria-invalid={error() ? 'true' : undefined}
+                                maxlength={about()?.maxLength}
+                                value={about()?.value ?? ''}
+                                disabled={props.saving || !about()?.writable}
+                                onInput={(event) => {
+                                    const field = about();
+                                    if (field) {
+                                        props.onChange({
+                                            ...field,
+                                            value: event.currentTarget.value,
+                                        });
+                                    }
+                                }}
+                            />
+                        </Field>
+                        <Show when={about() && !about()!.writable}>
+                            <small class="hint">This setting is read-only.</small>
+                        </Show>
+                    </Row>
+                </Surface>
             </Show>
             <Show when={props.fields.some((field) => field.key === 'ai.prompt')}>
                 <Surface>
-                    <RowButton label='Prompts' disabled={props.saving} onClick={props.onPrompts} />
+                    <RowButton label="Prompts" disabled={props.saving} onClick={props.onPrompts} />
                 </Surface>
             </Show>
-            <p class='section-heading'>Chat settings</p>
+            <p class="section-heading">Chat settings</p>
             <Surface>
                 <RowButton
-                    label='Private Chats Options'
-                    detail={chats('private').length === 1
-                        ? chats('private')[0].title
-                        : undefined}
+                    label="Private Chats Options"
+                    detail={chats('private').length === 1 ? chats('private')[0].title : undefined}
                     disabled={props.saving || chats('private').length === 0}
                     onClick={() => props.onScope('private')}
                 />
                 <RowButton
-                    label='Group Chats Options'
+                    label="Group Chats Options"
                     disabled={props.saving || chats('group').length === 0}
                     onClick={() => props.onScope('group')}
                 />
                 <Show when={props.data?.scopes.includes('global')}>
                     <RowButton
-                        label='Global Settings'
+                        label="Global Settings"
                         disabled={props.saving}
                         onClick={props.onGlobal}
                     />
@@ -167,13 +187,11 @@ export function ScopeView(props: {
             when={props.fields.length > 0}
             fallback={
                 <Surface>
-                    <p class='empty'>
-                        No settings are available for this chat.
-                    </p>
+                    <p class="empty">No settings are available for this chat.</p>
                 </Surface>
             }
         >
-            <p class='section-heading'>Options</p>
+            <p class="section-heading">Options</p>
             <Surface>
                 <For each={props.sections}>
                     {(section) => (
@@ -191,42 +209,38 @@ export function ScopeView(props: {
 
 export function SettingsLoading(props: { personal: boolean }) {
     return (
-        <div
-            class='settings-loading'
-            role='status'
-            aria-label='Loading settings'
-        >
+        <div class="settings-loading" role="status" aria-label="Loading settings">
             <Show
                 when={props.personal}
                 fallback={
                     <Surface>
-                        <Row class='skeleton-row'>
-                            <span class='skeleton skeleton-wide' />
+                        <Row class="skeleton-row">
+                            <span class="skeleton skeleton-wide" />
                         </Row>
-                        <Row class='skeleton-row'>
-                            <span class='skeleton skeleton-medium' />
+                        <Row class="skeleton-row">
+                            <span class="skeleton skeleton-medium" />
                         </Row>
-                        <Row class='skeleton-row'>
-                            <span class='skeleton skeleton-wide' />
+                        <Row class="skeleton-row">
+                            <span class="skeleton skeleton-wide" />
                         </Row>
                     </Surface>
                 }
             >
                 <Surface>
-                    <Row class='skeleton-row skeleton-about'>
-                        <span class='skeleton skeleton-label' />
-                        <span class='skeleton skeleton-area' />
+                    <Row class="skeleton-row skeleton-about">
+                        <span class="skeleton skeleton-label" />
+                        <span class="skeleton skeleton-area" />
                     </Row>
                 </Surface>
                 <Surface>
-                    <Row class='skeleton-row'>
-                        <span class='skeleton skeleton-wide' />
+                    <Row class="skeleton-row">
+                        <span class="skeleton skeleton-wide" />
                     </Row>
-                    <Row class='skeleton-row'>
-                        <span class='skeleton skeleton-medium' />
+                    <Row class="skeleton-row">
+                        <span class="skeleton skeleton-medium" />
                     </Row>
-                    <Row class='skeleton-row'>
-                        <span class='skeleton skeleton-wide' />
+                    <Row class="skeleton-row">
+                        <span class="skeleton skeleton-wide" />
                     </Row>
                 </Surface>
             </Show>
@@ -250,12 +264,11 @@ export function SectionView(props: {
 }) {
     return (
         <>
-            <p class='section-heading'>Options</p>
+            <p class="section-heading">Options</p>
             <Surface>
                 <For each={props.section.keys}>
                     {(key) => {
-                        const field = () =>
-                            props.fields.find((item) => item.key === key);
+                        const field = () => props.fields.find((item) => item.key === key);
                         return (
                             <Show when={field()}>
                                 <SettingField
@@ -293,21 +306,16 @@ export function EditorView(props: {
 }) {
     return (
         <Show when={props.field}>
-            <p class='section-heading'>Items</p>
+            <p class="section-heading">Items</p>
             <Surface>
-                <Row class='editor-row'>
-                    <div class='editor-label'>
-                        <span id={labelId(props.field!.key)}>
-                            {titleFor(props.field!.key)}
-                        </span>
+                <Row class="editor-row">
+                    <div class="editor-label">
+                        <span id={labelId(props.field!.key)}>{titleFor(props.field!.key)}</span>
                         <Show when={props.field!.overridden && !props.reset}>
                             <Button
-                                class='reset-button'
-                                disabled={props.saving ||
-                                    !props.field!.writable}
-                                aria-label={`Revert ${
-                                    titleFor(props.field!.key)
-                                } to default`}
+                                class="reset-button"
+                                disabled={props.saving || !props.field!.writable}
+                                aria-label={`Revert ${titleFor(props.field!.key)} to default`}
                                 onClick={() => props.onReset(props.field!)}
                             >
                                 ↶
@@ -315,19 +323,16 @@ export function EditorView(props: {
                         </Show>
                         <Show when={props.reset}>
                             <Button
-                                class='reset-button reset-cancel'
+                                class="reset-button reset-cancel"
                                 disabled={props.saving}
-                                onClick={() =>
-                                    props.onCancelReset(props.field!.key)}
+                                onClick={() => props.onCancelReset(props.field!.key)}
                             >
                                 Keep override
                             </Button>
                         </Show>
                     </div>
                     <Show when={props.reset}>
-                        <p class='reset-pending'>
-                            This setting will be reset when you save.
-                        </p>
+                        <p class="reset-pending">This setting will be reset when you save.</p>
                     </Show>
                     <fieldset disabled={props.saving || !props.field!.writable}>
                         <FieldEditor
@@ -342,7 +347,7 @@ export function EditorView(props: {
                         />
                     </fieldset>
                     <Show when={!props.field!.writable}>
-                        <small class='hint'>This setting is read-only.</small>
+                        <small class="hint">This setting is read-only.</small>
                     </Show>
                 </Row>
             </Surface>
@@ -382,35 +387,24 @@ function SettingField(props: {
 
     return (
         <div
-            class={['setting-row', {
-                'has-error': Boolean(props.error),
-                dirty: props.isDirty(props.field),
-            }]}
+            class={[
+                'setting-row',
+                {
+                    'has-error': Boolean(props.error),
+                    dirty: props.isDirty(props.field),
+                },
+            ]}
         >
-            <div class='setting-label'>
-                <span id={labelId(props.field.key)}>
-                    {titleFor(props.field.key)}
-                </span>
-                <Show
-                    when={!props.reset &&
-                        (props.field.overridden || props.isDirty(props.field))}
-                >
-                    <i
-                        role='img'
-                        aria-label={changeLabel()}
-                        title={changeLabel()}
-                    />
+            <div class="setting-label">
+                <span id={labelId(props.field.key)}>{titleFor(props.field.key)}</span>
+                <Show when={!props.reset && (props.field.overridden || props.isDirty(props.field))}>
+                    <i role="img" aria-label={changeLabel()} title={changeLabel()} />
                 </Show>
-                <Show
-                    when={props.field.overridden && props.field.writable &&
-                        !props.reset}
-                >
+                <Show when={props.field.overridden && props.field.writable && !props.reset}>
                     <Button
-                        class='reset-button'
+                        class="reset-button"
                         disabled={props.saving}
-                        aria-label={`Revert ${
-                            titleFor(props.field.key)
-                        } to default`}
+                        aria-label={`Revert ${titleFor(props.field.key)} to default`}
                         onClick={() => props.onReset(props.field)}
                     >
                         ↶
@@ -418,7 +412,7 @@ function SettingField(props: {
                 </Show>
                 <Show when={props.reset}>
                     <Button
-                        class='reset-button reset-cancel'
+                        class="reset-button reset-cancel"
                         disabled={props.saving}
                         onClick={() => props.onCancelReset(props.field.key)}
                     >
@@ -427,9 +421,7 @@ function SettingField(props: {
                 </Show>
             </div>
             <Show when={props.reset}>
-                <p class='reset-pending'>
-                    This setting will be reset when you save.
-                </p>
+                <p class="reset-pending">This setting will be reset when you save.</p>
             </Show>
             <fieldset disabled={props.saving || !props.field.writable}>
                 <FieldEditor
@@ -444,7 +436,7 @@ function SettingField(props: {
                 />
             </fieldset>
             <Show when={!props.field.writable}>
-                <small class='hint'>This setting is read-only.</small>
+                <small class="hint">This setting is read-only.</small>
             </Show>
         </div>
     );
@@ -552,13 +544,10 @@ function NumberField(props: FieldEditorProps) {
 
     return (
         <Show when={field()}>
-            <Field
-                error={props.error}
-                errorId={errorId(field()!.key, props.error)}
-            >
+            <Field error={props.error} errorId={errorId(field()!.key, props.error)}>
                 <input
-                    type='text'
-                    inputmode='decimal'
+                    type="text"
+                    inputmode="decimal"
                     min={field()!.min}
                     max={field()!.max}
                     step={field()!.step}
@@ -566,8 +555,7 @@ function NumberField(props: FieldEditorProps) {
                     aria-describedby={errorId(field()!.key, props.error)}
                     aria-invalid={props.error ? 'true' : undefined}
                     value={props.inputValue(field()!)}
-                    onInput={(event) =>
-                        props.onRaw(field()!, event.currentTarget.value)}
+                    onInput={(event) => props.onRaw(field()!, event.currentTarget.value)}
                 />
             </Field>
         </Show>
@@ -582,8 +570,11 @@ function RangeField(props: FieldEditorProps) {
     };
     return (
         <Show when={field()}>
-            <div class='range-field'>
-                <output>{field()!.value}{field()!.unit ?? ''}</output>
+            <div class="range-field">
+                <output>
+                    {field()!.value}
+                    {field()!.unit ?? ''}
+                </output>
                 <Slider
                     value={field()!.value}
                     min={field()!.min}
@@ -644,29 +635,18 @@ function TextField(props: FieldEditorProps) {
     };
     return (
         <Show when={field()}>
-            <Field
-                error={props.error}
-                errorId={errorId(field()!.key, props.error)}
-            >
-
+            <Field error={props.error} errorId={errorId(field()!.key, props.error)}>
                 <Show
                     when={field()!.multiline}
                     fallback={
                         <input
-                            type='text'
+                            type="text"
                             aria-labelledby={labelId(field()!.key)}
-                            aria-describedby={errorId(
-                                field()!.key,
-                                props.error,
-                            )}
+                            aria-describedby={errorId(field()!.key, props.error)}
                             aria-invalid={props.error ? 'true' : undefined}
                             maxlength={field()!.maxLength}
                             value={props.inputValue(field()!)}
-                            onInput={(event) =>
-                                props.onRaw(
-                                    field()!,
-                                    event.currentTarget.value,
-                                )}
+                            onInput={(event) => props.onRaw(field()!, event.currentTarget.value)}
                         />
                     }
                 >
@@ -676,11 +656,9 @@ function TextField(props: FieldEditorProps) {
                         aria-invalid={props.error ? 'true' : undefined}
                         maxlength={field()!.maxLength}
                         value={props.inputValue(field()!)}
-                        onInput={(event) =>
-                            props.onRaw(field()!, event.currentTarget.value)}
+                        onInput={(event) => props.onRaw(field()!, event.currentTarget.value)}
                     />
                 </Show>
-
             </Field>
         </Show>
     );
@@ -734,9 +712,7 @@ function ListField(props: FieldEditorProps) {
         if (current.kind === 'matcher-list') {
             props.onChange({
                 ...current,
-                value: current.value.filter((_, itemIndex) =>
-                    itemIndex !== index
-                ),
+                value: current.value.filter((_, itemIndex) => itemIndex !== index),
             });
             return;
         }
@@ -753,29 +729,25 @@ function ListField(props: FieldEditorProps) {
                 fallback={
                     <>
                         <Button
-                            class='list-preview'
+                            class="list-preview"
                             disabled={props.saving}
                             onClick={() => props.onOpen?.(field()!.key)}
                         >
-                            {field()!.value.slice(0, 2).map(display).join(
-                                ', ',
-                            ) || 'None'} <span>›</span>
+                            {field()!.value.slice(0, 2).map(display).join(', ') || 'None'}{' '}
+                            <span>›</span>
                         </Button>
-                        <ValidationMessage
-                            field={field()!.key}
-                            error={error()}
-                        />
+                        <ValidationMessage field={field()!.key} error={error()} />
                     </>
                 }
             >
-                <div class='list-editor'>
-                    <div class='chips'>
+                <div class="list-editor">
+                    <div class="chips">
                         <For each={field()!.value}>
                             {(item, index) => (
                                 <span>
                                     {display(item)}
                                     <button
-                                        type='button'
+                                        type="button"
                                         disabled={props.saving}
                                         aria-label={`Remove ${display(item)}`}
                                         onClick={() => remove(index())}
@@ -786,14 +758,12 @@ function ListField(props: FieldEditorProps) {
                             )}
                         </For>
                     </div>
-                    <div class='add-row'>
+                    <div class="add-row">
                         <input
                             value={text()}
-                            placeholder='Add item'
+                            placeholder="Add item"
                             aria-label={`Add item to ${titleFor(field()!.key)}`}
-                            aria-describedby={error()
-                                ? errorId(field()!.key, error())
-                                : undefined}
+                            aria-describedby={error() ? errorId(field()!.key, error()) : undefined}
                             aria-invalid={error() ? 'true' : undefined}
                             disabled={props.saving}
                             onInput={(event) => {
@@ -811,20 +781,14 @@ function ListField(props: FieldEditorProps) {
                             <Button
                                 class={regex() ? 'button-primary' : ''}
                                 disabled={props.saving}
-                                aria-label={regex()
-                                    ? 'Add regular expression'
-                                    : 'Add plain text'}
+                                aria-label={regex() ? 'Add regular expression' : 'Add plain text'}
                                 aria-pressed={regex() ? 'true' : 'false'}
                                 onClick={() => setRegex(!regex())}
                             >
                                 .*
                             </Button>
                         </Show>
-                        <Button
-                            class='button-primary'
-                            disabled={props.saving}
-                            onClick={add}
-                        >
+                        <Button class="button-primary" disabled={props.saving} onClick={add}>
                             Add
                         </Button>
                     </div>
@@ -852,48 +816,36 @@ function ObjectField(props: FieldEditorProps) {
 
     return (
         <Show when={field()}>
-            <div class='object-editor'>
+            <div class="object-editor">
                 <For each={field()!.value} keyed={false}>
                     {(item, index) => (
-                        <div class='object-row'>
+                        <div class="object-row">
                             <div>
                                 <For each={field()!.keys}>
                                     {(key) => (
                                         <input
-                                            aria-label={`${
-                                                titleFor(field()!.key)
-                                            } item ${index + 1} ${key}`}
+                                            aria-label={`${titleFor(
+                                                field()!.key,
+                                            )} item ${index + 1} ${key}`}
                                             placeholder={key}
                                             value={item()[key] ?? ''}
                                             disabled={props.saving}
-                                            aria-describedby={errorId(
-                                                field()!.key,
-                                                props.error,
-                                            )}
-                                            aria-invalid={props.error
-                                                ? 'true'
-                                                : undefined}
+                                            aria-describedby={errorId(field()!.key, props.error)}
+                                            aria-invalid={props.error ? 'true' : undefined}
                                             onInput={(event) => {
                                                 const current = field();
                                                 if (!current) return;
                                                 props.onChange({
                                                     ...current,
-                                                    value: current.value.map(
-                                                        (entry, itemIndex) => {
-                                                            if (
-                                                                itemIndex ===
-                                                                    index
-                                                            ) {
-                                                                return {
-                                                                    ...entry,
-                                                                    [key]: event
-                                                                        .currentTarget
-                                                                        .value,
-                                                                };
-                                                            }
-                                                            return entry;
-                                                        },
-                                                    ),
+                                                    value: current.value.map((entry, itemIndex) => {
+                                                        if (itemIndex === index) {
+                                                            return {
+                                                                ...entry,
+                                                                [key]: event.currentTarget.value,
+                                                            };
+                                                        }
+                                                        return entry;
+                                                    }),
                                                 });
                                             }}
                                         />
@@ -901,19 +853,16 @@ function ObjectField(props: FieldEditorProps) {
                                 </For>
                             </div>
                             <Button
-                                aria-label={`Remove ${
-                                    titleFor(field()!.key)
-                                } item ${index + 1}`}
+                                aria-label={`Remove ${titleFor(field()!.key)} item ${index + 1}`}
                                 disabled={props.saving}
                                 onClick={() => {
                                     const current = field();
                                     if (current) {
                                         props.onChange({
                                             ...current,
-                                            value: current.value.filter((
-                                                _,
-                                                itemIndex,
-                                            ) => itemIndex !== index),
+                                            value: current.value.filter(
+                                                (_, itemIndex) => itemIndex !== index,
+                                            ),
                                         });
                                     }
                                 }}
@@ -923,11 +872,7 @@ function ObjectField(props: FieldEditorProps) {
                         </div>
                     )}
                 </For>
-                <Button
-                    class='button-plain'
-                    disabled={props.saving}
-                    onClick={add}
-                >
+                <Button class="button-plain" disabled={props.saving} onClick={add}>
                     + Add item
                 </Button>
                 <ValidationMessage field={field()!.key} error={props.error} />
@@ -944,11 +889,7 @@ function errorId(key: string, error?: string) {
 function ValidationMessage(props: { field: string; error?: string }) {
     return (
         <Show when={props.error}>
-            <span
-                id={errorId(props.field, props.error)}
-                class='field-error'
-                role='alert'
-            >
+            <span id={errorId(props.field, props.error)} class="field-error" role="alert">
                 {props.error}
             </span>
         </Show>
