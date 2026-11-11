@@ -709,6 +709,7 @@ function SettingsApp(props: SettingsAppProps) {
                         onCancelReset={session.cancelReset}
                         onScope={openChats}
                         onGlobal={() => requestSelection({ scope: 'global' })}
+                        onPrompts={() => routeTo(props.route.selection!, 'section', 'prompts')}
                     />
                 </Show>
                 <Show

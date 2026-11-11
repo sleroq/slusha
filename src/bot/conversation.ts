@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gt, lt, lte, or, sql } from 'drizzle-orm';
 import { GrammyError, type Api } from 'grammy';
 import type { Message, Update } from 'grammy/types';
 import { z } from 'zod';
-import { defaultPersonality, UnsupportedImageModelError, type AgentActions, type AgentEvent, type AgentKey, type AgentSessions } from '../agent';
+import { UnsupportedImageModelError, type AgentActions, type AgentEvent, type AgentKey, type AgentSessions } from '../agent';
 import { characterInstructions, type Characters } from '../characters';
 import type { Db } from '../db/client';
 import { chatMembers, chats, conversations, events, optOuts, users } from '../db/schema';
@@ -346,14 +346,24 @@ export function createConversationHandler(options: Options) {
             await db.update(conversations).set({ contextEventId: event.id, generation: current.generation + 1, pendingRotation: false, pendingReset: null }).where(and(eq(conversations.chatId, key.chatId), eq(conversations.topicId, key.topicId)));
             await delivery.send(key.chatId, 'Session reset.');
         } else if (name === '/start') {
+            const { startMessage } = await settings.resolve(key.chatId, userId);
             if (options.webAppUrl && message.chat.type === 'private') {
-                await delivery.send(key.chatId, 'Привет! Я Слюша.', {
+                await delivery.send(key.chatId, startMessage, {
                     reply_markup: { inline_keyboard: [[{ text: 'Настройки', web_app: { url: options.webAppUrl } }]] },
                 });
             } else {
-                await delivery.send(key.chatId, 'Привет! Я Слюша.');
+                await delivery.send(key.chatId, startMessage);
             }
         }
+    }
+
+    async function isComment(message: Message) {
+        if (message.is_automatic_forward || message.reply_to_message?.is_automatic_forward) return true;
+        if (!message.message_thread_id) return false;
+        const rows = await db.select({ payload: events.payload }).from(events).where(and(
+            eq(events.chatId, message.chat.id), eq(events.messageId, message.message_thread_id), eq(events.kind, 'message'),
+        )).limit(1);
+        return z.object({ is_automatic_forward: z.literal(true) }).safeParse(rows[0]?.payload).success;
     }
 
     async function handleMessage(updateId: number, message: Message, kind: 'message' | 'edit', deferReply = false) {
@@ -402,7 +412,7 @@ export function createConversationHandler(options: Options) {
                 if (seedCost + cost > seedBudget) continue;
                 seed.push(row);
                 seedCost += cost;
-                if (seed.length === 50) break;
+                if (seed.length === 20) break;
             }
             seed.reverse();
             if (!options.imageModels.has(model) && seed.some((row) => row.kind === 'message' && imageFile(storedMessage.parse(row.payload)))) {
@@ -451,10 +461,15 @@ export function createConversationHandler(options: Options) {
             await sessions.append(key, contextEvent);
         }
         try {
-            let personality = defaultPersonality;
+            let personality = effective['ai.prompt'];
             if (character) personality = characterInstructions(character);
-            let instructions = `${personality}\n\nThe preferred chat language is ${effective.locale}.`;
-            if (effective.hateMode) instructions += '\nBe a playful hater in this chat.';
+            let contextPrompt = effective['ai.groupChatPromptAddition'];
+            if (message.chat.type === 'private') contextPrompt = effective['ai.privateChatPromptAddition'];
+            if (await isComment(message)) contextPrompt += `\n${effective['ai.commentsPromptAddition']}`;
+            let hatePrompt = '';
+            if (effective.hateMode) hatePrompt = effective['ai.hateModePrompt'];
+            const instructions = [effective['ai.prePrompt'], personality, contextPrompt, hatePrompt,
+                effective['ai.chatActionsToolDescription'], effective['ai.finalPrompt'], `The preferred chat language is ${effective.locale}.`].filter(Boolean).join('\n\n');
             const images = await image(event, model);
             await options.budgets.reconcile(key, await sessions.usage(key));
             await options.budgets.start(key, event.id);

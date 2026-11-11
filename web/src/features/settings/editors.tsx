@@ -30,6 +30,7 @@ export function PersonalView(props: {
     onCancelReset: (key: string) => void;
     onScope: (type: 'private' | 'group') => void;
     onGlobal: () => void;
+    onPrompts: () => void;
 }) {
     const about = () =>
         props.fields.find((
@@ -118,6 +119,11 @@ export function PersonalView(props: {
                     </Show>
                 </Row>
             </Surface>
+            </Show>
+            <Show when={props.fields.some((field) => field.key === 'ai.prompt')}>
+                <Surface>
+                    <RowButton label='Prompts' disabled={props.saving} onClick={props.onPrompts} />
+                </Surface>
             </Show>
             <p class='section-heading'>Chat settings</p>
             <Surface>

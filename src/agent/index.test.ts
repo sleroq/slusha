@@ -124,3 +124,39 @@ test.each([false, true])("startup recovery %s controls an interrupted persisted 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("behavior prompts are durable, append only on change, and reset with the session", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "slusha-prompts-"));
+  const faux = fauxProvider({ provider: "opencode-go", models: [{ id: "first" }] });
+  const models = createModels();
+  models.setProvider(faux.provider);
+  const actions: AgentActions = { async reply() {}, async react() {}, async shell() { return ""; } };
+  const key = { chatId: 1, topicId: 0 };
+  let sessions = await createAgentSessions({ dataDir: dir, actions, models });
+  const seen: string[][] = [];
+  async function run(id: string, instructions: string) {
+    faux.setResponses([(context) => {
+      seen.push(context.messages.filter((message) => message.role === "system").map((message) => message.sections?.["Behavioral instructions"] ?? "").filter(Boolean));
+      return fauxAssistantMessage("done");
+    }]);
+    await sessions.run(key, { eventId: Number(id), generation: 0, requestId: id, model: "first", text: id, instructions });
+  }
+  try {
+    await run("1", "first prompt");
+    await run("2", "first prompt");
+    await sessions.close();
+    sessions = await createAgentSessions({ dataDir: dir, actions, models });
+    await run("3", "second prompt");
+    await run("3", "different retry prompt");
+    await run("4", "first prompt");
+    await sessions.reset(key);
+    await run("5", "first prompt");
+    expect(seen).toEqual([
+      ["first prompt"], ["first prompt"], ["first prompt", "second prompt"],
+      ["first prompt", "second prompt", "first prompt"], ["first prompt"],
+    ]);
+  } finally {
+    await sessions.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});

@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client';
 import * as schema from '../db/schema';
+import { defaultPersonality } from '../agent';
 
 export type SettingsScope =
     | { scope: 'global' }
@@ -9,7 +10,24 @@ export type SettingsScope =
     | { scope: 'user'; userId: number };
 export type SettingsOptions = { models: readonly string[]; defaultModel: string; defaultShellEnabled?: boolean };
 export type ModelKey = 'ai.model' | 'ai.characterNamesModel';
-export type ModelOperation = { key: ModelKey; value: string } | { key: ModelKey; reset: true };
+export const promptDefaults = {
+    'ai.prompt': defaultPersonality,
+    'ai.prePrompt': '',
+    'ai.privateChatPromptAddition': '',
+    'ai.groupChatPromptAddition': '',
+    'ai.commentsPromptAddition': '',
+    'ai.hateModePrompt': 'Be a playful hater in this chat.',
+    'ai.finalPrompt': '',
+    'ai.chatActionsToolDescription': '',
+    startMessage: 'Привет! Я Слюша.',
+} as const;
+export const promptKeys = [
+    'ai.prompt', 'ai.prePrompt', 'ai.privateChatPromptAddition', 'ai.groupChatPromptAddition',
+    'ai.commentsPromptAddition', 'ai.hateModePrompt', 'ai.finalPrompt', 'ai.chatActionsToolDescription', 'startMessage',
+] as const;
+export type PromptKey = typeof promptKeys[number];
+export type ConfigKey = ModelKey | PromptKey;
+export type ModelOperation = { key: ConfigKey; value: string } | { key: ConfigKey; reset: true };
 export type ModelValues = { value: string; inheritedValue: string; overridden: boolean };
 
 const names = [
@@ -24,6 +42,15 @@ export function createSettings(db: Db, options: SettingsOptions) {
     const settingSchema = z.object({
         'ai.model': z.string().refine((model) => models.includes(model), 'Invalid model'),
         'ai.characterNamesModel': z.string().refine((model) => models.includes(model), 'Invalid model'),
+        'ai.prompt': z.string().max(32000),
+        'ai.prePrompt': z.string().max(32000),
+        'ai.privateChatPromptAddition': z.string().max(32000),
+        'ai.groupChatPromptAddition': z.string().max(32000),
+        'ai.commentsPromptAddition': z.string().max(32000),
+        'ai.hateModePrompt': z.string().max(32000),
+        'ai.finalPrompt': z.string().max(32000),
+        'ai.chatActionsToolDescription': z.string().max(32000),
+        startMessage: z.string().max(32000),
         locale: z.string().min(2).max(32),
         hateMode: z.boolean(),
         shellEnabled: z.boolean(),
@@ -37,6 +64,7 @@ export function createSettings(db: Db, options: SettingsOptions) {
     const defaults: Values = {
         'ai.model': options.defaultModel,
         'ai.characterNamesModel': options.defaultModel,
+        ...promptDefaults,
         locale: 'ru',
         hateMode: false,
         shellEnabled: options.defaultShellEnabled ?? true,
@@ -61,8 +89,8 @@ export function createSettings(db: Db, options: SettingsOptions) {
         return settingSchema.partial().parse(Object.fromEntries(rows.map((row) => [row.key, row.value])));
     }
 
-    async function read(target: SettingsScope, key: ModelKey = 'ai.model'): Promise<ModelValues> {
-        let inheritedValue = options.defaultModel;
+    async function read(target: SettingsScope, key: ConfigKey = 'ai.model'): Promise<ModelValues> {
+        let inheritedValue: string = defaults[key];
         if (target.scope !== 'global') inheritedValue = (await overrides({ scope: 'global' }))[key] ?? inheritedValue;
         const value = (await overrides(target))[key];
         return { value: value ?? inheritedValue, inheritedValue, overridden: value !== undefined };
@@ -95,7 +123,7 @@ export function createSettings(db: Db, options: SettingsOptions) {
     async function apply(target: SettingsScope, operations: readonly ModelOperation[]) {
         const id = identity(target);
         for (const operation of operations) {
-            if (operation.key !== 'ai.model' && operation.key !== 'ai.characterNamesModel') throw new Error('Unknown setting');
+            if (!(operation.key in promptDefaults) && operation.key !== 'ai.model' && operation.key !== 'ai.characterNamesModel') throw new Error('Unknown setting');
             if (!('reset' in operation)) settingSchema.shape[operation.key].parse(operation.value);
         }
         await db.transaction(async (tx) => {

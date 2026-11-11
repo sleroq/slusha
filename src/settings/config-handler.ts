@@ -5,7 +5,7 @@ import { updateConfigSchema, type ConfigChat, type ConfigScope, type ConfigRespo
 import { CONFIG_CONTRACT_VERSION } from '../../shared/config-contract-version';
 import type { Db } from '../db/client';
 import { chatMembers, chats } from '../db/schema';
-import type { ModelOperation, Settings, SettingsScope } from './index';
+import { promptKeys, type ModelOperation, type Settings, type SettingsScope } from './index';
 
 export type TelegramApi = {
     getChatMember(chatId: number, userId: number): Promise<{ status: string; is_member?: boolean }>;
@@ -135,24 +135,31 @@ export function createConfigHandler({ db, botToken, adminIds, settings, api }: C
             if (!writable) return error('Forbidden', 403);
             const validated: ModelOperation[] = [];
             for (const operation of operations) {
-                if (operation.key !== 'ai.model' && operation.key !== 'ai.characterNamesModel') return error('Unknown setting', 400);
+                const parsed = z.enum(['ai.model', 'ai.characterNamesModel', ...promptKeys]).safeParse(operation.key);
+                if (!parsed.success) return error('Unknown setting', 400);
+                const key = parsed.data;
                 if ('reset' in operation) {
-                    validated.push({ key: operation.key, reset: true });
+                    validated.push({ key, reset: true });
                 } else {
                     const value = z.string().safeParse(operation.value);
-                    if (!value.success || !settings.models.includes(value.data)) return error('Invalid model', 400);
-                    validated.push({ key: operation.key, value: value.data });
+                    if (!value.success || value.data.length > 32000) return error('Invalid setting', 400);
+                    if ((key === 'ai.model' || key === 'ai.characterNamesModel') && !settings.models.includes(value.data)) return error('Invalid model', 400);
+                    validated.push({ key, value: value.data });
                 }
             }
             await settings.apply(target, validated);
         }
         const model = await settings.read(target);
         const characterNamesModel = await settings.read(target, 'ai.characterNamesModel');
+        const prompts = await Promise.all(promptKeys.map(async (key) => ({
+            key, kind: 'text' as const, multiline: true, maxLength: 32000, ...await settings.read(target, key), writable,
+        })));
         const response: ConfigResponse = {
             contractVersion: CONFIG_CONTRACT_VERSION, scope, scopes, chats: available, isAdmin,
             fields: [
                 { key: 'ai.model', kind: 'select', options: settings.models, ...model, writable },
                 { key: 'ai.characterNamesModel', kind: 'select', options: settings.models, ...characterNamesModel, writable },
+                ...prompts,
             ],
         };
         if (scope === 'private' || scope === 'group') response.chatId = chatId;

@@ -216,6 +216,7 @@ export async function createAgentSessions({ dataDir, actions, models: providedMo
         const messages = (await root.context(BACKGROUND_CONTEXT)).messages;
         const latest = messages.findLast((message) => message.role === "assistant");
         if (!latest || latest.role !== "assistant") return false;
+        if (Date.now() - latest.timestamp >= 10 * 60 * 1000) return true;
         const usage = latest.usage;
         return usage.input + usage.cacheRead + usage.cacheWrite + usage.output >= model.contextWindow * 0.7;
       });
@@ -233,8 +234,15 @@ export async function createAgentSessions({ dataDir, actions, models: providedMo
     run(key: AgentKey, input: AgentInput) {
       return inSession(key, async ({ root, harness, shell }) => {
         await root.waitForIdle(BACKGROUND_CONTEXT);
+        const existing = await root.commit((tx) => tx.submissionByRequest(root.id, `run:${input.requestId}`), BACKGROUND_CONTEXT);
+        if (existing) {
+          const submission = await harness.submission(existing.id, BACKGROUND_CONTEXT);
+          if (!submission) throw new Error("Persisted submission is missing");
+          return { settlement: await submission.wait(BACKGROUND_CONTEXT), cumulativeUsage: await harness.usage(BACKGROUND_CONTEXT) };
+        }
         const model = models.getModel("opencode-go", input.model);
-        const messages = (await root.context(BACKGROUND_CONTEXT)).messages;
+        const view = await root.context(BACKGROUND_CONTEXT);
+        const messages = view.messages;
         const hasImages = (input.images?.length ?? 0) > 0 || messages.some((message) =>
           Array.isArray(message.content) && message.content.some((block) => block.type === "image"));
         if (model && hasImages && !model.input.includes("image")) {
@@ -242,7 +250,16 @@ export async function createAgentSessions({ dataDir, actions, models: providedMo
         }
         let tools: import("@earendil-works/pi-durable").AgentChange["tools"] = null;
         if (input.shellEnabled === false) tools = { remove: [shell] };
-        await root.configure({ model: { provider: "opencode-go", modelId: input.model }, instructions: input.instructions ?? defaultPersonality, tools }, BACKGROUND_CONTEXT);
+        await root.configure({ model: { provider: "opencode-go", modelId: input.model }, instructions: "", tools }, BACKGROUND_CONTEXT);
+        const instructions = input.instructions ?? defaultPersonality;
+        const previous = view.entries.findLast((entry, index) => entry.kind === "slusha.prompt" && view.contributions[index]?.length !== 0);
+        if (previous?.data !== instructions) {
+          const prompt = await root.submit({
+            type: "write", requestId: `prompt:${crypto.randomUUID()}`,
+            entry: { kind: "slusha.prompt", data: instructions, model: [{ role: "system", content: "", sections: { "Behavioral instructions": instructions }, timestamp: Date.now() }] },
+          }, BACKGROUND_CONTEXT);
+          await prompt.wait(BACKGROUND_CONTEXT);
+        }
         const submission = await root.submit({ type: "input", requestId: `run:${input.requestId}`, content: content(input.text, input.images), entry: { kind: "slusha.input", data: { generation: input.generation, eventId: input.eventId } } }, BACKGROUND_CONTEXT);
         const settlement = await submission.wait(BACKGROUND_CONTEXT);
         return { settlement, cumulativeUsage: await harness.usage(BACKGROUND_CONTEXT) };

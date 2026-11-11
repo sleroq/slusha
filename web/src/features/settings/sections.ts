@@ -71,6 +71,7 @@ export function titleFor(key: string) {
     const labels = new Map(Object.entries({
         'ai.prompt': 'Character',
         'ai.prePrompt': 'System prompt',
+        'ai.chatActionsToolDescription': 'Chat action guidance (not tool schema)',
         'ai.model': 'Model',
         'ai.characterNamesModel': 'Character name model',
         'ai.imageAttachmentFallbackModel': 'Image fallback model',

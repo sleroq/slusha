@@ -434,7 +434,7 @@ test.skipIf(!databaseUrl)('old group messages do not generate; edits and reactio
 });
 
 
-test.skipIf(!databaseUrl)('rotation reseeds only 50 eligible events and releases opted-in history without replaying tools', async () => {
+test.skipIf(!databaseUrl)('rotation reseeds only 20 eligible events and releases opted-in history without replaying tools', async () => {
     const app = await appFixture({}, 4096);
     try {
         const { db, faux, sent, processUpdate, actions, sessions } = app;
@@ -463,8 +463,8 @@ test.skipIf(!databaseUrl)('rotation reseeds only 50 eligible events and releases
         expect(context).toContain('trigger rotation');
         expect(context).toContain('released secret');
         expect(context).not.toContain('still hidden');
-        expect(context).not.toContain('buffer-7');
-        expect(context).toContain('buffer-8');
+        expect(context).not.toContain('buffer-37');
+        expect(context).toContain('buffer-38');
         expect(sent.filter((item) => item.text === 'one side effect')).toHaveLength(1);
         const [released] = await db.select().from(events).where(eq(events.updateId, 58));
         const [hidden] = await db.select().from(events).where(eq(events.updateId, 61));
@@ -472,6 +472,45 @@ test.skipIf(!databaseUrl)('rotation reseeds only 50 eligible events and releases
         const [state] = await db.select().from(conversations);
         expect([state?.generation, state?.pendingRotation]).toEqual([1, false]);
     } finally { await app.close(); }
+});
+
+test.skipIf(!databaseUrl)('idle rotation uses the last generation across passive messages and restart', async () => {
+    await withApp(async ({ db, faux, processUpdate, snapshot, sent }) => {
+        const originalNow = Date.now;
+        let now = originalNow();
+        Date.now = () => now;
+        try {
+            faux.setResponses([
+                fauxAssistantMessage([fauxToolCall('send_reply', { targetRef: 'm1', text: 'delivered once' })], { stopReason: 'toolUse', timestamp: now }),
+                fauxAssistantMessage('old assistant transcript', { timestamp: now }),
+            ]);
+            await processUpdate(update(1, 'initial history'));
+            now += 10 * 60 * 1000 - 1;
+            let context = '';
+            faux.setResponses([(input) => { context = JSON.stringify(input.messages); return fauxAssistantMessage('fresh assistant transcript', { timestamp: now }); }]);
+            await processUpdate(update(2, 'fresh generation'));
+            expect((await db.select().from(conversations))[0]?.generation).toBe(0);
+            expect(context).toContain('old assistant transcript');
+            expect(context).toContain('toolCall');
+
+            now += 10 * 60 * 1000 - 1;
+            await processUpdate(update(3, 'passive recent history'), { deferReply: true });
+            expect((await db.select().from(conversations))[0]?.generation).toBe(0);
+            await snapshot();
+            now += 1;
+            faux.setResponses([(input) => { context = JSON.stringify(input.messages); return fauxAssistantMessage('done', { timestamp: now }); }]);
+            await processUpdate(update(4, 'after idle'));
+            expect((await db.select().from(conversations))[0]?.generation).toBe(1);
+            expect(context).toContain('initial history');
+            expect(context).toContain('fresh generation');
+            expect(context).toContain('passive recent history');
+            expect(context).toContain('after idle');
+            expect(context).not.toContain('old assistant transcript');
+            expect(context).not.toContain('fresh assistant transcript');
+            expect(context).not.toContain('toolCall');
+            expect(sent.filter((item) => item.text === 'delivered once')).toHaveLength(1);
+        } finally { Date.now = originalNow; }
+    });
 });
 
 test.skipIf(!databaseUrl)('opting out again revokes released history and durable context until another rotation', async () => {
@@ -701,5 +740,40 @@ test.skipIf(!databaseUrl)('restoring a pre-forget generation rebuilds and marks 
         const [current] = await db.select().from(conversations);
         expect(current?.generation).toBe(2);
         expect(current?.pendingRotation).toBe(false);
+    });
+});
+
+test.skipIf(!databaseUrl)('prompt settings follow chat context, character selection and start', async () => {
+    await withApp(async ({ settings, processUpdate, faux, sent }) => {
+        const target = { scope: 'global' } as const;
+        await settings.apply(target, [
+            { key: 'ai.prompt', value: 'default character prompt' }, { key: 'ai.prePrompt', value: 'preamble' },
+            { key: 'ai.privateChatPromptAddition', value: 'private guidance' }, { key: 'ai.groupChatPromptAddition', value: 'group guidance' },
+            { key: 'ai.commentsPromptAddition', value: 'comment guidance' }, { key: 'ai.hateModePrompt', value: 'hate guidance' },
+            { key: 'ai.finalPrompt', value: 'final guidance' }, { key: 'ai.chatActionsToolDescription', value: 'action guidance' },
+            { key: 'startMessage', value: 'custom greeting' },
+        ]);
+        await processUpdate({ update_id: 100, message: message(100, '/start') });
+        expect(sent.at(-1)?.text).toBe('custom greeting');
+        let prompt = '';
+        faux.setResponses([(input) => { prompt = JSON.stringify(input.messages); return fauxAssistantMessage('done'); }]);
+        await processUpdate({ update_id: 101, message: message(101, 'hello') });
+        expect(prompt).toContain('default character prompt');
+        expect(prompt).toContain('private guidance');
+        expect(prompt).toContain('action guidance');
+        expect(prompt).not.toContain('group guidance');
+        await settings.setOption({ scope: 'chat', chatId: group.id }, 'hateMode', true);
+        await processUpdate({ update_id: 102, message: { ...message(102, 'channel post', group), is_automatic_forward: true, from: { ...user, is_bot: true } } });
+        faux.setResponses([(input) => { prompt = JSON.stringify(input.messages); return fauxAssistantMessage('done'); }]);
+        await processUpdate({ update_id: 103, message: { ...message(103, 'slusha hi', group), message_thread_id: 102 } });
+        expect(prompt).toContain('group guidance');
+        expect(prompt).toContain('comment guidance');
+        expect(prompt).toContain('hate guidance');
+        expect(prompt).not.toContain('private guidance');
+        await processUpdate({ update_id: 104, message: message(104, '/character set 12', group) });
+        faux.setResponses([(input) => { prompt = JSON.stringify(input.messages); return fauxAssistantMessage('done'); }]);
+        await processUpdate({ update_id: 105, message: message(105, 'slusha hi', group) });
+        expect(prompt).toContain('A curious stargazer');
+        expect(prompt).not.toContain('default character prompt');
     });
 });

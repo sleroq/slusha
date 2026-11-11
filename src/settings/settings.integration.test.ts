@@ -69,7 +69,16 @@ test.skipIf(!databaseUrl)('settings resolution and signed config requests enforc
         expect((await request('PUT', '', { scope: 'group', chatId: -1, operations: [{ key: 'ai.model', value: 'a' }] })).status).toBe(403);
         expect(payload.fields[1]).toMatchObject({ key: 'ai.characterNamesModel', value: 'c', inheritedValue: 'b', writable: false });
         expect((await request('PUT', '', { scope: 'group', chatId: -1, operations: [{ key: 'ai.characterNamesModel', value: 'a' }] })).status).toBe(403);
+        expect((await request('PUT', '', { scope: 'group', chatId: -1, operations: [{ key: 'ai.prompt', value: 'forbidden' }] })).status).toBe(403);
         admin = true;
+        const promptKeys = ['ai.prompt', 'ai.prePrompt', 'ai.privateChatPromptAddition', 'ai.groupChatPromptAddition', 'ai.commentsPromptAddition', 'ai.hateModePrompt', 'ai.finalPrompt', 'ai.chatActionsToolDescription', 'startMessage'];
+        expect((await request('PUT', '', { scope: 'group', chatId: -1, operations: promptKeys.map((key) => ({ key, value: `custom ${key}` })) })).status).toBe(200);
+        const promptResponse = configResponseSchema.parse(await (await request('GET', '?scope=group&chatId=-1')).json());
+        for (const key of promptKeys) expect(promptResponse.fields.find((field) => field.key === key)).toMatchObject({ kind: 'text', multiline: true, value: `custom ${key}`, overridden: true });
+        expect((await request('PUT', '', { scope: 'group', chatId: -1, operations: [{ key: 'ai.prompt', value: 'not saved' }, { key: 'startMessage', value: 123 }] })).status).toBe(400);
+        expect((await settings.resolve(-1, 42))['ai.prompt']).toBe('custom ai.prompt');
+        expect((await request('PUT', '', { scope: 'group', chatId: -1, operations: promptKeys.map((key) => ({ key, reset: true as const })) })).status).toBe(200);
+        expect((await settings.resolve(-1, 42))['ai.prompt']).not.toBe('custom ai.prompt');
         expect((await request('PUT', '', { scope: 'group', chatId: -1, operations: [{ key: 'ai.characterNamesModel', value: 'invalid' }] })).status).toBe(400);
         expect((await request('PUT', '', { scope: 'group', chatId: -1, operations: [{ key: 'ai.characterNamesModel', reset: true }] })).status).toBe(200);
         expect((await settings.resolve(-1, 42))['ai.characterNamesModel']).toBe('b');
