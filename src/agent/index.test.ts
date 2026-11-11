@@ -200,6 +200,7 @@ test.each([false, true])(
                 expect(fresh.settlement.status).toBe('done');
                 expect(replies).toEqual([]);
                 expect(faux.state.callCount).toBe(1);
+                faux.setResponses([fauxAssistantMessage('retried answer')]);
                 const old = await sessions.run(key, {
                     eventId: 1,
                     generation: 0,
@@ -207,8 +208,8 @@ test.each([false, true])(
                     model: 'first',
                     text: 'old request',
                 });
-                expect(old.settlement.status).toBe('unanswered');
-                expect(faux.state.callCount).toBe(1);
+                expect(old.settlement.status).toBe('done');
+                expect(faux.state.callCount).toBe(2);
             }
         } finally {
             await sessions.close();

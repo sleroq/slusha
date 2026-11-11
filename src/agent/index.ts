@@ -130,6 +130,19 @@ type Session = {
     tail: Promise<unknown>;
 };
 
+async function latestAttempt(root: Session['root'], logicalId: string) {
+    return root.commit(async (tx) => {
+        const base = `run:${logicalId}`;
+        let record = await tx.submissionByRequest(root.id, base);
+        while (record) {
+            const next = await tx.submissionByRequest(root.id, `${base}:retry:${record.id}`);
+            if (!next) break;
+            record = next;
+        }
+        return record;
+    }, BACKGROUND_CONTEXT);
+}
+
 export async function createAgentSessions({
     dataDir,
     actions,
@@ -176,10 +189,8 @@ export async function createAgentSessions({
                     const inputs = inspection.submissions.filter(
                         (item) => item.conversationId === root.id && item.type === 'input',
                     );
-                    if (
-                        inputs.length &&
-                        inputs.every((item) => item.requestId === `run:${approvedRequest}`)
-                    ) {
+                    const record = await latestAttempt(root, approvedRequest);
+                    if (inputs.length && record && inputs.every((item) => item.id === record.id)) {
                         harness.resume();
                     } else {
                         await root.abort(BACKGROUND_CONTEXT, { background: true });
@@ -341,10 +352,7 @@ export async function createAgentSessions({
         },
         recover(key: AgentKey, requestId: string) {
             return inSession(key, async ({ root, harness }) => {
-                const record = await root.commit(
-                    (tx) => tx.submissionByRequest(root.id, `run:${requestId}`),
-                    BACKGROUND_CONTEXT,
-                );
+                const record = await latestAttempt(root, requestId);
                 if (!record) return undefined;
                 const submission = await harness.submission(record.id, BACKGROUND_CONTEXT);
                 if (!submission) throw new Error('Persisted submission is missing');
@@ -355,11 +363,11 @@ export async function createAgentSessions({
         run(key: AgentKey, input: AgentInput) {
             return inSession(key, async ({ root, harness, shell }) => {
                 await root.waitForIdle(BACKGROUND_CONTEXT);
-                const existing = await root.commit(
-                    (tx) => tx.submissionByRequest(root.id, `run:${input.requestId}`),
-                    BACKGROUND_CONTEXT,
-                );
-                if (existing) {
+                const existing = await latestAttempt(root, input.requestId);
+                if (
+                    existing &&
+                    !(existing.status === 'unanswered' && existing.reason === 'aborted')
+                ) {
                     const submission = await harness.submission(existing.id, BACKGROUND_CONTEXT);
                     if (!submission) throw new Error('Persisted submission is missing');
                     return {
@@ -424,7 +432,9 @@ export async function createAgentSessions({
                 const submission = await root.submit(
                     {
                         type: 'input',
-                        requestId: `run:${input.requestId}`,
+                        requestId: existing
+                            ? `run:${input.requestId}:retry:${existing.id}`
+                            : `run:${input.requestId}`,
                         content: content(input.text, input.images),
                         entry: {
                             kind: 'slusha.input',
