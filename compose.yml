@@ -1,11 +1,4 @@
 services:
-    sandbox-image:
-        image: ${SANDBOX_IMAGE:-slusha-sandbox}
-        build: ./src/sandbox
-        entrypoint: ['/bin/true']
-        network_mode: none
-        restart: 'no'
-
     db:
         image: postgres:17
         environment:
@@ -48,18 +41,14 @@ services:
             WEB_PORT: ${WEB_PORT:-8080}
             DATA_DIR: ${SLUSHA_DATA_DIR:?Set SLUSHA_DATA_DIR to an absolute host path}
             SANDBOX_ENABLED: ${SANDBOX_ENABLED:-true}
-            SLUSHA_SANDBOX_SOCKET: ${SLUSHA_SANDBOX_SOCKET:-/run/slusha-gvisor/sandbox.sock}
             BACKUP_DIR: /app/backups
             BACKUP_KEEP: ${BACKUP_KEEP:-10}
         volumes:
             - ${SLUSHA_DATA_DIR}:${SLUSHA_DATA_DIR}
             - backup-data:/app/backups
-            - /run/slusha-gvisor:/run/slusha-gvisor:ro
         depends_on:
             db:
                 condition: service_healthy
-            sandbox-image:
-                condition: service_completed_successfully
         healthcheck:
             test:
                 [

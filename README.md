@@ -45,7 +45,6 @@ Dumbest girl in telegram.
 - Bun
 - PostgreSQL
 - OpenCode API key
-- Docker, gVisor, and the host-managed `sandboxd` service, or `SANDBOX_ENABLED=false`
 
 ## Preparation
 

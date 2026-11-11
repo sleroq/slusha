@@ -97,7 +97,7 @@ Slusha responds in private and group Telegram chats using conversation history, 
 - Assign stable, compact message references so the agent can target replies and the application can identify messages in edits and reactions.
 - Keep other topics and relevant external context outside the active session, accessible through scoped files or tools when useful. Do not expose another chat's data unless explicitly permitted later.
 - Provider caching is an optimization, not a guarantee. Edits, privacy controls, rotation, or provider behavior may require context changes.
-- Limit agent-created files to 25 MB per session. Start with a simple cleanup policy; later consider asking the agent to choose what to preserve.
+- Limit workspace file contents to 25 MB per chat.
 
 ### Providers and tools
 
@@ -105,12 +105,8 @@ Slusha responds in private and group Telegram chats using conversation history, 
 - Do not switch models as an image-support fallback. Define how the user is informed when the selected model cannot process an image.
 - The agent sends replies and reactions through tools. Keep Telegram delivery and authorization in the application boundary.
 - Tool availability is configurable by chat. At launch, agents generally have broad tool access, including code execution; selected chats may have different permissions.
-- Run agent shell commands in gVisor sandboxes, isolated by topic or chat. Give the agent unrestricted shell access inside its sandbox, not to the host or other chats.
-- Keep app logic, pi-durable, and inference in the Bun process. A sandbox manager module invokes the container runtime; no separate application worker or sandbox service is required initially. Runtime and sandbox processes run separately.
-- The shell tool sends commands to the manager and returns output to pi-durable. Reply and reaction tools use the app's Telegram integration directly.
-- Give each sandbox access only to its session's persistent, quota-limited workspace. Do not expose application credentials, databases, runtime sockets, or other sessions' files. Recreate disposable sandboxes from their workspaces after restart.
-- Enforce execution time, CPU, memory, process count, output, and token limits outside the sandbox. Kill the whole sandbox on timeout.
-- Permit public internet access while blocking host interfaces, private/internal networks, cloud metadata, and other sandboxes. Enforce egress restrictions outside the sandbox for IPv4 and IPv6; do not use host networking. Validate isolation and network policy on the deployment host.
+- Run shell commands with just-bash in the Bun process, using persistent chat-scoped virtual workspaces. JavaScript execution is configurable; shell network access is disabled.
+- The shell tool returns output to pi-durable. Reply and reaction tools use the app's Telegram integration directly.
 
 ### Telegram ingestion and recovery
 

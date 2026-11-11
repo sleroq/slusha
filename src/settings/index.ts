@@ -35,9 +35,11 @@ export const promptKeys = [
     'startMessage',
 ] as const;
 export type PromptKey = (typeof promptKeys)[number];
-export type ConfigKey = ModelKey | PromptKey;
-export type ModelOperation = { key: ConfigKey; value: string } | { key: ConfigKey; reset: true };
-export type ModelValues = { value: string; inheritedValue: string; overridden: boolean };
+export type ConfigKey = ModelKey | PromptKey | 'javascriptEnabled';
+export type ModelOperation =
+    | { key: ModelKey | PromptKey; value: string }
+    | { key: 'javascriptEnabled'; value: boolean }
+    | { key: ConfigKey; reset: true };
 
 const names = [
     'слюша',
@@ -76,6 +78,7 @@ export function createSettings(db: Db, options: SettingsOptions) {
         locale: z.string().min(2).max(32),
         hateMode: z.boolean(),
         shellEnabled: z.boolean(),
+        javascriptEnabled: z.boolean(),
         randomReplyProbability: z.number().min(0).max(100),
         tendToReplyProbability: z.number().min(0).max(100),
         tendToIgnoreProbability: z.number().min(0).max(100),
@@ -90,6 +93,7 @@ export function createSettings(db: Db, options: SettingsOptions) {
         locale: 'ru',
         hateMode: false,
         shellEnabled: options.defaultShellEnabled ?? true,
+        javascriptEnabled: false,
         randomReplyProbability: 1,
         tendToReplyProbability: 50,
         tendToIgnoreProbability: 90,
@@ -116,8 +120,16 @@ export function createSettings(db: Db, options: SettingsOptions) {
             .parse(Object.fromEntries(rows.map((row) => [row.key, row.value])));
     }
 
-    async function read(target: SettingsScope, key: ConfigKey = 'ai.model'): Promise<ModelValues> {
-        let inheritedValue: string = defaults[key];
+    function read(
+        target: SettingsScope,
+        key: 'javascriptEnabled',
+    ): Promise<{ value: boolean; inheritedValue: boolean; overridden: boolean }>;
+    function read(
+        target: SettingsScope,
+        key?: ModelKey | PromptKey,
+    ): Promise<{ value: string; inheritedValue: string; overridden: boolean }>;
+    async function read(target: SettingsScope, key: ConfigKey = 'ai.model') {
+        let inheritedValue: string | boolean = defaults[key];
         if (target.scope !== 'global')
             inheritedValue = (await overrides({ scope: 'global' }))[key] ?? inheritedValue;
         const value = (await overrides(target))[key];
@@ -133,6 +145,8 @@ export function createSettings(db: Db, options: SettingsOptions) {
         const values = { ...defaults, ...global, ...chat, ...user };
         const chatShell = chat.shellEnabled ?? global.shellEnabled ?? defaults.shellEnabled;
         values.shellEnabled = chatShell && (user.shellEnabled ?? true);
+        values.javascriptEnabled =
+            chat.javascriptEnabled ?? global.javascriptEnabled ?? defaults.javascriptEnabled;
         return { ...values, model: values['ai.model'] };
     }
 
@@ -141,6 +155,8 @@ export function createSettings(db: Db, options: SettingsOptions) {
         key: K,
         value: Values[K],
     ) {
+        if (target.scope === 'user' && key === 'javascriptEnabled')
+            throw new Error('JavaScript is a chat setting');
         const validated = settingSchema.shape[key].parse(value);
         const id = identity(target);
         await db
@@ -167,15 +183,20 @@ export function createSettings(db: Db, options: SettingsOptions) {
 
     async function apply(target: SettingsScope, operations: readonly ModelOperation[]) {
         const id = identity(target);
+
         for (const operation of operations) {
             if (
                 !(operation.key in promptDefaults) &&
                 operation.key !== 'ai.model' &&
-                operation.key !== 'ai.characterNamesModel'
+                operation.key !== 'ai.characterNamesModel' &&
+                operation.key !== 'javascriptEnabled'
             )
                 throw new Error('Unknown setting');
+            if (target.scope === 'user' && operation.key === 'javascriptEnabled')
+                throw new Error('JavaScript is a chat setting');
             if (!('reset' in operation)) settingSchema.shape[operation.key].parse(operation.value);
         }
+
         await db.transaction(async (tx) => {
             for (const operation of operations) {
                 if ('reset' in operation) {

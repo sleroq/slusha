@@ -70,18 +70,12 @@
               install -Dm755 bun $out/bin/bun
             '';
           };
-          sandboxd = pkgs.buildGoModule {
-            pname = "slusha-sandboxd";
-            version = "0.1.0";
-            src = ./sandboxd;
-            vendorHash = null;
-          };
           slusha = import ./nix/package.nix {
             inherit pkgs bun source;
             cacheHash =
               {
-                aarch64-linux = "sha256-9eyFr71pD23koMZ/ormPnkNIzieemVoxWnUEshw2+e8=";
-                x86_64-linux = "sha256-Uk2YbHGUuCh/hjGlM6jSYZ7VvuxCPW/MZbX3DoOLD24=";
+                aarch64-linux = "sha256-oqAUqZoRbNzXqlZ6fkD1jXVV3+Uv+ZdljfLEFNTSGZY=";
+                x86_64-linux = "sha256-k6ye+YWHOPHfcpsNhWNbjQt6LzVwR316k/wwuo2rdXA=";
               }
               .${system};
           };
@@ -90,14 +84,12 @@
           packages = pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             default = slusha.app;
             bun-cache = slusha.cache;
-            inherit sandboxd;
           };
           devShells.default = pkgs.mkShell {
             packages = with pkgs; [
               bun
               direnv
               git
-              go
               nix-direnv
               bore-cli
               postgresql

@@ -40,6 +40,11 @@ export const sections = [
         ],
     },
     {
+        id: 'tools',
+        title: 'Tools',
+        keys: ['javascriptEnabled'],
+    },
+    {
         id: 'prompts',
         title: 'Prompts',
         keys: [
@@ -84,6 +89,7 @@ export function titleFor(key: string) {
             nepons: 'Fallback replies',
             blacklistedReactions: 'Blocked reactions',
             locale: 'Language',
+            javascriptEnabled: 'Allow JavaScript execution',
         }),
     );
     const last = key.split('.').at(-1) ?? key;

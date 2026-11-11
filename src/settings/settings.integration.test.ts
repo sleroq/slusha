@@ -45,6 +45,7 @@ test.skipIf(!databaseUrl)(
                 model: 'c',
                 locale: 'ru',
                 randomReplyProbability: 1,
+                javascriptEnabled: false,
             });
             await settings.set({ scope: 'user', userId: 42 }, 'a');
             expect(await settings.resolve(-1, 42)).toMatchObject({ model: 'a' });
@@ -88,12 +89,13 @@ test.skipIf(!databaseUrl)(
             function request(
                 method: string,
                 path: string,
-                body?: { scope: ConfigScope; chatId: number; operations: ConfigOperation[] },
+                body?: { scope: ConfigScope; chatId?: number; operations: ConfigOperation[] },
+                authorization = auth,
             ) {
                 return handler(
                     new Request(`https://example.test/api/config${path}`, {
                         method,
-                        headers: { authorization: `tma ${auth}` },
+                        headers: { authorization: `tma ${authorization}` },
                         body: body && JSON.stringify(body),
                     }),
                 );
@@ -141,7 +143,90 @@ test.skipIf(!databaseUrl)(
                     })
                 ).status,
             ).toBe(403);
+            const js = [{ key: 'javascriptEnabled', value: true }];
+            expect(payload.fields.find((field) => field.key === 'javascriptEnabled')).toMatchObject(
+                {
+                    kind: 'boolean',
+                    value: false,
+                    inheritedValue: false,
+                    writable: false,
+                },
+            );
+            expect(
+                (await request('PUT', '', { scope: 'group', chatId: -1, operations: js })).status,
+            ).toBe(403);
+            expect((await request('PUT', '', { scope: 'personal', operations: js })).status).toBe(
+                403,
+            );
+            expect((await request('PUT', '', { scope: 'global', operations: js })).status).toBe(
+                403,
+            );
+            expect(
+                (await request('PUT', '', { scope: 'private', chatId: 99, operations: js })).status,
+            ).toBe(403);
+            expect((await request('PUT', '', { scope: 'private', operations: js })).status).toBe(
+                200,
+            );
+            expect((await settings.resolve(42, 42)).javascriptEnabled).toBe(true);
+            expect((await settings.resolve(-1, 42)).javascriptEnabled).toBe(false);
+            const botAdminAuth = await sign(
+                { user: { id: 99, first_name: 'Admin' } },
+                '123:secret',
+                new Date(),
+            );
+            expect(
+                (await request('PUT', '', { scope: 'global', operations: js }, botAdminAuth))
+                    .status,
+            ).toBe(200);
+            expect((await settings.resolve(-1, 42)).javascriptEnabled).toBe(true);
+            expect(
+                (
+                    await request(
+                        'PUT',
+                        '',
+                        { scope: 'group', chatId: -1, operations: js },
+                        botAdminAuth,
+                    )
+                ).status,
+            ).toBe(403);
+            expect(
+                await settings
+                    .setOption({ scope: 'user', userId: 42 }, 'javascriptEnabled', true)
+                    .then(
+                        () => false,
+                        () => true,
+                    ),
+            ).toBe(true);
             admin = true;
+            expect(
+                (
+                    await request('PUT', '', {
+                        scope: 'group',
+                        chatId: -1,
+                        operations: [{ key: 'javascriptEnabled', value: false }],
+                    })
+                ).status,
+            ).toBe(200);
+            expect((await settings.resolve(-1, 42)).javascriptEnabled).toBe(false);
+            expect(
+                (
+                    await request('PUT', '', {
+                        scope: 'group',
+                        chatId: -1,
+                        operations: [{ key: 'javascriptEnabled', value: 'true' }],
+                    })
+                ).status,
+            ).toBe(400);
+            expect(
+                (
+                    await request('PUT', '', {
+                        scope: 'group',
+                        chatId: -1,
+                        operations: [{ key: 'javascriptEnabled', reset: true }],
+                    })
+                ).status,
+            ).toBe(200);
+            expect((await settings.resolve(-1, 42)).javascriptEnabled).toBe(true);
             const promptKeys = [
                 'ai.prompt',
                 'ai.prePrompt',

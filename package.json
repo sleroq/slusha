@@ -39,6 +39,7 @@
         "abort-controller": "3.0.0",
         "drizzle-orm": "0.45.4",
         "grammy": "1.46.0",
+        "just-bash": "3.6.0",
         "postgres": "3.4.8",
         "zod": "4.4.3"
     },

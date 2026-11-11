@@ -86,9 +86,13 @@ const actions = createAgentActions({
     api,
     async shell(key, command) {
         if (!sandboxEnabled) throw new Error('Sandbox is disabled');
-        if (!(await settings.resolve(key.chatId, 0)).shellEnabled)
-            throw new Error('Shell is disabled in this chat');
-        const result = await sandbox.execute({ chatId: key.chatId, command });
+        const effective = await settings.resolve(key.chatId, 0);
+        if (!effective.shellEnabled) throw new Error('Shell is disabled in this chat');
+        const result = await sandbox.execute({
+            chatId: key.chatId,
+            command,
+            javascriptEnabled: effective.javascriptEnabled,
+        });
         return `${result.stdout}\n${result.stderr}\nExit code: ${result.exitCode}`;
     },
 });

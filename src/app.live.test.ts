@@ -188,8 +188,6 @@ test.skipIf(!enabled)(
                         '--security-opt',
                         'no-new-privileges',
                         '-v',
-                        '/run/slusha-gvisor:/run/slusha-gvisor:ro',
-                        '-v',
                         `${dir}:${dir}`,
                         '-e',
                         'OPENCODE_API_KEY',
@@ -209,8 +207,6 @@ test.skipIf(!enabled)(
                         'SANDBOX_ENABLED',
                         '-e',
                         'DEFAULT_MODEL',
-                        '-e',
-                        'SLUSHA_SANDBOX_SOCKET',
                         containerImage,
                     ],
                     {
@@ -379,24 +375,12 @@ test.skipIf(!enabled)(
                 ).status,
             ).toBe(401);
 
-            let archiveInode: number | undefined;
             if (containerImage || systemdService) {
                 enqueue(
                     102,
                     'Run the shell command `printf sandbox-proof > proof.txt`, then read proof.txt using the shell and reply with its contents.',
                 );
                 expect(await waitForReply(102)).toContain('sandbox-proof');
-                const archive = join(dir, 'workspaces', `${chatId}.tar`);
-                const archiveInfo = await stat(archive);
-                expect(archiveInfo.isFile()).toBe(true);
-                archiveInode = archiveInfo.ino;
-                const tar = Bun.spawn(['tar', '-xOf', archive, './proof.txt'], {
-                    stdout: 'pipe',
-                    stderr: 'ignore',
-                });
-                const contents = await new Response(tar.stdout).text();
-                expect(await tar.exited).toBe(0);
-                expect(contents).toBe('sandbox-proof');
             }
             if (systemdService) {
                 let backup = '';
@@ -416,19 +400,6 @@ test.skipIf(!enabled)(
                 expect((await stat(join(dir, 'backups', backup, 'postgres.dump'))).isFile()).toBe(
                     true,
                 );
-                await systemctl('restart', 'docker.service');
-                await waitFor(
-                    async () => {
-                        try {
-                            return (await fetch(`http://127.0.0.1:${port}/healthz`)).ok;
-                        } catch {
-                            return false;
-                        }
-                    },
-                    'Docker restart',
-                    30_000,
-                );
-                expect(await systemctl('is-active', systemdService)).toBe('active');
             }
             await stop();
             await start();
@@ -440,9 +411,6 @@ test.skipIf(!enabled)(
                 const reply = await waitForReply(103);
                 expect(reply).toContain('sandbox-proof');
                 expect(reply).toMatch(/zephyr|зефир/i);
-                expect((await stat(join(dir, 'workspaces', `${chatId}.tar`))).ino).not.toBe(
-                    archiveInode,
-                );
             } else {
                 enqueue(102, 'What was the name of my imaginary cat? Reply with its name.');
                 expect(await waitForReply(102)).toMatch(/zephyr|зефир/i);

@@ -5,6 +5,5 @@
   services.slusha = {
     enable = true;
     environmentFile = "/run/secrets/slusha.env";
-    blockedCidrs = [ ];
   };
 }

@@ -41,16 +41,6 @@ jobs:
               uses: oven-sh/setup-bun@v2
               with:
                   bun-version: 1.4.4
-            - name: Setup Go
-              uses: actions/setup-go@v5
-              with:
-                  go-version-file: sandboxd/go.mod
-                  cache: false
-            - name: Check sandbox broker
-              working-directory: sandboxd
-              run: |
-                  go build ./...
-                  go vet ./...
             - name: Install
               run: |
                   bun install --frozen-lockfile

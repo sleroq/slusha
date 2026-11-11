@@ -177,12 +177,23 @@ export function createConfigHandler({
             const validated: ModelOperation[] = [];
             for (const operation of operations) {
                 const parsed = z
-                    .enum(['ai.model', 'ai.characterNamesModel', ...promptKeys])
+                    .enum([
+                        'ai.model',
+                        'ai.characterNamesModel',
+                        ...promptKeys,
+                        'javascriptEnabled',
+                    ])
                     .safeParse(operation.key);
                 if (!parsed.success) return error('Unknown setting', 400);
                 const key = parsed.data;
+                if (key === 'javascriptEnabled' && scope === 'personal')
+                    return error('Forbidden', 403);
                 if ('reset' in operation) {
                     validated.push({ key, reset: true });
+                } else if (key === 'javascriptEnabled') {
+                    const value = z.boolean().safeParse(operation.value);
+                    if (!value.success) return error('Invalid setting', 400);
+                    validated.push({ key, value: value.data });
                 } else {
                     const value = z.string().safeParse(operation.value);
                     if (!value.success || value.data.length > 32000)
@@ -225,6 +236,16 @@ export function createConfigHandler({
                     writable,
                 },
                 ...prompts,
+                ...(scope === 'personal'
+                    ? []
+                    : [
+                          {
+                              key: 'javascriptEnabled',
+                              kind: 'boolean' as const,
+                              ...(await settings.read(target, 'javascriptEnabled')),
+                              writable,
+                          },
+                      ]),
             ],
         };
         if (scope === 'private' || scope === 'group') response.chatId = chatId;
