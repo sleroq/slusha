@@ -49,6 +49,7 @@ export type AgentActions = {
     react(key: AgentKey, input: { targetRef: string; emoji: string }): Promise<string | void>;
     shell(key: AgentKey, input: { command: string }): Promise<string>;
     history?(this: void, key: AgentKey, input: { query: string }): Promise<string>;
+    search?(this: void, input: { query: string }): Promise<string>;
 };
 export type AgentSessionsOptions = {
     dataDir: string;
@@ -99,6 +100,18 @@ function extension(key: AgentKey, actions: AgentActions) {
                 description: 'Search host-scoped conversation history.',
                 parameters: obj({ query: str() }),
                 execute: async (args) => output(await history(key, args)),
+            }),
+        );
+    }
+
+    if (actions.search) {
+        const search = actions.search;
+        tools.push(
+            defineTool({
+                name: 'web_search',
+                description: 'Search the public web for current information and sources.',
+                parameters: obj({ query: str() }),
+                execute: async (args) => output(await search(args)),
             }),
         );
     }

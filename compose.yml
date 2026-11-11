@@ -29,6 +29,7 @@ services:
             BOT_TOKEN: ${BOT_TOKEN:?Set BOT_TOKEN}
             OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
             OPENCODE_TOKEN: ${OPENCODE_TOKEN:-}
+            RADIUS_TOKEN: ${RADIUS_TOKEN:-}
             BOT_ADMIN_IDS: ${BOT_ADMIN_IDS:-}
             DEFAULT_MODEL: ${DEFAULT_MODEL:-deepseek-v4.1-flash}
             USER_WEEKLY_TOKENS: ${USER_WEEKLY_TOKENS:-}

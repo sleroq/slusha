@@ -13,6 +13,7 @@ import { createNameGenerator } from './characters/generation';
 import { createDb } from './db/client';
 import { migrateDb } from './db/migrate';
 import { createSandbox } from './sandbox';
+import { createSearch } from './search';
 import { createConfigHandler, createSettings } from './settings';
 import { createIngestion } from './telegram/ingestion';
 import { pollingApi } from './telegram/api';
@@ -99,7 +100,10 @@ const actions = createAgentActions({
 const sessions = await createAgentSessions({
     dataDir: resolve(dataDir, 'sessions'),
     models,
-    actions,
+    actions: {
+        ...actions,
+        search: process.env.RADIUS_TOKEN ? createSearch(process.env.RADIUS_TOKEN) : undefined,
+    },
     telemetry: tracing.telemetry,
     recoverOnStartup: (key) => resumeRequest(pending, key),
 });
