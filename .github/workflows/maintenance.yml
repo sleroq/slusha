@@ -18,7 +18,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
 
             - name: Setup Deno
               uses: denoland/setup-deno@v2
@@ -32,7 +32,7 @@ jobs:
               run: deno cache --allow-import main.ts
 
             - name: Create update PR
-              uses: peter-evans/create-pull-request@v7
+              uses: peter-evans/create-pull-request@v8
               with:
                   branch: chore/weekly-dependency-updates
                   delete-branch: true
