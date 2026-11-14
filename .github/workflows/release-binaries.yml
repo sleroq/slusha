@@ -18,7 +18,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
 
             - name: Setup Deno
               uses: denoland/setup-deno@v2
@@ -29,7 +29,7 @@ jobs:
               run: mkdir -p out && bash scripts/build.bash
 
             - name: Publish release assets
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3
               with:
                   files: out/slusha.*
                   generate_release_notes: true
